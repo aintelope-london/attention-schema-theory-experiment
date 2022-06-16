@@ -23,9 +23,14 @@ Dependencies are managed via `poetry`. See installation instructions
 [here](https://python-poetry.org/docs/#installation).
 
 To install the python dependencies run `poetry install`.
-To activate the environment via poetry run `poetry shell`.
-TODO: add execution instructions.
+To activate the environment via poetry run `poetry shell`. Alternatively, most
+commands can also be executed without an active python environment via
+`poetry run <command>`.
+
+To execute the current trainer do `poetry run aintelope`.
 
 To autoformat python files you can use [`yapf`](https://github.com/google/yapf).
 To automatically sort the imports you can run
 [`isort .`](https://github.com/PyCQA/isort) from the root level of the project.
+
+See the `Makefile` for further instructions.

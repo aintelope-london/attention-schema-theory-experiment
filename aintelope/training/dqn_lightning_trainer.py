@@ -53,6 +53,7 @@ class DQNLightning(LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
+        # GYM_INTERACTION
         self.env = gym.make(self.hparams.env)
         obs_size = self.env.observation_space.shape[0]
         n_actions = self.env.action_space.n
@@ -196,9 +197,11 @@ class DQNLightning(LightningModule):
         return batch[0].device.index if self.on_gpu else "cpu"
 
 
-if __name__ == '__main__':
+def run_experiment():
     model = DQNLightning()
-
     trainer = Trainer(gpus=AVAIL_GPUS, max_epochs=1000, val_check_interval=100)
-
     trainer.fit(model)
+
+
+if __name__ == '__main__':
+    run_experiment()

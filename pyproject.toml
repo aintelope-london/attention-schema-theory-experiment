@@ -5,12 +5,15 @@ description = "Simulate agents with reinforcement learning over selected cue-res
 authors = ["Hauke Rehfeld <git@haukerehfeld.de>", "Gunnar Zarncke <gunnar@zarncke.de>", "Andre Kochanke <a.kochanke@posteo.net>"]
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = "^3.10, <3.11"
 pytorch-lightning = "^1.6.4"
 yapf = "^0.32.0"
 flake8 = "^4.0.1"
 toml = "^0.10.2"
 isort = "^5.10.1"
+pytest = "^7.1.2"
+mypy = "^0.961"
+PettingZoo = "^1.18.1"
 
 [tool.poetry.dev-dependencies]
 
@@ -27,3 +30,6 @@ max-line-length = 80
 
 [tool.isort]
 line_length = 80
+
+[tool.mypy]
+ignore_missing_imports = true

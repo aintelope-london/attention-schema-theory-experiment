@@ -20,10 +20,10 @@ class Agent:
         self.env = env
         self.replay_buffer = replay_buffer
         self.reset()
-        self.state = self.env.reset()
 
     def reset(self) -> None:
         """Resents the environment and updates the state."""
+        # GYM_INTERACTION
         self.state = self.env.reset()
 
     def get_action(self, net: nn.Module, epsilon: float, device: str) -> int:
@@ -39,6 +39,7 @@ class Agent:
             action
         """
         if np.random.random() < epsilon:
+            # GYM_INTERACTION
             action = self.env.action_space.sample()
         else:
             state = torch.tensor([self.state])
@@ -70,10 +71,11 @@ class Agent:
         Returns:
             reward, done
         """
-
+        # GYM_INTERACTION
         action = self.get_action(net, epsilon, device)
 
         # do step in the environment
+        # GYM_INTERACTION
         new_state, reward, done, _ = self.env.step(action)
 
         exp = Experience(self.state, action, reward, done, new_state)

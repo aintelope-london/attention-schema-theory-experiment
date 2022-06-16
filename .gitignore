@@ -130,3 +130,6 @@ dmypy.json
 
 # tags
 tags
+
+# pytorch_lightning
+**/lightning_logs
