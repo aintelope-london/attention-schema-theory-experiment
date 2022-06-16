@@ -27,7 +27,7 @@ To activate the environment via poetry run `poetry shell`. Alternatively, most
 commands can also be executed without an active python environment via
 `poetry run <command>`.
 
-To execute the current trainer do `poetry run aintelope`.
+To execute the current trainer run `poetry run aintelope`.
 
 To autoformat python files you can use [`yapf`](https://github.com/google/yapf).
 To automatically sort the imports you can run
