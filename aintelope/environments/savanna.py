@@ -162,3 +162,25 @@ def env():
     env = wrappers.AssertOutOfBoundsWrapper(env)
     env = wrappers.OrderEnforcingWrapper(env)
     return env
+
+
+def main(env: RawEnv):
+    env.reset()
+    for agent in env.agent_iter():
+        observation, reward, done, info = env.last()
+
+        action_space:Discrete = env.action_space(agent)
+
+
+        # action = policy(observation, agent)
+        if not done:
+            action = action_space.sample()
+        else:
+            action = None
+        env.step(action)
+        env.render('human')
+
+
+if __name__ == '__main__':
+    e = env()
+    main(e)
