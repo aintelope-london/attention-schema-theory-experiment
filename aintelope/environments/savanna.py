@@ -5,6 +5,9 @@ import numpy as np
 from gym.spaces import Discrete, Box
 from pettingzoo import AECEnv
 from pettingzoo.utils import wrappers, agent_selector
+import pygame
+import random
+from pprint import pprint
 
 NUM_ITERS = 500  # duration of the game
 MAP_MIN = 0
@@ -19,10 +22,55 @@ OBSERVATION_SPACE = Box(0,
 ACTION_SPACE = Discrete(4)  # agent can walk in 4 directions
 ACTION_MAP = np.array([[0, 1], [1, 0], [0, -1], [-1, 0]], dtype=Float)
 
+class RenderSettings:
+    def __init__(self, metadata):
+        prefix = 'render_'
+        settings = {(k.lstrip(prefix), v) for k, v in metadata.items() if k.startswith(prefix)}
+        self.__dict__.update(settings)
+
+
+
+
+class RenderState:
+    def __init__(self, canvas, settings):
+        self.canvas = canvas
+
+    def render(self):
+        pass
+
+
+class HumanRenderState:
+    def __init__(self, settings):
+
+        self.fps = settings.fps
+
+        window_size = settings.window_size
+
+        pygame.init()
+        pygame.display.init()
+        self.window = pygame.display.set_mode((window_size, window_size))
+        self.clock = pygame.time.Clock()
+
+    def render(self, render_state):
+        # The following line copies our drawings from `canvas` to the visible window
+        self.window.blit(render_state.canvas, render_state.canvas.get_rect())
+        pygame.event.pump()
+        pygame.display.update()
+
+        # We need to ensure that human-rendering occurs at the predefined framerate.
+        # The following line will automatically add a delay to keep the framerate stable.
+        self.clock.tick(self.fps)
 
 class RawEnv(AECEnv):
 
-    metadata = {'name': 'savanna_v1'}
+    metadata = {'name': 'savanna_v1', 'render_fps': 15,
+                'render_agent_radius': 5,
+                'render_agent_color': (200, 50, 0),
+                'render_grass_radius': 5,
+                'render_grass_color': (20, 200, 0),
+                'render_modes': ('human',),
+                'render_window_size': 512,
+                }
 
     def __init__(self):
         self.possible_agents = [
@@ -40,6 +88,9 @@ class RawEnv(AECEnv):
             for agent in self.possible_agents
         }
 
+        self.render_state = None
+        self.human_render_state = None
+
     @functools.lru_cache(maxsize=None)
     def observation_space(self, agent: str):
         return OBSERVATION_SPACE
@@ -56,7 +107,54 @@ class RawEnv(AECEnv):
     def render(self, mode='human'):
         """Render the environment.
         """
-        raise NotImplementedError
+
+        render_settings = RenderSettings(self.metadata)
+        window_size = render_settings.window_size
+
+
+
+        if not self.render_state:
+            canvas = pygame.Surface((window_size, window_size))
+            self.render_state = RenderState(canvas, render_settings)
+        canvas = self.render_state.canvas
+
+        if mode == 'human' and not self.human_render_state:
+            self.human_render_state = HumanRenderState(render_settings)
+
+        canvas.fill((255, 255, 255))
+        scale = window_size / MAP_DIM
+
+        modelview_m = np.identity(2, dtype=Float) * scale
+
+        for gr in self.grass.reshape((2, -1)):
+            p = np.matmul(gr, modelview_m)
+            pygame.draw.circle(
+                canvas,
+                render_settings.grass_color,
+                p,
+                scale * render_settings.grass_radius,
+            )
+
+        for agent, agent_pos in self.state.items():
+            print('agent_pos', agent_pos)
+            assert len(agent_pos) == 2, agent_pos
+            # TODO: render agent name as text
+            p = np.matmul(agent_pos, modelview_m)
+            print(p)
+            pygame.draw.circle(
+                canvas,
+                render_settings.agent_color,
+                p.astype(np.int32),
+                scale * render_settings.agent_radius,
+            )
+
+
+        if mode == "human":
+            self.human_render_state.render(self.render_state)
+        else:  # rgb_array
+            return np.transpose(
+                np.array(pygame.surfarray.pixels3d(canvas)), axes=(1, 0, 2)
+            )
 
     def close(self):
         """Release any graphical display, subprocesses, network connections
@@ -82,13 +180,13 @@ class RawEnv(AECEnv):
         self._cumulative_rewards = {agent: 0 for agent in self.agents}
         self.dones = {agent: False for agent in self.agents}
         self.infos = {agent: {} for agent in self.agents}
-        self.grass = np.random.randint(0, MAP_DIM, 2 * AMOUNT_GRASS)
+        self.grass = np.random.randint(0, MAP_DIM, 2 * AMOUNT_GRASS).reshape(2, -1)
         self.state = {
             agent: np.array(np.random.randint(0, MAP_DIM, 2), dtype=Float)
             for agent in self.agents
         }
         self.observations = {
-            agent: np.concatenate([self.state[agent], self.grass])
+            agent: np.concatenate([self.state[agent], self.grass.reshape(-1)])
             for agent in self.agents
         }
         self.num_moves = 0
