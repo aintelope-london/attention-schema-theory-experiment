@@ -7,15 +7,17 @@ from pettingzoo import AECEnv
 from pettingzoo.utils import wrappers, agent_selector
 
 NUM_ITERS = 500  # duration of the game
+MAP_MIN = 0
 MAP_DIM = 100
 CYCLIC_BOUNDARIES = True
 AMOUNT_AGENTS = 1  # for now only one agent
 AMOUNT_GRASS = 2
+Float = np.float32
 OBSERVATION_SPACE = Box(0,
                         MAP_DIM,
                         shape=(2 * (AMOUNT_AGENTS + AMOUNT_GRASS), ))
 ACTION_SPACE = Discrete(4)  # agent can walk in 4 directions
-ACTION_MAP = np.array([[0, 1], [1, 0], [0, -1], [-1, 0]])
+ACTION_MAP = np.array([[0, 1], [1, 0], [0, -1], [-1, 0]], dtype=Float)
 
 
 class RawEnv(AECEnv):
@@ -82,7 +84,7 @@ class RawEnv(AECEnv):
         self.infos = {agent: {} for agent in self.agents}
         self.grass = np.random.randint(0, MAP_DIM, 2 * AMOUNT_GRASS)
         self.state = {
-            agent: np.random.randint(0, MAP_DIM, 2 * AMOUNT_AGENTS)
+            agent: np.array(np.random.randint(0, MAP_DIM, 2), dtype=Float)
             for agent in self.agents
         }
         self.observations = {
@@ -122,15 +124,23 @@ class RawEnv(AECEnv):
         """
         self._cumulative_rewards[agent] = 0
 
+        move = ACTION_MAP[action]
         # stores action of current agent
-        self.state[self.agent_selection] = action
+        agent_pos = self.state[self.agent_selection]
+        agent_pos += move
+        agent_pos = np.clip(agent_pos, MAP_MIN, MAP_DIM)
+        self.state[self.agent_selection] = agent_pos
+
 
         # collect reward if it is the last agent to act
         if self._agent_selector.is_last():
             # rewards for all agents are placed in the .rewards dictionary
-            self.rewards[self.agents[0]], self.rewards[
-                self.agents[1]] = REWARD_MAP[(self.state[self.agents[0]],
-                                              self.state[self.agents[1]])]
+            for iagent, agent in enumerate(self.agents):
+                agent_pos = self.state[agent]
+                def distance(a, b):
+                    return np.linalg.norm(np.vstack((a, b)))
+                reward = min(distance(agent_pos, grass_pos) for grass_pos in self.grass)
+                self.rewards[agent] = reward
 
             self.num_moves += 1
             # The dones dictionary must be updated for all players.
@@ -140,12 +150,13 @@ class RawEnv(AECEnv):
             }
 
             # observe the current state
-            for i in self.agents:
-                self.observations[i] = self.state[self.agents[
-                    1 - self.agent_name_mapping[i]]]
+            for agent in self.agents:
+                iagent = self.agent_name_mapping[agent]
+                self.observations[iagent] = self.state[agent]
         else:
             # necessary so that observe() returns a reasonable observation at all times.
-            self.state[self.agents[1 - self.agent_name_mapping[agent]]] = NONE
+            iagent = 1 - self.agent_name_mapping[agent]
+            self.state[self.agents[iagent]] = None
             # no rewards are allocated until both players give an action
             self._clear_rewards()
 
