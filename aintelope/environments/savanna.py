@@ -231,7 +231,8 @@ class RawEnv(AECEnv):
             for iagent, agent in enumerate(self.agents):
                 agent_pos = self.state[agent]
                 def distance(a, b):
-                    return np.linalg.norm(np.vstack((a, b)))
+                    d = np.linalg.norm(a - b)
+                    return d
                 reward = min(distance(agent_pos, grass_pos) for grass_pos in self.grass)
                 self.rewards[agent] = reward
 
