@@ -33,7 +33,7 @@ To execute the current trainer run `poetry run aintelope`.
 
 ### Code formatting
 
-To autoformat python files you can use [`yapf`](https://github.com/google/yapf).
+To autoformat python files you can use [`black`](https://github.com/psf/black).
 To automatically sort the imports you can run
 [`isort .`](https://github.com/PyCQA/isort) from the root level of the project.
 

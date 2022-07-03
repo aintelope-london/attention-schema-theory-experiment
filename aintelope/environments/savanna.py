@@ -1,28 +1,22 @@
 import functools
 import random
 import typing as typ
-from collections import UserDict, defaultdict
 from pprint import pprint
 
 import numpy as np
 import pygame
 from gym.spaces import Box, Discrete
+from gym.utils import seeding
 from pettingzoo import AECEnv
 from pettingzoo.utils import agent_selector, wrappers
 
 NUM_ITERS = 500  # duration of the game
-# TODO: MAP_SIZE or MAP_EXTENT?
-MAP_MIN = 0
-MAP_DIM = 100
+MAP_MIN, MAP_MAX = 0, 100
 CYCLIC_BOUNDARIES = True
 # TODO: NUM_AGENTS
 AMOUNT_AGENTS = 1  # for now only one agent
 AMOUNT_GRASS = 2
 Float = np.float32
-OBSERVATION_SPACE = Box(
-    0, MAP_DIM, shape=(2 * (AMOUNT_AGENTS + AMOUNT_GRASS),)
-)
-ACTION_SPACE = Discrete(4)  # agent can walk in 4 directions
 ACTION_MAP = np.array([[0, 1], [1, 0], [0, -1], [-1, 0]], dtype=Float)
 
 
@@ -48,7 +42,7 @@ class RenderState:
         canvas = self.canvas
 
         canvas.fill((255, 255, 255))
-        scale = window_size / MAP_DIM
+        scale = window_size / MAP_MAX
 
         screen_m = np.identity(2, dtype=Float) * scale
 
@@ -119,23 +113,30 @@ class RawEnv(AECEnv):
         )
 
         self._action_spaces = {
-            agent: ACTION_SPACE for agent in self.possible_agents
-        }
+            agent: Discrete(4) for agent in self.possible_agents
+        }  # agents can walk in 4 directions
         self._observation_spaces = {
-            agent: OBSERVATION_SPACE for agent in self.possible_agents
+            agent: Box(
+                MAP_MIN, MAP_MAX, shape=(2 * (AMOUNT_AGENTS + AMOUNT_GRASS),)
+            )
+            for agent in self.possible_agents
         }
 
         render_settings = RenderSettings(self.metadata)
         self.render_state = RenderState(render_settings)
         self.human_render_state = None
+        self.seed()
 
     @functools.lru_cache(maxsize=None)
     def observation_space(self, agent: str):
-        return OBSERVATION_SPACE
+        return self._observation_spaces[agent]
 
     @functools.lru_cache(maxsize=None)
     def action_space(self, agent: str):
-        return ACTION_SPACE
+        return self._action_spaces[agent]
+
+    def seed(self, seed: typ.Optional[int] = None) -> None:
+        self.np_random, seed = seeding.np_random(seed)
 
     def observe(self, agent: str):
         """Return observation of given agent."""
@@ -176,6 +177,8 @@ class RawEnv(AECEnv):
         And must set up the environment so that render(), step(), and observe()
         can be called without issues.
         """
+        if seed is not None:
+            self.seed(seed)
 
         self.agents = self.possible_agents[:]
         self.rewards = {agent: 0 for agent in self.agents}
@@ -183,12 +186,12 @@ class RawEnv(AECEnv):
         self.dones = {agent: False for agent in self.agents}
         self.infos = {agent: {} for agent in self.agents}
         self.grass = (
-            np.random.randint(0, MAP_DIM, 2 * AMOUNT_GRASS)
+            self.np_random.integers(MAP_MIN, MAP_MAX, 2 * AMOUNT_GRASS)
             .astype(Float)
             .reshape(2, -1)
         )
         self.state = {
-            agent: np.random.randint(0, MAP_DIM, 2).astype(Float)
+            agent: self.np_random.integers(MAP_MIN, MAP_MAX, 2).astype(Float)
             for agent in self.agents
         }
         self.observations = {
@@ -232,7 +235,7 @@ class RawEnv(AECEnv):
         # stores action of current agent
         agent_pos = self.state[self.agent_selection]
         agent_pos += move
-        agent_pos = np.clip(agent_pos, MAP_MIN, MAP_DIM)
+        agent_pos = np.clip(agent_pos, MAP_MIN, MAP_MAX)
         self.state[self.agent_selection] = agent_pos
 
         # collect reward if it is the last agent to act
