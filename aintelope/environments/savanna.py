@@ -21,6 +21,7 @@ AMOUNT_GRASS = 2
 ACTION_MAP = np.array([[0, 1], [1, 0], [0, -1], [-1, 0]], dtype=PositionFloat)
 
 EPS = 0.0001
+INF = 9999999999  # pi = 3
 Action = int
 
 
@@ -293,6 +294,21 @@ class RandomWalkAgent:
         return action_space.sample()
 
 
+class OneStepPerfectPredictionAgent:
+    def __call__(self, action_space, observation, reward, info):
+        # FIXME: are you fucking kidding me?!
+        agent_pos, grass = observation[:2], observation[2:].reshape(2, -1)
+        bestreward = -INF
+        ibestaction = 0
+        for iaction in range(action_space.n):
+            p = move_agent(agent_pos, iaction)
+            reward = reward_agent(p, grass)
+            if reward > bestreward:
+                bestreward = reward
+                ibestaction = iaction
+        print(observation)
+        print(reward, iaction)
+        return ibestaction
 
 
 class IterativeWeightOptimizationAgent:
@@ -376,6 +392,7 @@ class IterativeWeightOptimizationAgent:
 
 def main(env: RawEnv):
     policy = IterativeWeightOptimizationAgent()
+    policy = OneStepPerfectPredictionAgent()
     env.reset()
     for agent in env.agent_iter():
         observation, reward, done, info = env.last()
