@@ -164,7 +164,7 @@ class RawEnv(AECEnv):
 
     def observe(self, agent: str):
         """Return observation of given agent."""
-        return np.array(self.observations[agent])
+        return np.concatenate([self.state[agent], self.grass.reshape(-1)])
 
     def render(self, mode="human"):
         """Render the environment."""
@@ -220,10 +220,6 @@ class RawEnv(AECEnv):
             )
             for agent in self.agents
         }
-        self.observations = {
-            agent: np.concatenate([self.state[agent], self.grass.reshape(-1)])
-            for agent in self.agents
-        }
         self.num_moves = 0
 
         # cycle through the agents
@@ -273,10 +269,6 @@ class RawEnv(AECEnv):
                 agent: self.num_moves >= NUM_ITERS for agent in self.agents
             }
 
-            # observe the current state
-            for agent in self.agents:
-                iagent = self.agent_name_mapping[agent]
-                self.observations[iagent] = self.state[agent]
         else:
             # necessary so that observe() returns a reasonable observation at all times.
             iagent = 1 - self.agent_name_mapping[agent]
