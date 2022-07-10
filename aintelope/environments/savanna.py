@@ -10,19 +10,20 @@ from gym.utils import seeding
 from pettingzoo import AECEnv
 from pettingzoo.utils import agent_selector, wrappers
 
+# typing aliases
 PositionFloat = np.float32
+Action = int
 
+# environment constants
 NUM_ITERS = 500  # duration of the game
 MAP_MIN, MAP_MAX = 0, 100
-CYCLIC_BOUNDARIES = True
-# TODO: NUM_AGENTS
 AMOUNT_AGENTS = 1  # for now only one agent
-AMOUNT_GRASS = 2
+AMOUNT_GRASS_PATCHES = 2
 ACTION_MAP = np.array([[0, 1], [1, 0], [0, -1], [-1, 0]], dtype=PositionFloat)
 
+# numerical constants
 EPS = 0.0001
-INF = 9999999999  # pi = 3
-Action = int
+INF = 9999999999
 
 
 class RenderSettings:
@@ -98,16 +99,26 @@ class HumanRenderState:
         self.clock.tick(self.fps)
 
 
-def vec_distance(a, b):
-    d = np.linalg.norm(a - b)
-    return d
+def vec_distance(vec_a: np.ndarray, vec_b: np.ndarray) -> np.float64:
+    return np.linalg.norm(np.subtract(vec_a, vec_b))
 
 
-def reward_agent(agent_pos, grass):
-    reward = 1 / (
-        1 + min(vec_distance(agent_pos, grass_pos) for grass_pos in grass)
-    )
-    return reward
+def reward_agent(
+    agent_pos: np.ndarray, grass_patches: np.ndarray
+) -> np.float64:
+    if len(grass_patches.shape) == 1:
+        grass_patches = np.expand_dims(grass_patches, 0)
+    assert (
+        grass_patches.shape[1] == 2
+    ), f"{grass_patches.shape} -- x/y index with axis=1"
+
+    grass_patch_closest = grass_patches[
+        np.argmin(
+            np.linalg.norm(np.subtract(grass_patches, agent_pos), axis=1)
+        )
+    ]
+
+    return 1 / (1 + vec_distance(grass_patch_closest, agent_pos))
 
 
 def move_agent(agent_pos, action):
@@ -133,7 +144,7 @@ class RawEnv(AECEnv):
     }
 
     def __init__(self):
-        self.possible_agents = [f"player_{r}" for r in range(AMOUNT_AGENTS)]
+        self.possible_agents = [f"agent_{r}" for r in range(AMOUNT_AGENTS)]
         self.agent_name_mapping = dict(
             zip(self.possible_agents, list(range(AMOUNT_AGENTS)))
         )
@@ -143,7 +154,9 @@ class RawEnv(AECEnv):
         }  # agents can walk in 4 directions
         self._observation_spaces = {
             agent: Box(
-                MAP_MIN, MAP_MAX, shape=(2 * (AMOUNT_AGENTS + AMOUNT_GRASS),)
+                MAP_MIN,
+                MAP_MAX,
+                shape=(2 * (AMOUNT_AGENTS + AMOUNT_GRASS_PATCHES),),
             )
             for agent in self.possible_agents
         }
@@ -166,12 +179,14 @@ class RawEnv(AECEnv):
 
     def observe(self, agent: str):
         """Return observation of given agent."""
-        return np.concatenate([self.state[agent], self.grass.reshape(-1)])
+        return np.concatenate(
+            [self.state[agent], self.grass_patches.reshape(-1)]
+        )
 
     def render(self, mode="human"):
         """Render the environment."""
 
-        self.render_state.render(self.state, self.grass)
+        self.render_state.render(self.state, self.grass_patches)
 
         if mode == "human":
             if not self.human_render_state:
@@ -211,11 +226,9 @@ class RawEnv(AECEnv):
         self._cumulative_rewards = {agent: 0 for agent in self.agents}
         self.dones = {agent: False for agent in self.agents}
         self.infos = {agent: {} for agent in self.agents}
-        self.grass = (
-            self.np_random.integers(MAP_MIN, MAP_MAX, 2 * AMOUNT_GRASS)
-            .astype(PositionFloat)
-            .reshape(2, -1)
-        )
+        self.grass_patches = self.np_random.integers(
+            MAP_MIN, MAP_MAX, size=(AMOUNT_GRASS_PATCHES, 2)
+        ).astype(PositionFloat)
         self.state = {
             agent: self.np_random.integers(MAP_MIN, MAP_MAX, 2).astype(
                 PositionFloat
@@ -262,7 +275,7 @@ class RawEnv(AECEnv):
         if self._agent_selector.is_last():
             for iagent, agent in enumerate(self.agents):
                 self.rewards[agent] = reward_agent(
-                    self.state[agent], self.grass
+                    self.state[agent], self.grass_patches
                 )
 
             self.num_moves += 1
