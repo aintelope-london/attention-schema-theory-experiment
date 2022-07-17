@@ -121,10 +121,9 @@ def reward_agent(
     return 1 / (1 + vec_distance(grass_patch_closest, agent_pos))
 
 
-def move_agent(agent_pos, action):
+def move_agent(agent_pos: np.ndarray, action: Action) -> np.ndarray:
     assert agent_pos.dtype == PositionFloat, agent_pos.dtype
     move = ACTION_MAP[action]
-    # force copy
     agent_pos = agent_pos + move
     agent_pos = np.clip(agent_pos, MAP_MIN, MAP_MAX)
     return agent_pos
@@ -180,13 +179,13 @@ class RawEnv(AECEnv):
     def observe(self, agent: str):
         """Return observation of given agent."""
         return np.concatenate(
-            [self.state[agent], self.grass_patches.reshape(-1)]
+            [self.agent_states[agent], self.grass_patches.reshape(-1)]
         )
 
     def render(self, mode="human"):
         """Render the environment."""
 
-        self.render_state.render(self.state, self.grass_patches)
+        self.render_state.render(self.agent_states, self.grass_patches)
 
         if mode == "human":
             if not self.human_render_state:
@@ -229,7 +228,7 @@ class RawEnv(AECEnv):
         self.grass_patches = self.np_random.integers(
             MAP_MIN, MAP_MAX, size=(AMOUNT_GRASS_PATCHES, 2)
         ).astype(PositionFloat)
-        self.state = {
+        self.agent_states = {
             agent: self.np_random.integers(MAP_MIN, MAP_MAX, 2).astype(
                 PositionFloat
             )
@@ -258,7 +257,7 @@ class RawEnv(AECEnv):
             agent_selection to the next done agent, or if there are no more
             done agents, to the next live agent
             """
-            # FIXME: why th is it REQUIRED to call step() on a done agent?!
+            # FIXME: why is it REQUIRED to call step() on a done agent?!
             return self._was_done_step(action)
 
         agent = self.agent_selection
@@ -269,13 +268,13 @@ class RawEnv(AECEnv):
         """
         self._cumulative_rewards[agent] = 0
 
-        self.state[agent] = move_agent(self.state[agent], action)
+        self.agent_states[agent] = move_agent(self.agent_states[agent], action)
 
         # collect reward if it is the last agent to act
         if self._agent_selector.is_last():
             for iagent, agent in enumerate(self.agents):
                 self.rewards[agent] = reward_agent(
-                    self.state[agent], self.grass_patches
+                    self.agent_states[agent], self.grass_patches
                 )
 
             self.num_moves += 1

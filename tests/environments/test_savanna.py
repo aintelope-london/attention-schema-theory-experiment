@@ -1,5 +1,7 @@
-import numpy as np
 import pytest
+import numpy as np
+import numpy.testing as npt
+from gym.spaces import Discrete
 from pettingzoo.test import api_test, seed_test
 
 from aintelope.environments import savanna as sut
@@ -54,29 +56,77 @@ def test_reward_agent():
     )
 
 
+def test_move_agent():
+    env = sut.env()
+    env.reset()
+
+    agent = env.possible_agents[0]
+    agent_states = env.unwrapped.agent_states
+
+    for _ in range(1000):
+        prev_state = np.copy(agent_states[agent])
+        action = env.action_space(agent).sample()
+        agent_states[agent] = sut.move_agent(agent_states[agent], action)
+        npt.assert_array_equal(
+            np.clip(
+                prev_state + sut.ACTION_MAP[action], sut.MAP_MIN, sut.MAP_MAX
+            ),
+            agent_states[agent],
+        )
+        assert sut.MAP_MIN <= agent_states[agent][0] <= sut.MAP_MAX
+        assert sut.MAP_MIN <= agent_states[agent][1] <= sut.MAP_MAX
+        assert agent_states[agent].dtype == sut.PositionFloat
+
+
 def test_agents():
     env = sut.env()
-    with pytest.raises(AssertionError):
-        env.state()
+
     assert len(env.possible_agents) == sut.AMOUNT_AGENTS
+    assert isinstance(env.possible_agents, list)
+    assert isinstance(env.unwrapped.agent_name_mapping, dict)
+    assert all(
+        agent_name in env.unwrapped.agent_name_mapping
+        for agent_name in env.possible_agents
+    )
+
+
+def test_agent_states():
+    env = sut.env()
+
+    with pytest.raises(AttributeError):
+        env.agent_states
+    with pytest.raises(AttributeError):
+        env.unwrapped.agent_states
 
     env.reset()
-    assert len(env.unwrapped.state) == sut.AMOUNT_AGENTS
-    assert isinstance(env.unwrapped.state, dict)
+    assert isinstance(env.unwrapped.agent_states, dict)
     assert all(
         isinstance(agent_state, np.ndarray)
-        for agent_state in env.unwrapped.state.values()
+        for agent_state in env.unwrapped.agent_states.values()
     )
     assert all(
         agent_state.shape == (2,)
-        for agent_state in env.unwrapped.state.values()
+        for agent_state in env.unwrapped.agent_states.values()
     )
+
+
+def test_action_spaces():
+    env = sut.env()
+
+    for agent in env.possible_agents:
+        assert isinstance(env.action_space(agent), Discrete)
+        assert env.action_space(agent).n == 4
+        assert agent in env.action_spaces
+        assert isinstance(env.action_spaces[agent], Discrete)
+        assert env.action_spaces[agent].n == 4
 
 
 def test_grass_patches():
     env = sut.env()
+
     with pytest.raises(AttributeError):
         env.grass_patches
+    with pytest.raises(AttributeError):
         env.unwrapped.grass_patches
 
     env.reset()
@@ -85,5 +135,5 @@ def test_grass_patches():
     assert env.unwrapped.grass_patches.shape[1] == 2
 
 
-def test_state():
-    pass
+def test_observation_spaces():
+    pass  # TODO
