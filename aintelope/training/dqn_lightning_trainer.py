@@ -27,7 +27,7 @@ class DQNLightning(LightningModule):
         self,
         batch_size: int = 16,
         lr: float = 1e-3,
-        env: str = "CartPole-v1",
+        env: str = "savanna-v1",
         gamma: float = 0.99,
         sync_rate: int = 10,
         replay_size: int = 1000,
