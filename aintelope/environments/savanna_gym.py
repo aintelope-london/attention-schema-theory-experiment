@@ -16,7 +16,6 @@ from aintelope.environments.env_utils.distance import distance_to_closest_item
 from savanna import (
     RenderSettings, 
     RenderState,
-    HumanRenderState, 
     move_agent, 
     calc_grass_reward,
     reward_agent, 
@@ -25,7 +24,7 @@ from savanna import (
     )
 
 
-class SavannaEnv(gym.Env):
+class SavannaGymEnv(gym.Env):
 
     metadata = {
         "name": "savanna-v2",
