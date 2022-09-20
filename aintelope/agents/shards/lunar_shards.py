@@ -16,99 +16,93 @@ class Safety:
 
     def __init__(self, shard_params={}) -> None:
         self.shard_params = shard_params
-        self.hunger_rate
-        self.max_hunger_reward
-        self.last_ate
+        self.previous_speed = None
+        self.last_vertical_orientation = None
+        self.reluctance_for_speed_at_obstacles = None
+        self.reluctance_for_acceleration_at_obstacles = None
+        self.desired_obstacle_clearance = None
+        self.max_safety_reward = None
 
     def reset(self):
-        self.hunger_rate = self.shard_params.get('hunger_rate', 10)
-        self.max_hunger_reward = self.shard_params.get(
-            'max_hunger_reward', 3.0)
-        self.last_ate = self.shard_params.get('last_ate', -10)
+        self.speed = self.shard_params.get('speed', 10)
+        self.last_vertical_orientation = 0
+        self.desired_obstacle_clearance = self.shard_params.get('desired_obstacle_clearance', 10)
+        self.reluctance_for_speed_at_obstacles = self.shard_params.get('reluctance_for_speed_at_obstacles', 10)
+        self.reluctance_for_acceleration_at_obstacles = self.shard_params.get('reluctance_for_acceleration_at_obstacles', 10)
+        self.max_safety_reward = self.shard_params.get('max_safety_reward', 10)
 
     def calc_reward(self, agent, state):
-        '''function of time since last ate and hunger rate and opportunity to eat'''
+        '''function of: 
+        desire to remain close to upright, 
+        not too close to obstacles (desired obstacle clearance),
+        not heading towards obstacles,
+        not accelerating towards obstacles,
+        
+        '''
         current_step = agent.env.num_moves
         agent_pos = [state[1], state[2]]
-        min_grass_distance = distance_to_closest_item(
-            agent_pos, agent.env.grass_patches)
+        min_obstacle_distance = distance_to_closest_item(
+            agent_pos, agent.env.obstacle_boundaries)
 
-        if min_grass_distance < 1.0:
-            self.last_ate = current_step
-
-        time_since_ate = current_step - self.last_ate
-        current_hunger = time_since_ate / self.hunger_rate
-        opportunity_to_eat = 1 / (1 + min_grass_distance)
-        hunger_reward = (current_hunger *
-                         opportunity_to_eat + (1 - current_hunger))
-        hunger_reward = min(hunger_reward, self.max_hunger_reward)
-        return hunger_reward
+        safety_reward = 1 # TODO: implement
+        safety_reward = min(safety_reward, self.max_safety_reward)
+        return safety_reward
 
 
 class Fuel:
 
     def __init__(self, shard_params={}) -> None:
         self.shard_params = shard_params
-        self.thirst_rate
-        self.max_thirst_reward
-        self.last_drank
+        self.starting_fuel = None
+        self.current_fuel = None
+        self.initial_goal_distance = None
+        self.goal_distance = None
+        self.fuel_location_in_state = None
 
     def reset(self):
-        self.thirst_rate = self.shard_params.get('thirst_rate', 10)
-        self.max_thirst_reward = self.shard_params.get(
-            'max_thirst_reward', 4.0)
-        self.last_drank = self.shard_params.get('last_drank', 0)
+        self.starting_fuel = self.shard_params.get('starting_fuel', 10)
+        self.current_fuel = self.starting_fuel
+        self.initial_goal_distance  = self.shard_params.get('initial_goal_distance', 100)
+        self.max_fuel_reward = self.shard_params.get(
+            'max_fuel_reward', 4.0)
+        self.fuel_location_in_state = self.shard_params.get(
+            'fuel_location_in_state', 0)
 
     def calc_reward(self, agent, state):
-        '''function of time since last ate and thirst rate and opportunity to eat'''
+        '''function of starting fuel, current_fuel, goal_distance '''
         current_step = agent.env.num_moves
         agent_pos = [state[1], state[2]]
-        min_grass_distance = distance_to_closest_item(
-            agent_pos, agent.env.water_holes)
+        current_goal_distance = distance_to_specific_item(
+            agent_pos, agent.env.goal)
 
-        if min_grass_distance < 1.0:
-            self.last_drank = current_step
-
-        time_since_drank = current_step - self.last_drank
-        current_thirst = time_since_drank / self.thirst_rate
-        opportunity_to_drink = 1 / (1 + min_grass_distance)
-        thirst_reward = (current_thirst *
-                         opportunity_to_drink + (1 - current_thirst))
-        thirst_reward = min(thirst_reward, self.max_thirst_reward)
-        return thirst_reward
+        current_fuel = state[self.fuel_location_in_state]
+       
+        fuel_reward = current_fuel / self.max_fuel_reward 
+        # something about fuel consumption rate calculated from distance travelled so far and fuel consumed so far, 
+        # remaining distance to goal,
+        # and whether we're on track to get to goal still with current remaining fuel
+        fuel_reward = min(fuel_reward, self.max_fuel_reward)
+        return fuel_reward
 
 
 class Mission:
 
     def __init__(self, shard_params={}) -> None:
         self.shard_params = shard_params
-        self.thirst_rate
-        self.max_thirst_reward
-        self.last_drank
+        self.initial_goal_distance  = None
 
     def reset(self):
-        self.thirst_rate = self.shard_params.get('thirst_rate', 10)
-        self.max_thirst_reward = self.shard_params.get(
-            'max_thirst_reward', 4.0)
-        self.last_drank = self.shard_params.get('last_drank', 0)
-
+        self.initial_goal_distance  = self.shard_params.get('initial_goal_distance', 100)
+        
     def calc_reward(self, agent, state):
-        '''function of time since last ate and thirst rate and opportunity to eat'''
-        current_step = agent.env.num_moves
+        '''function of remaining distance to goal as percent of initial distance, plus big bonus for actually safely at goal'''
         agent_pos = [state[1], state[2]]
-        min_grass_distance = distance_to_closest_item(
-            agent_pos, agent.env.water_holes)
-
-        if min_grass_distance < 1.0:
-            self.last_drank = current_step
-
-        time_since_drank = current_step - self.last_drank
-        current_thirst = time_since_drank / self.thirst_rate
-        opportunity_to_drink = 1 / (1 + min_grass_distance)
-        thirst_reward = (current_thirst *
-                         opportunity_to_drink + (1 - current_thirst))
-        thirst_reward = min(thirst_reward, self.max_thirst_reward)
-        return thirst_reward
+        current_distance_to_goal = current_goal_distance = distance_to_specific_item(
+            agent_pos, agent.env.goal)
+        mission_reward = 10 * (current_distance_to_goal / self.initial_goal_distance)
+        if current_distance_to_goal == 0:
+            mission_reward += 100
+        return mission_reward
 
 
 class Curiosity:
@@ -127,9 +121,8 @@ class Curiosity:
         self.last_discovery = self.shard_params.get('last_discovery', 0)
 
     def calc_reward(self, agent, state):
-        '''prefer not to revist tiles within curiosity window
-        if agent had a sight-range, I'd add a preference to see new areas and objects
-        could make this proportional to the nearest point in some sort of shifted window (e.g. 10 - 30)
+        '''a mild desire to experience new states not recently entered into.
+        maybe add a random factor to this so it comes and goes?
         '''
         current_step = agent.env.num_moves
         agent_pos = [state[1], state[2]]
@@ -148,7 +141,8 @@ class Curiosity:
 
 
 available_shards_dict = {
-    'hunger': Hunger,
-    'thirst': Thirst,
+    'safety': Safety,
+    'fuel': Fuel,
+    'mission': Mission,
     'curiosity': Curiosity
 }
