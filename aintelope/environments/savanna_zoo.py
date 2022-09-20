@@ -21,7 +21,7 @@ from savanna import (
     )
 
 
-class RawEnv(ParallelEnv):
+class SavannaZooEnv(ParallelEnv):
 
     metadata = {
         "name": "savanna_v1",
