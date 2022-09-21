@@ -1,2 +1,31 @@
 name: lightning_savanna_shardagent
 agent: shard_agent
+hparams:
+  batch_size: 16
+  lr: 0.001
+  env: "savanna-v2"
+  gamma: 0.99
+  sync_rate: 10
+  replay_size: 99
+  warm_start_size: 100
+  eps_last_frame: 1000
+  eps_start: 1.0
+  eps_end: 0.01
+  episode_length: 1010
+  warm_start_steps: 100
+  env_params:
+    NUM_ITERS: 1000  # duration of the game
+    MAP_MIN: 0
+    MAP_MAX: 5
+    render_map_max: 5
+    AMOUNT_AGENTS: 1  # for now only one agent
+    AMOUNT_GRASS_PATCHES: 2
+    AMOUNT_WATER_HOLES: 2  
+  agent_params:
+    target_shards: ['hunger', 'thirst', 'curiosity']
+trainer_params:
+  resume_from_checkpoint: False
+  num_workers: 14
+  max_epochs: 200
+  record_path: '../checkpoints/memory_records/test2.csv'
+    
