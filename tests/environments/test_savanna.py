@@ -14,7 +14,6 @@ from pettingzoo.utils import parallel_to_aec
 
 from aintelope.aintelope.environments import savanna_zoo as sut
 from aintelope.aintelope.environments.savanna_zoo import SavannaZooEnv
-from aintelope.aintelope.environments.savanna_gym import SavannaGymEnv
 
 
 def test_pettingzoo_api_parallel():
