@@ -20,7 +20,7 @@ from aintelope.aintelope.environments.savanna_zoo import (
 import os
 
 
-def main(env):
+def run_episode(env):
     mode = "ascii"
     # policy = IterativeWeightOptimizationAgent()
     # policy = OneStepPerfectPredictionAgent()

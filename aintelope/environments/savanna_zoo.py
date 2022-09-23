@@ -7,7 +7,7 @@ from gym.spaces import Box, Discrete
 from gym.utils import seeding
 from pettingzoo import AECEnv, ParallelEnv
 from pettingzoo.test import api_test
-from pettingzoo.utils import agent_selector, wrappers, parallel_to_aec
+from pettingzoo.utils import agent_selector, wrappers
 from aintelope.environments.env_utils.render_ascii import AsciiRenderState
 
 from savanna import (
@@ -189,42 +189,3 @@ class SavannaZooEnv(ParallelEnv):
             self.agents = []
 
         return observations, rewards, self.dones, infos
-
-
-def env(env_params={}):
-    """
-    To support the AEC API, the raw_env() function just uses the from_parallel
-    function to convert from a ParallelEnv to an AEC env
-    """
-    env_obj = RawEnv(env_params=env_params)
-    env_obj = parallel_to_aec(env_obj)
-    return env_obj
-
-
-# def env(env_params={}):
-#     """Add PettingZoo wrappers to environment class."""
-#     env = RawEnv(env_params=env_params)
-#     # BaseWrapper class need agent_selection attribute
-#     # env = wrappers.AssertOutOfBoundsWrapper(env)
-#     # env = wrappers.OrderEnforcingWrapper(env)
-#     return env
-
-
-if __name__ == "__main__":
-    env_params = {
-        'NUM_ITERS':500,  # duration of the game
-        'MAP_MIN':0, 
-        'MAP_MAX':100,
-        'render_map_max':100,
-        'AMOUNT_AGENTS':1,  # for now only one agent
-        'AMOUNT_GRASS_PATCHES':2
-                }
-    e = raw_env(env_params=env_params)
-    print(type(e))
-    print(e)
-    print(e.__dict__)
-    ret = e.reset()
-    print(ret)
-
-    api_test(e, num_cycles=10, verbose_progress=True)
-    print(e.last())

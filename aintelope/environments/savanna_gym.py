@@ -4,11 +4,9 @@ import functools
 import typing as typ
 
 import numpy as np
-import pygame
 from gym.spaces import Box, Discrete
 from gym.utils import seeding
 from pettingzoo import AECEnv, ParallelEnv
-from pettingzoo.test import api_test
 from pettingzoo.utils import agent_selector, wrappers, parallel_to_aec
 from aintelope.environments.env_utils.render_ascii import AsciiRenderState
 from aintelope.environments.env_utils.distance import distance_to_closest_item
@@ -18,7 +16,6 @@ from savanna import (
     RenderState,
     move_agent, 
     calc_grass_reward,
-    reward_agent, 
     PositionFloat,
     Action
     )
@@ -117,24 +114,3 @@ class SavannaGymEnv(gym.Env):
         ] = replacement_grass
 
         return grass_patches
-
-
-if __name__ == "__main__":
-    env_params = {
-        'NUM_ITERS': 500,  # duration of the game
-        'MAP_MIN': 0,
-        'MAP_MAX': 100,
-        'render_map_max': 100,
-        'AMOUNT_AGENTS': 1,  # for now only one agent
-        'AMOUNT_GRASS_PATCHES': 2,
-        'AMOUNT_WATER_HOLES': 2,
-    }
-    # e = raw_env(env_params=env_params)
-    # print(type(e))
-    # print(e)
-    # print(e.__dict__)
-    # ret = e.reset()
-    # print(ret)
-
-    # api_test(e, num_cycles=10, verbose_progress=True)
-    # print(e.last())
