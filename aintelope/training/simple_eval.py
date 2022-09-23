@@ -4,6 +4,7 @@ from pprint import pprint
 import numpy as np
 from gym.spaces import Discrete
 import gym
+from pettingzoo.utils import parallel_to_aec
 from aintelope.agents.q_agent import Agent as Qagent
 from aintelope.agents.shard_agent import Agent as ShardAgent
 from aintelope.agents.simple_agents import (
@@ -39,6 +40,8 @@ def run_episode(hparams: dict = {}):
 
     if env_params.get("env_type") == "zoo":
         env = ENV_LOOKUP[env_params["name"]](env_params=env_params)
+        if hparams.get('sequential_env', False) is True:
+            env = parallel_to_aec(env)
         obs_size = env.observation_space.shape[0]
     elif env_params.get("env_type") == "gym":
         # GYM_INTERACTION
