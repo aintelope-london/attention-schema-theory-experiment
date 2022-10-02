@@ -120,7 +120,7 @@ class SavannaZooEnv(ParallelEnv):
         """
         raise NotImplementedError
 
-    def reset(self, seed: typ.Optional[int] = None):
+    def reset(self, seed: typ.Optional[int] = None, options = None):
         """Reset needs to initialize the following attributes:
             - agents
             - rewards

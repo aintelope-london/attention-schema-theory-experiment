@@ -79,7 +79,7 @@ class SavannaGymEnv(gym.Env):
         info = {"placeholder":"Placeholder because Nathan is confused here."}
         return observation, reward, done, info
 
-    def reset(self):
+    def reset(self, seed = None, options={}):
         self.agent_state = self.np_random.integers(
             self.metadata['map_min'], self.metadata['map_max'], 2)
         self.grass_patches = self.np_random.integers(
@@ -99,11 +99,11 @@ class SavannaGymEnv(gym.Env):
             observations += [1, x[0], x[1]]
         for x in self.water_holes:
             observations += [2, x[0], x[1]]
-        return np.array(observations, dtype=np.float64)
+        return np.array(observations, dtype=np.float32)
 
     def replace_grass(self,
                       agent_pos: np.ndarray, grass_patches: np.ndarray
-                      ) -> np.float64:
+                      ) -> np.float32:
         if len(grass_patches.shape) == 1:
             grass_patches = np.expand_dims(grass_patches, 0)
 

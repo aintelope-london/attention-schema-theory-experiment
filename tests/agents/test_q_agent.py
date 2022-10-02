@@ -2,7 +2,7 @@ import pytest
 import yaml
 from yaml.loader import SafeLoader
 
-
+from aintelope.environments.env_utils.cleanup import cleanup_gym_envs
 from aintelope.training.simple_eval import run_episode
 
 
@@ -37,7 +37,6 @@ def test_qagent_in_savanna_zoo_sequential():
     }
     hparams.update(test_params)
     run_episode(hparams=hparams)
-    
     
     
 def test_qagent_in_savanna_zoo_parallel():
@@ -102,3 +101,4 @@ def test_qagent_in_savanna_gym():
     }
     hparams.update(test_params)
     run_episode(hparams=hparams)
+    cleanup_gym_envs()

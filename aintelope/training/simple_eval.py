@@ -5,6 +5,7 @@ import numpy as np
 from gym.spaces import Discrete
 import gym
 from pettingzoo.utils import parallel_to_aec
+# from supersuit import gym_vec_env_v0
 from aintelope.agents.q_agent import Agent as Qagent
 from aintelope.agents.shard_agent import ShardAgent
 from aintelope.agents.simple_agents import (
@@ -38,6 +39,13 @@ def run_episode(hparams: dict = {}):
     render_mode = hparams.get("render_mode")
     verbose = hparams.get("verbose", False)
 
+
+    # gym_vec_env_v0(env, num_envs) creates a Gym vector environment with num_envs copies of the environment.
+    # https://tristandeleu.github.io/gym/vector/
+    # https://github.com/Farama-Foundation/SuperSuit
+
+    # stable_baselines3_vec_env_v0(env, num_envs) creates a stable_baselines vector environment with num_envs copies of the environment. 
+
     if hparams.get("env_type") == "zoo":
         env = ENV_LOOKUP[hparams["env"]](env_params=env_params)
         if hparams.get('sequential_env', False) is True:
@@ -45,8 +53,8 @@ def run_episode(hparams: dict = {}):
         # assumption here: all agents in zoo have same observation space shape
         
         obs_size = list(env.observation_spaces.values())[0].shape[0]
-        print(env.action_spaces)
-        n_actions = list(env.action_spaces.values())[0].n
+        print(env.action_space())
+        n_actions = list(env.action_space().values())[0].n
     elif hparams.get("env_type") == "gym":
         # GYM_INTERACTION
         if hparams.get("env_entry_point") is not None:
@@ -60,12 +68,13 @@ def run_episode(hparams: dict = {}):
         env = gym.make(hparams["env"])
         obs_size = env.observation_space.shape[0]
         n_actions = env.action_space.n
+        # env = gym_vec_env_v0(env, num_envs=1)
     else:
         print(
-            f'env_type {hparams.get("env_type")} not implemented. Choose: [zoo, gym]'
+            f'env_type {hparams.get("env_type")} not implemented. Choose: [zoo, gym]. TODO: add stable_baselines3'
         )
 
-    env.reset()
+    env.reset(options={})
     
     buffer = ReplayBuffer(hparams['replay_size'])
     
