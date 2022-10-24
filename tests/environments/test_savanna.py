@@ -31,9 +31,17 @@ def test_grass_patches():
         env.grass_patches
 
     env.reset()
-    assert len(env.grass_patches) == env.metadata['amount_grass_patches']
+    assert len(env.grass_patches) == env.metadata["amount_grass_patches"]
     assert isinstance(env.grass_patches, np.ndarray)
     assert env.grass_patches.shape[1] == 2
+
+
+def test_get_agent_pos_from_stats():
+    env = sut.SavannaEnv()
+    env.reset()
+    agent_state_env = env.agent_state
+    agent_state_func = sut.get_agent_pos_from_state(agent_state_env)
+    assert [agent_state_env[0], agent_state_env[1]] == agent_state_func
 
 
 def test_observation_spaces():
