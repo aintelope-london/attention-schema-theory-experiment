@@ -15,24 +15,30 @@ from pettingzoo.utils import parallel_to_aec
 
 from aintelope.environments import savanna_zoo as sut
 from aintelope.environments.savanna import ACTION_MAP
-from aintelope.environments.savanna_zoo import SavannaZooParallelEnv, SavannaZooSequentialEnv
-from aintelope.environments.env_utils.distance import vec_distance, distance_to_closest_item
+from aintelope.environments.savanna_zoo import (
+    SavannaZooParallelEnv,
+    SavannaZooSequentialEnv,
+)
+from aintelope.environments.env_utils.distance import (
+    vec_distance,
+    distance_to_closest_item,
+)
+
 
 def test_pettingzoo_api_parallel():
     parallel_api_test(sut.SavannaZooParallelEnv(), num_cycles=1000)
-    
-    
-    
+
+
 def test_pettingzoo_api_sequential():
     # TODO: refactor these values out to a test-params file
     env_params = {
-        'num_iters': 500,  # duration of the game
-        'map_min': 0,
-        'map_max': 100,
-        'render_map_max': 100,
-        'amount_agents': 1,  # for now only one agent
-        'amount_grass_patches': 2,
-        'amount_water_holes': 2,
+        "num_iters": 500,  # duration of the game
+        "map_min": 0,
+        "map_max": 100,
+        "render_map_max": 100,
+        "amount_agents": 1,  # for now only one agent
+        "amount_grass_patches": 2,
+        "amount_water_holes": 2,
     }
     parallel_env = SavannaZooParallelEnv(env_params=env_params)
     # TODO: Nathan was able to get the sequential-turn env to work, using this conversion, but not the parallel env. why??
@@ -41,7 +47,9 @@ def test_pettingzoo_api_sequential():
 
 
 def test_seed():
-    parallel_seed_test(sut.SavannaZooParallelEnv, num_cycles=10, test_kept_state=True)
+    parallel_seed_test(
+        sut.SavannaZooParallelEnv, num_cycles=10, test_kept_state=True
+    )
 
 
 def test_agent_states():
@@ -68,15 +76,21 @@ def test_reward_agent():
     env = sut.SavannaZooParallelEnv()
     env.reset()
     # single grass patch
-    agent_pos = np.random.randint(env.metadata['map_min'], env.metadata['map_max'], 2)
-    grass_patch = np.random.randint(env.metadata['map_min'], env.metadata['map_max'], 2)
+    agent_pos = np.random.randint(
+        env.metadata["map_min"], env.metadata["map_max"], 2
+    )
+    grass_patch = np.random.randint(
+        env.metadata["map_min"], env.metadata["map_max"], 2
+    )
     min_grass_distance = distance_to_closest_item(agent_pos, grass_patch)
     reward_single = sut.reward_agent(min_grass_distance)
     assert reward_single == 1 / (1 + vec_distance(grass_patch, agent_pos))
 
     # multiple grass patches
-    grass_patches = np.random.randint(env.metadata['map_min'], env.metadata['map_max'], size=(10, 2))
-    min_grass_distance = distance_to_closest_item(agent_pos, grass_patch)
+    grass_patches = np.random.randint(
+        env.metadata["map_min"], env.metadata["map_max"], size=(10, 2)
+    )
+    min_grass_distance = distance_to_closest_item(agent_pos, grass_patches)
     reward_many = sut.reward_agent(min_grass_distance)
     grass_patch_closest = grass_patches[
         np.argmin(
@@ -101,12 +115,22 @@ def test_move_agent():
         agent_states[agent] = sut.move_agent(agent_states[agent], action)
         npt.assert_array_equal(
             np.clip(
-                prev_state + ACTION_MAP[action], env.metadata['map_min'], env.metadata['map_max']
+                prev_state + ACTION_MAP[action],
+                env.metadata["map_min"],
+                env.metadata["map_max"],
             ),
             agent_states[agent],
         )
-        assert env.metadata['map_min'] <= agent_states[agent][0] <= env.metadata['map_max']
-        assert env.metadata['map_min'] <= agent_states[agent][1] <= env.metadata['map_max']
+        assert (
+            env.metadata["map_min"]
+            <= agent_states[agent][0]
+            <= env.metadata["map_max"]
+        )
+        assert (
+            env.metadata["map_min"]
+            <= agent_states[agent][1]
+            <= env.metadata["map_max"]
+        )
         assert agent_states[agent].dtype == sut.PositionFloat
 
 
@@ -130,13 +154,14 @@ def test_step_result():
         rewards[agent], np.float64
     ), "reward of agent is not a float64"
 
+
 def test_done_step():
     env = sut.SavannaZooParallelEnv()
     assert len(env.possible_agents) == 1
     env.reset()
 
     agent = env.possible_agents[0]
-    for _ in range(env.metadata['num_iters']):
+    for _ in range(env.metadata["num_iters"]):
         action = {agent: env.action_space(agent).sample()}
         _, _, dones, _ = env.step(action)
 
@@ -149,7 +174,7 @@ def test_done_step():
 def test_agents():
     env = sut.SavannaZooParallelEnv()
 
-    assert len(env.possible_agents) == env.metadata['amount_agents']
+    assert len(env.possible_agents) == env.metadata["amount_agents"]
     assert isinstance(env.possible_agents, list)
     assert isinstance(env.unwrapped.agent_name_mapping, dict)
     assert all(
