@@ -38,6 +38,7 @@ For development and testing follow (active environment):
 To autoformat python files you can use [`black`](https://github.com/psf/black).
 To automatically sort the imports you can run
 [`isort .`](https://github.com/PyCQA/isort) from the root level of the project.
+Configurations of the formatters can be found in `pyproject.toml`
 
 ## Executing `aintelope`
 

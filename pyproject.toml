@@ -18,13 +18,13 @@ build-backend = "setuptools.build_meta"
 packages = ["aintelope", "tests"]
 
 [tool.black]
-line-length = 79
+line-length = 88
 
 [tool.flake8]
-max-line-length = 80
+max-line-length = 88
 
 [tool.isort]
-line_length = 80
+line_length = 88
 
 [tool.mypy]
 ignore_missing_imports = true
