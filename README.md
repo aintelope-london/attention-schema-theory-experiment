@@ -2,7 +2,8 @@
 
 We operationalize conjectures from Steven Byrnes’
 [“Reverse-engineer human social instincts”](https://www.lesswrong.com/s/HzcM2dkCq7fwXBej8/p/tj8AC3vhTnBywdZoA)
-research program and extend existing research into brain-like AI. We simulate agents with reinforcement learning over selected cue-response patterns in
+research program and extend existing research into brain-like AI. We simulate
+agents with reinforcement learning over selected cue-response patterns in
 environments that could give rise to humanl-iike complex behaviors. To do so we
 select cue-responses from a pre-existing list of more than 60 candidates for
 human affects and instincts from affective neuroscience and other sources
@@ -14,28 +15,23 @@ and simulate the agents and the environment to a sufficient degree.
 Working document:
 https://docs.google.com/document/d/1qc6a3MY2_guCZH8XJjutpaASNE7Zy6O5z1gblrfPemk/edit#
 
-## Installation
+## Project setup
 
-### Poetry
+### Installation
 
-Dependencies are managed via `poetry`. See installation instructions
-[here](https://python-poetry.org/docs/#installation).
+The project installation is managed via `make` and `pip`. Please see the
+respective commanads in the `Makefile`. To setup the environment follow these
+steps:
 
-You can update your version of poetry by running `poetry self update` (only from
-version `>1.2`). Otherwise uninstall your version and install the latest one.
+1. Create a virtual python environment: `make venv`
+2. Activate the environment: `source venv_aintelope/bin/activate`
+3. Install dependencies: `make install`
 
-To install the python dependencies run `poetry install`. To activate the
-environment via poetry run `poetry shell`. Alternatively, most commands can also
-be executed without an active python environment via `poetry run <command>`.
+For development and testing follow (active environment):
 
-To execute the current trainer run `poetry run aintelope`.
-
-Unfortunately, Poetry has a key outstanding incompatibility with PyTorch.
-PyTorch often needs you to specify a specific Cuda Version appropriate to your
-local graphics card. The easiest way to fix this is to simply manually install
-the correct version of PyTorch using pip. For example, Nathan needed to do the
-following to get PyTorch with Cuda version 113:
-`pip3 install --use-deprecated=legacy-resolver torch==1.12.1+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html`
+1. Install development dependencies: `make install-dev`
+2. Install project locally: `make build-local`
+3. Run tests: `make tests-local`
 
 ### Code formatting
 
@@ -44,23 +40,29 @@ To automatically sort the imports you can run
 [`isort .`](https://github.com/PyCQA/isort) from the root level of the project.
 Configurations of the formatters can be found in `pyproject.toml`
 
-See the `Makefile` for further instructions.
+## Executing `aintelope`
 
-## Start a training
-
-Run `make run-training-short`. Then look in
+Try `make run-training-short`. Then look in
 `aintelope/checkpoints/memory_records`. There should be two new files named
 `Record_{current timestamp}.csv` and `Record_{current timestamp}_plot..png`. The
 plot will be an image of the path the agent took during the test episode, using
 the best agent that the training produced. Green dots are food in the
 environment, blue dots are water.
 
-### Cygwin
+## Logging
 
-[If](If) you are a Windows user, note that this project does work fine on linux
-ubuntu using Windows wsl2. If you would prefer not to use wsl2, and instead run
-this directly on Windows, you will need to figure out how to do that. We have
-not managed to get aintelope to build under Windows/Cygwin!
+The logging level can be controlled via hydra. By adding `hydra.verbose=True`
+all loggers will be executed with level `DEBUG`. Alternatively a string or list
+of loggers can be provided. See the
+[documentation](https://hydra.cc/docs/tutorials/basic/running_your_app/logging/)
+for more details.
+
+# Cygwin
+
+If you are a Windows user, note that this project does work fine on linux ubuntu
+using Windows wsl2. If you would prefer not to use wsl2, and instead run this
+directly on Windows, you will need to figure out how to do that. We have not
+managed to get aintelope to build under Windows/Cygwin!
 
 You need at least the following prerequisites:
 

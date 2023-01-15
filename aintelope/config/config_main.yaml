@@ -1,6 +1,3 @@
 defaults:
+  - _self_
   - training: lightning
-
-
-
-

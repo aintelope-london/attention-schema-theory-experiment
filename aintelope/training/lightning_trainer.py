@@ -1,22 +1,24 @@
 import typing as typ
+import logging
 from collections import OrderedDict
 from datetime import timedelta
 
+from omegaconf import DictConfig
 import gym
 import torch
-from pytorch_lightning import LightningModule, Trainer
-from pytorch_lightning.utilities import DistributedType
-from pytorch_lightning.callbacks import ModelCheckpoint
 from torch import Tensor, nn
 from torch.optim import Adam, Optimizer
 from torch.utils.data import DataLoader
+from pytorch_lightning import LightningModule, Trainer
+from pytorch_lightning.utilities.enums import DistributedType
+from pytorch_lightning.callbacks import ModelCheckpoint
 
 from aintelope.agents.memory import ReplayBuffer, RLDataset
-from aintelope.agents.q_agent import Agent
 from aintelope.agents.shard_agent import ShardAgent
 from aintelope.models.dqn import DQN
+from aintelope.environments.savanna_gym import SavannaGymEnv
 
-from aintelope.environments.savanna_gym import SavannaEnv
+logger = logging.getLogger("aintelope.training.lightning_trainer")
 
 AVAIL_GPUS = min(1, torch.cuda.device_count())
 
@@ -24,43 +26,17 @@ AVAIL_GPUS = min(1, torch.cuda.device_count())
 class DQNLightning(LightningModule):
     """Basic DQN Model."""
 
-    def __init__(
-        self,
-        batch_size: int = 16,
-        lr: float = 1e-3,
-        env: str = "savanna-v2",
-        gamma: float = 0.99,
-        sync_rate: int = 10,
-        replay_size: int = 1000,
-        warm_start_size: int = 1000,
-        eps_last_frame: int = 1000,
-        eps_start: float = 1.0,
-        eps_end: float = 0.01,
-        episode_length: int = 500,
-        warm_start_steps: int = 1000,
-        env_params: dict = {},
-        agent_params: dict = {}
-    ) -> None:
-        """
+    def __init__(self, hparams: DictConfig) -> None:
+        """Main model class
+
         Args:
-            batch_size: size of the batches
-            lr: learning rate
-            env: gym environment tag
-            gamma: discount factor
-            sync_rate: how many frames do we update the target network
-            replay_size: capacity of the replay buffer
-            warm_start_size: how many samples do we use to fill our buffer at
-                the start of training
-            eps_last_frame: what frame should epsilon stop decaying
-            eps_start: starting value of epsilon
-            eps_end: final value of epsilon
-            episode_length: max length of an episode
-            warm_start_steps: max episode reward in the environment
+            hparams (DictConfig): hyperparameter dictionary
         """
         super().__init__()
-        self.save_hyperparameters()
-        if self.hparams.env == 'savanna-v2':
-            self.env = SavannaEnv(env_params=env_params)
+        self.save_hyperparameters(hparams)
+
+        if self.hparams.env == "savanna-gym-v2":
+            self.env = SavannaGymEnv(env_params=self.hparams.env_params)
             obs_size = self.env.observation_space.shape[0]
         else:
             # GYM_INTERACTION
@@ -72,13 +48,16 @@ class DQNLightning(LightningModule):
             # )
             self.env = gym.make(self.hparams.env)
             obs_size = self.env.observation_space.shape[0]
+
         n_actions = self.env.action_space.n
 
         self.net = DQN(obs_size, n_actions)
         self.target_net = DQN(obs_size, n_actions)
 
         self.buffer = ReplayBuffer(self.hparams.replay_size)
-        self.agent = ShardAgent(self.env, self.buffer, **agent_params)
+        self.agent = ShardAgent(
+            self.env, self, self.buffer, **self.hparams.agent_params
+        )
         self.total_reward = 0
         self.episode_reward = 0
         self.populate(self.hparams.warm_start_steps)
@@ -173,13 +152,17 @@ class DQNLightning(LightningModule):
             self.target_net.load_state_dict(self.net.state_dict())
 
         log = {
-            "total_reward": torch.tensor(self.total_reward, dtype=torch.float32).to(device),
+            "total_reward": torch.tensor(
+                self.total_reward, dtype=torch.float32
+            ).to(device),
             "reward": torch.tensor(reward, dtype=torch.float32).to(device),
             "train_loss": loss,
         }
         status = {
             "steps": torch.tensor(self.global_step).to(device),
-            "total_reward": torch.tensor(self.total_reward, dtype=torch.float32).to(device),
+            "total_reward": torch.tensor(
+                self.total_reward, dtype=torch.float32
+            ).to(device),
         }
 
         # /home/nathan/.pyenv/versions/3.10.3/envs/aintelope/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:229: UserWarning: You called `self.log('episode_reward', ...)` in your `training_step` but the value needs to be floating point. Converting it to torch.float32
@@ -192,13 +175,13 @@ class DQNLightning(LightningModule):
         self.log("done", done)
 
         return OrderedDict({"loss": loss, "log": log, "progress_bar": status})
-    
-    def record_step(self, nb_batch, record_path):
+
+    def record_step(self, nb_batch, record_path) -> bool:
         if nb_batch == 0:
-            init_string = 'state,action,reward,done,shard_events,new_state\n'
-            with open(record_path, 'w') as f:
+            init_string = "state,action,reward,done,shard_events,new_state\n"
+            with open(record_path, "w") as f:
                 f.write(init_string)
-        device = 'cpu'
+        device = "cpu"
         epsilon = max(
             self.hparams.eps_end,
             self.hparams.eps_start
@@ -206,17 +189,16 @@ class DQNLightning(LightningModule):
         )
 
         # step through environment with agent
-        reward, done = self.agent.play_step(self.net, epsilon, device, save_path=record_path)
+        reward, done = self.agent.play_step(
+            self.net, epsilon, device, save_path=record_path
+        )
         self.episode_reward += reward
-
 
         if done:
             self.total_reward = self.episode_reward
             self.episode_reward = 0
-          
+
         return done
-            
-        
 
     def configure_optimizers(self) -> typ.List[Optimizer]:
         """Initialize Adam optimizer."""
@@ -243,77 +225,45 @@ class DQNLightning(LightningModule):
         return batch[0].device.index if self.on_gpu else "cpu"
 
 
-def run_experiment(hparams={}, trainer_params={}, train=True):
-    model = DQNLightning(**hparams)
+def run_experiment(cfg: DictConfig) -> None:
+    model = DQNLightning(cfg.hparams)
+
     # save any arbitrary metrics like `val_loss`, etc. in name
     # saves a file like: my/path/epoch=2-val_loss=0.02-other_metric=0.03.ckpt
-    
     checkpoint_callback = ModelCheckpoint(
-         dirpath='checkpoints',
-         filename='savanna-{epoch}-{val_loss:.2f}',
-         auto_insert_metric_name=True,
-         train_time_interval=timedelta(minutes=20), 
-         save_last=True,
-         save_on_train_epoch_end=True
-     )
-    if trainer_params.get('resume_from_checkpoint'):
-        checkpoint = '../checkpoints/last.ckpt'
+        dirpath="checkpoints",
+        filename="savanna-{epoch}-{val_loss:.2f}",
+        auto_insert_metric_name=True,
+        train_time_interval=timedelta(minutes=20),
+        save_last=True,
+        save_on_train_epoch_end=True,
+    )
+
+    if cfg.trainer_params.resume_from_checkpoint:
+        checkpoint = "../checkpoints/last.ckpt"
     else:
         checkpoint = None
-    print('checkpoint', checkpoint)
+    logger.info(f"checkpoint: {checkpoint}")
+
     trainer = Trainer(
         gpus=AVAIL_GPUS,
-        max_epochs=trainer_params.get('max_epochs', 100), 
-        val_check_interval=100,  
+        max_epochs=cfg.trainer_params.max_epochs,
+        val_check_interval=100,
         enable_progress_bar=True,
-        callbacks=[checkpoint_callback])
-    if train is True:
-        trainer.fit(model, ckpt_path=checkpoint)
-    
+        callbacks=[checkpoint_callback],
+    )
+
+    trainer.fit(model, ckpt_path=checkpoint)
+
     count = 0
-    record_done = model.record_step(nb_batch=count, record_path=trainer_params.get('record_path'))
-    while not record_done: 
+    record_done = model.record_step(
+        nb_batch=count, record_path=cfg.trainer_params.record_path
+    )
+    while not record_done:
         count += 1
-        record_done = model.record_step(nb_batch=count, record_path=trainer_params.get('record_path'))
-
-
-
-if __name__ == "__main__":
-
-    hparams = {
-        'batch_size': 16,
-        'lr': 1e-3,
-        'env': "savanna-v2",
-        'gamma': 0.99,
-        'sync_rate': 10,
-        'replay_size': 99,
-        'warm_start_size': 100,
-        'eps_last_frame': 1000,
-        'eps_start': 1.0,
-        'eps_end': 0.01,
-        'episode_length': 1010,
-        'warm_start_steps': 100,
-        'env_params': {
-            'num_iters': 1000,  # duration of the game
-            'map_min': 0,
-            'map_max': 5,
-            'render_map_max': 5,
-            'amount_agents': 1,  # for now only one agent
-            'amount_grass_patches': 2,
-            'amount_water_holes': 2
-        },
-        'agent_params': {
-            'target_shards':['hunger', 'thirst', 'curiosity']
-        }
-
-    }
-    trainer_params = {
-        'resume_from_checkpoint': False,
-        'num_workers': 14,
-        'max_epochs': 200,
-        'record_path': '../checkpoints/memory_records/test2.csv'
-    }
-    run_experiment(hparams, trainer_params, train=True)
+        record_done = model.record_step(
+            nb_batch=count, record_path=cfg.trainer_params.record_path
+        )
 
     # Notes
     # resume from a specific checkpoint
@@ -323,10 +273,6 @@ if __name__ == "__main__":
     # runs only 1 training and 1 validation batch and the program ends, avoids side-effects
     # trainer = Trainer(fast_dev_run=True, enable_progress_bar=False)
 
-
-
     # retrieve the best checkpoint after training
 
     # checkpoint_callback.best_model_path
-    
-    

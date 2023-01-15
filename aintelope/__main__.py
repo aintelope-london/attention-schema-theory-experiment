@@ -1,13 +1,18 @@
+import logging
+
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from aintelope.training.dqn_lightning_trainer import run_experiment
+from aintelope.training.lightning_trainer import run_experiment
+
+logger = logging.getLogger("aintelope.__main__")
 
 
-@hydra.main(version_base=None, config_path="conf", config_name="config")
+@hydra.main(version_base=None, config_path="config", config_name="config_main")
 def aintelope_main(cfg: DictConfig) -> None:
-    print(OmegaConf.to_yaml(cfg))
-    run_experiment(**cfg)
+    logger.info("Running training with the following configuration")
+    logger.info(OmegaConf.to_yaml(cfg))
+    run_experiment(cfg.training)
 
 
 if __name__ == "__main__":
