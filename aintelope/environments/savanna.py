@@ -94,7 +94,9 @@ def reward_agent(min_grass_distance):
     return 1 / (1 + min_grass_distance)
 
 
-def move_agent(agent_pos: np.ndarray, action: Action, map_min=0, map_max=100) -> np.ndarray:
+def move_agent(
+    agent_pos: np.ndarray, action: Action, map_min=0, map_max=100
+) -> np.ndarray:
     move = ACTION_MAP[action]
     agent_pos = agent_pos + move
     agent_pos = np.clip(agent_pos, map_min, map_max)
@@ -102,15 +104,10 @@ def move_agent(agent_pos: np.ndarray, action: Action, map_min=0, map_max=100) ->
 
 
 def get_agent_pos_from_state(agent_state):
-    """be sure to update this if you change
-    the organization of the state to put the
-    agent's position somewhere else.
-    TODO: make unit test for this
-    """
-    return [agent_state[1], agent_state[2]]
-    
+    return [agent_state[0], agent_state[1]]
 
-class SavannaEnv():
+
+class SavannaEnv:
 
     metadata = {
         "name": "savanna-v2",
@@ -126,21 +123,28 @@ class SavannaEnv():
         "map_max": 10,
         "amount_grass_patches": 2,
         "amount_water_holes": 0,
-        "num_iters": 1
+        "num_iters": 1,
     }
 
     def __init__(self, env_params={}):
         self.metadata.update(env_params)
-        print(f'initializing savanna env with params: {self.metadata}')
-        assert self.metadata['amount_agents'] == 1, print(
-            'agents must == 1 for gym env')
+        print(f"initializing savanna env with params: {self.metadata}")
+        assert self.metadata["amount_agents"] == 1, print(
+            "agents must == 1 for gym env"
+        )
         self.action_space = Discrete(4)
         # observation space will be (object_type, pos_x, pos_y)
         self.observation_space = spaces.Box(
-            low=self.metadata['map_min'],
-            high=self.metadata['map_max'],
+            low=self.metadata["map_min"],
+            high=self.metadata["map_max"],
             shape=(
-                3 * (self.metadata['amount_agents'] + self.metadata['amount_grass_patches'] + self.metadata['amount_water_holes']),)
+                3
+                * (
+                    self.metadata["amount_agents"]
+                    + self.metadata["amount_grass_patches"]
+                    + self.metadata["amount_water_holes"]
+                ),
+            ),
         )
         self.agent_state = np.ndarray([])  # just the agents position for now
         self._seed()
@@ -159,49 +163,60 @@ class SavannaEnv():
         #     self.state + u, self.observation_space.low, self.observation_space.high)
         self.last_action = action
         self.agent_state = move_agent(
-            self.agent_state, action,
-            map_min=self.metadata['map_min'], map_max=self.metadata['map_max']
+            self.agent_state,
+            action,
+            map_min=self.metadata["map_min"],
+            map_max=self.metadata["map_max"],
         )
-        min_grass_distance = distance_to_closest_item(self.agent_state, self.grass_patches)
+        min_grass_distance = distance_to_closest_item(
+            self.agent_state, self.grass_patches
+        )
         reward = reward_agent(min_grass_distance)
         if min_grass_distance < 1.0:
             self.grass_patches = self.replace_grass(
-                self.agent_state, self.grass_patches)
+                self.agent_state, self.grass_patches
+            )
         self.num_moves += 1
-        done = self.num_moves >= self.metadata['num_iters']
+        done = self.num_moves >= self.metadata["num_iters"]
 
         observation = self._get_obs()
         return observation, reward, done
 
     def reset(self):
         self.agent_state = self.np_random.integers(
-            self.metadata['map_min'], self.metadata['map_max'], 2)
+            self.metadata["map_min"], self.metadata["map_max"], 2
+        )
         self.grass_patches = self.np_random.integers(
-            self.metadata['map_min'], self.metadata['map_max'], size=(
-                self.metadata['amount_grass_patches'], 2))
+            self.metadata["map_min"],
+            self.metadata["map_max"],
+            size=(self.metadata["amount_grass_patches"], 2),
+        )
         self.water_holes = self.np_random.integers(
-            self.metadata['map_min'], self.metadata['map_max'], size=(
-                self.metadata['amount_water_holes'], 2))
+            self.metadata["map_min"],
+            self.metadata["map_max"],
+            size=(self.metadata["amount_water_holes"], 2),
+        )
         self.last_action = None
         self.num_moves = 0
         return self._get_obs()
 
     def _get_obs(self):
-        observations = [0] + self.agent_state.tolist() 
+        observations = [0] + self.agent_state.tolist()
         for x in self.grass_patches:
             observations += [1, x[0], x[1]]
         for x in self.water_holes:
             observations += [2, x[0], x[1]]
         return np.array(observations, dtype=np.float64)
 
-    def replace_grass(self,
-                      agent_pos: np.ndarray, grass_patches: np.ndarray
-                      ) -> np.float64:
+    def replace_grass(
+        self, agent_pos: np.ndarray, grass_patches: np.ndarray
+    ) -> np.float64:
         if len(grass_patches.shape) == 1:
             grass_patches = np.expand_dims(grass_patches, 0)
 
         replacement_grass = self.np_random.integers(
-            self.metadata['map_min'], self.metadata['map_max'], size=(2))
+            self.metadata["map_min"], self.metadata["map_max"], size=(2)
+        )
         grass_patches[
             np.argmin(
                 np.linalg.norm(np.subtract(grass_patches, agent_pos), axis=1)
@@ -226,17 +241,13 @@ class SavannaEnv():
                 self.ascii_render_state = AsciiRenderState(
                     self.agent_states,
                     self.grass_patches,
-                    self.render_state.settings
+                    self.render_state.settings,
                 )
             self.ascii_render_state.render(
-                self.agent_states,
-                self.grass_patches
+                self.agent_states, self.grass_patches
             )
         else:  # rgb_array
             return np.transpose(
                 np.array(pygame.surfarray.pixels3d(self.render_state.canvas)),
                 axes=(1, 0, 2),
             )
-
-
-
