@@ -1,13 +1,19 @@
 import typing as typ
+import logging
+import csv
 
+import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 import gym
 import numpy as np
+import pandas as pd
 import torch
 from torch import nn
-import csv
 
 from aintelope.agents.memory import Experience, ReplayBuffer
 from aintelope.agents.instincts.savanna_instincts import available_instincts_dict
+
+logger = logging.getLogger("aintelope.agents.instinct_agent")
 
 
 class InstinctAgent:
@@ -28,16 +34,17 @@ class InstinctAgent:
         self.env = env
         self.model = model
         self.replay_buffer = replay_buffer
+        self.history = []
         self.target_instincts = target_instincts
         self.instincts = {}
         self.done = False
         self.reset()
 
     def init_instincts(self):
-        print("debug target_instincts", self.target_instincts)
+        logger.debug("debug target_instincts", self.target_instincts)
         for instinct_name in self.target_instincts:
             if instinct_name not in available_instincts_dict:
-                print(
+                logger.debug(
                     f"Warning: could not find {instinct_name} in available_instincts_dict"
                 )
                 continue
@@ -75,9 +82,7 @@ class InstinctAgent:
             # GYM_INTERACTION
             action = self.env.action_space.sample()
         else:
-            # TODO: UserWarning: Creating a tensor from a list of numpy.ndarrays is extremely slow. Please consider converting the list to a single numpy.ndarray with numpy.array() before converting to a tensor. (Triggered internally at  ../torch/csrc/utils/tensor_new.cpp:201.)
-
-            state = torch.tensor([self.state])
+            state = torch.tensor(np.expand_dims(self.state, 0))
 
             if device not in ["cpu"]:
                 state = state.cuda(device)
@@ -150,6 +155,10 @@ class InstinctAgent:
 
         # the action taken, the environment's response, and the body's reward are all recorded together in memory
         exp = Experience(self.state, action, reward, done, new_state)
+        self.history.append(
+            (self.state.tolist(), action, reward, done, instinct_events, new_state)
+        )
+
         if save_path is not None:
             with open(save_path, "a+") as f:
                 csv_writer = csv.writer(f)
@@ -171,3 +180,55 @@ class InstinctAgent:
         if done:
             self.reset()
         return reward, done
+
+    def get_history(self) -> pd.DataFrame:
+        return pd.DataFrame(
+            columns=["state", "action", "reward", "done", "instinct_events", "new_state"],
+            data=self.history,
+        )
+
+    def plot_history(self) -> Figure:
+        history_df = self.get_history()
+
+        x = []
+        y = []
+        event_x = []
+        event_y = []
+        event_type = []
+        food_x = []
+        food_y = []
+        water_x = []
+        water_y = []
+        for _, row in history_df.iterrows():
+            state = row["state"]
+            x.append(state[1])
+            y.append(state[2])
+
+            food_x.append(state[4])
+            food_y.append(state[5])
+            food_x.append(state[7])
+            food_y.append(state[8])
+
+            water_x.append(state[10])
+            water_y.append(state[11])
+            water_x.append(state[13])
+            water_y.append(state[14])
+
+            if row["instinct_events"] != "[]":
+                event_x.append(x[-1])
+                event_y.append(y[-1])
+                event_type.append(row["instinct_events"])
+
+        agent_df = pd.DataFrame(data={"x": x, "y": y})
+        food_df = pd.DataFrame(data={"x": food_x, "y": food_y})
+        water_df = pd.DataFrame(data={"x": water_x, "y": water_y})
+        event_df = pd.DataFrame(
+            data={"x": event_x, "y": event_y, "event_type": event_type}
+        )
+
+        fig, ax = plt.subplots()
+        ax.plot(agent_df["x"], agent_df["y"], ".r-")
+        ax.plot(food_df["x"], food_df["y"], ".g", markersize=15)
+        ax.plot(water_df["x"], water_df["y"], ".b", markersize=15)
+        plt.tight_layout()
+        return fig
