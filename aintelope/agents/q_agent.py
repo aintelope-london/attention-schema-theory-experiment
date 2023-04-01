@@ -1,4 +1,4 @@
-import typing as typ
+from typing import Optional, Tuple
 import logging
 
 import matplotlib
@@ -9,16 +9,32 @@ import pandas as pd
 import torch
 from torch import nn
 
+from aintelope.agents import (
+    Agent,
+    GymEnv,
+    PettingZooEnv,
+    Environment,
+    register_agent_class,
+)
 from aintelope.agents.memory import Experience, ReplayBuffer
 
-logger = logging.getLogger("aintelope.agents.base_agent")
+
+logger = logging.getLogger("aintelope.agents.q_agent")
 
 
-class QAgent:
-    """Base Agent class handeling the interaction with the environment."""
+class QAgent(Agent):
+    """QAgent class, functioning as a base class for agents"""
 
-    def __init__(self, env, model: nn.Module, replay_buffer: ReplayBuffer) -> None:
+    def __init__(
+        self, env: Environment, model: nn.Module, replay_buffer: ReplayBuffer
+    ) -> None:
         self.env = env
+        if isinstance(env, GymEnv):
+            self.action_space = self.env.action_space
+        elif isinstance(env, PettingZooEnv):
+            self.action_space = self.env.action_space("agent0")
+        else:
+            raise TypeError(f"{type(env)} is not a valid environment")
         self.action_space = self.env.action_space
         self.model = model
         self.replay_buffer = replay_buffer
@@ -32,7 +48,7 @@ class QAgent:
         if isinstance(self.state, tuple):
             self.state = self.state[0]
 
-    def get_action(self, epsilon: float, device: str) -> int:
+    def get_action(self, epsilon: float, device: str) -> Optional[int]:
         """Using the given network, decide what action to carry out using an
         epsilon-greedy policy.
 
@@ -41,7 +57,7 @@ class QAgent:
             device: current device
 
         Returns:
-            action
+            action (Optional[int]): index of action
         """
         if self.done:
             return None
@@ -66,8 +82,8 @@ class QAgent:
         net: nn.Module,
         epsilon: float = 0.0,
         device: str = "cpu",
-        save_path: str = None,
-    ) -> typ.Tuple[float, bool]:
+        save_path: Optional[str] = None,
+    ) -> Tuple[float, bool]:
         """
         Only for Gym envs, not PettingZoo envs
         Carries out a single interaction step between the agent and the
@@ -116,7 +132,7 @@ class QAgent:
     @staticmethod
     def process_history(
         history_df: pd.DataFrame,
-    ) -> typ.Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         x = []
         y = []
         event_x = []
@@ -201,3 +217,6 @@ class QAgent:
         ax.legend()
         plt.tight_layout()
         return fig
+
+
+register_agent_class("q_agent", QAgent)

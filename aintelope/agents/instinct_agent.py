@@ -1,4 +1,4 @@
-import typing as typ
+from typing import Optional, List, Tuple
 import logging
 import csv
 
@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from torch import nn
 
+from aintelope.agents import Environment, register_agent_class
 from aintelope.agents.q_agent import QAgent
 from aintelope.agents.memory import Experience, ReplayBuffer
 from aintelope.agents.instincts.savanna_instincts import available_instincts_dict
@@ -18,18 +19,27 @@ class InstinctAgent(QAgent):
 
     def __init__(
         self,
-        env,
-        model,
+        env: Environment,
+        model: nn.Module,
         replay_buffer: ReplayBuffer,
-        target_instincts: typ.List = [],
+        target_instincts: List[str] = [],
     ) -> None:
+        """
+        Args:
+            env (Environment): environment instance
+            model (nn.Module): neural network instance
+            replay_buffer (ReplayBuffer): replay buffer of the agent
+            target_instincts (List[str]): names if used instincts
+        """
         self.target_instincts = target_instincts
         self.instincts = {}
         self.done = False
-        super().__init__(env, model, replay_buffer)  # reset after attribute setup
+
+        # reset after attribute setup
+        super().__init__(env=env, model=model, replay_buffer=replay_buffer)
 
     def reset(self) -> None:
-        """Resents the environment and updates the state."""
+        """Reset environment and initialize instincts"""
         self.done = False
         self.state = self.env.reset()
         if isinstance(self.state, tuple):
@@ -41,12 +51,12 @@ class InstinctAgent(QAgent):
         epsilon-greedy policy.
 
         Args:
-            net: DQN network
-            epsilon: value to determine likelihood of taking a random action
-            device: current device
+            net (nn.Module): DQN network instance
+            epsilon (float): value to determine likelihood of taking a random action
+            device (str): current device
 
         Returns:
-            action
+            action (int): index of action
         """
         if np.random.random() < epsilon:
             action = self.env.action_space.sample()
@@ -68,18 +78,19 @@ class InstinctAgent(QAgent):
         net: nn.Module,
         epsilon: float = 0.0,
         device: str = "cpu",
-        save_path: str = None,
-    ) -> typ.Tuple[float, bool]:
+        save_path: Optional[str] = None,
+    ) -> Tuple[float, bool]:
         """Carries out a single interaction step between the agent and the
         environment.
 
         Args:
-            net: DQN network
+            net: DQN network instance
             epsilon: value to determine likelihood of taking a random action
             device: current device
+            save_path (typ.Optional[str]): path to save agent history
 
         Returns:
-            reward, done
+            reward, done (Tuple[float, bool]): reward value and done state
         """
 
         # The 'mind' of the agent decides what to do next
@@ -166,3 +177,6 @@ class InstinctAgent(QAgent):
         }
         for instinct in self.instincts.values():
             instinct.reset()
+
+
+register_agent_class("instinct_agent", InstinctAgent)
