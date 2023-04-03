@@ -10,11 +10,10 @@ from gym.utils import seeding
 from aintelope.environments.env_utils.render_ascii import AsciiRenderState
 from aintelope.environments.env_utils.distance import distance_to_closest_item
 
-ObservationFloat = np.float32
-
 logger = logging.getLogger("aintelope.environments.savanna")
 
 # typing aliases
+ObservationFloat = np.float32
 PositionFloat = np.float32
 Action = int
 
