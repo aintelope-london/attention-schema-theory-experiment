@@ -292,6 +292,7 @@ class SavannaEnv:
 
     def observe(self, agent: str):
         """Return observation of given agent."""
+
         def stack(*args):
             return np.hstack(args, dtype=ObservationFloat)
 
