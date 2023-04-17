@@ -104,7 +104,7 @@ def move_agent(
     return agent_pos
 
 
-def get_agent_pos_from_state(agent_state):
+def get_agent_pos_from_state(agent_state) -> typ.List[PositionFloat]:
     return [agent_state[0], agent_state[1]]
 
 
