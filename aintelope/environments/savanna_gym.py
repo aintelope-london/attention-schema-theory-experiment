@@ -1,20 +1,9 @@
 import logging
 
-import numpy as np
 import gym
-from gym.spaces import Box, Discrete
-from gym.utils import seeding
 
-from aintelope.environments.env_utils.render_ascii import AsciiRenderState
-from aintelope.environments.env_utils.distance import distance_to_closest_item
 from aintelope.environments.savanna import (
     SavannaEnv,
-    RenderSettings,
-    RenderState,
-    move_agent,
-    reward_agent,
-    PositionFloat,
-    Action,
     Observation,
     Reward,
     Info,
