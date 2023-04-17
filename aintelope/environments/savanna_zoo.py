@@ -26,6 +26,10 @@ logger = logging.getLogger("aintelope.environments.savanna_zoo")
 
 
 class SavannaZooParallelEnv(SavannaEnv, ParallelEnv):
+    def __init__(self, env_params={}):
+        SavannaEnv.__init__(self, env_params)
+        ParallelEnv.__init__(self)
+
     @functools.lru_cache(maxsize=None)
     def observation_space(self, agent: str):
         return self._observation_spaces[agent]
