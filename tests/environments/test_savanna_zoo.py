@@ -169,6 +169,23 @@ def test_action_spaces():
         assert env.action_space(agent).n == 4
 
 
+def test_action_space_valid_step():
+    env = sut.SavannaZooParallelEnv()
+    env.reset()
+
+    agent = env.possible_agents[0]
+    agent_states = env.unwrapped.agent_states
+
+    for _ in range(100):
+        prev_state = np.copy(agent_states[agent])
+        action = env.action_space(agent).sample()
+        agent_states[agent] = sut.move_agent(agent_states[agent], action)
+        step_vec = agent_states[agent] - prev_state
+        assert (
+            step_vec.tolist() in ACTION_MAP.tolist()
+        ), f"Invalid step occured {step_vec}"
+
+
 def test_max_cycles():
     # currently the environment does not accept parameters like max_cycles
     # max_cycles_test(sut.SavannaZooParallelEnv)
