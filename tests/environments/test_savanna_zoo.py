@@ -172,18 +172,25 @@ def test_action_spaces():
 def test_action_space_valid_step():
     env = sut.SavannaZooParallelEnv()
     env.reset()
+    map_min, map_max = 0, 25
 
     agent = env.possible_agents[0]
     agent_states = env.unwrapped.agent_states
 
-    for _ in range(100):
+    for it in range(1000):
         prev_state = np.copy(agent_states[agent])
         action = env.action_space(agent).sample()
-        agent_states[agent] = sut.move_agent(agent_states[agent], action)
+        agent_states[agent] = sut.move_agent(
+            agent_states[agent], action, map_min=map_min, map_max=map_max
+        )
         step_vec = agent_states[agent] - prev_state
-        assert (
-            step_vec.tolist() in ACTION_MAP.tolist()
-        ), f"Invalid step occured {step_vec}"
+        if np.array_equal(step_vec, np.array([0, 0])):
+            outside_state = prev_state + ACTION_MAP[action]
+            assert (outside_state < map_min).any() or (outside_state > map_max).any()
+        else:
+            assert (
+                step_vec.tolist() in ACTION_MAP.tolist()
+            ), f"Invalid step occured {step_vec} at iteration {it}"
 
 
 def test_max_cycles():
