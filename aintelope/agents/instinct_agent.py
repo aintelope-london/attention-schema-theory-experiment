@@ -22,6 +22,7 @@ class InstinctAgent(QAgent):
         env: Environment,
         model: nn.Module,
         replay_buffer: ReplayBuffer,
+        warm_start_steps: int,
         target_instincts: List[str] = [],
     ) -> None:
         """
@@ -29,6 +30,7 @@ class InstinctAgent(QAgent):
             env (Environment): environment instance
             model (nn.Module): neural network instance
             replay_buffer (ReplayBuffer): replay buffer of the agent
+            warm_start_steps (int): amount of initial random buffer
             target_instincts (List[str]): names if used instincts
         """
         self.target_instincts = target_instincts
@@ -36,7 +38,12 @@ class InstinctAgent(QAgent):
         self.done = False
 
         # reset after attribute setup
-        super().__init__(env=env, model=model, replay_buffer=replay_buffer)
+        super().__init__(
+            env=env,
+            model=model,
+            replay_buffer=replay_buffer,
+            warm_start_steps=warm_start_steps,
+        )
 
     def reset(self) -> None:
         """Reset environment and initialize instincts"""

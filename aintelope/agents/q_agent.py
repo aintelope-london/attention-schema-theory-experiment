@@ -26,7 +26,11 @@ class QAgent(Agent):
     """QAgent class, functioning as a base class for agents"""
 
     def __init__(
-        self, env: Environment, model: nn.Module, replay_buffer: ReplayBuffer
+        self,
+        env: Environment,
+        model: nn.Module,
+        replay_buffer: ReplayBuffer,
+        warm_start_steps: int,
     ) -> None:
         self.env = env
         if isinstance(env, GymEnv):
@@ -37,6 +41,7 @@ class QAgent(Agent):
             raise TypeError(f"{type(env)} is not a valid environment")
         self.model = model
         self.replay_buffer = replay_buffer
+        self.warm_start_steps = warm_start_steps
         self.history = []
         self.reset()
 
@@ -125,7 +130,7 @@ class QAgent(Agent):
                 "instinct_events",
                 "new_state",
             ],
-            data=self.history,
+            data=self.history[self.warm_start_steps :],
         )
 
     @staticmethod
@@ -145,21 +150,17 @@ class QAgent(Agent):
         for _, row in history_df.iterrows():
             state = row["state"]
             # fmt: off
-            i = 1
+            i = 0
             x.append(state[i]); i += 1
             y.append(state[i]); i += 1
-            i += 1
 
             food_x.append(state[i]); i += 1
             food_y.append(state[i]); i += 1
-            i += 1
             food_x.append(state[i]); i += 1
             food_y.append(state[i]); i += 1
-            i += 1
 
             water_x.append(state[i]); i += 1
             water_y.append(state[i]); i += 1
-            i += 1
             water_x.append(state[i]); i += 1
             water_y.append(state[i]); i += 1
             # fmt: on

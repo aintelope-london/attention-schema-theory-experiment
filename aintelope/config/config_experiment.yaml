@@ -7,7 +7,8 @@ trainer_params:
   max_epochs: 10
   checkpoint: ${abs_path:outputs/checkpoints}
   record_path: ${abs_path:outputs/memory_records}
-  device: cuda
+  device: cpu
+  verbose: false
 
 hparams:
   batch_size: 16
@@ -31,6 +32,7 @@ hparams:
     num_iters: 1000 # duration of the game
     map_min: 0
     map_max: 5
+    render_mode: null
     render_map_max: 5
     amount_agents: 1 # for now only one agent
     amount_grass_patches: 2
