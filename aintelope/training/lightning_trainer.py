@@ -104,11 +104,10 @@ class DQNLightning(LightningModule):
         states, actions, rewards, dones, next_states = batch
 
         state_action_values = (
-            # added .long() - Compatibility with newer versions of pytorch: without it 
-            # actions.unsqueeze(-1) results in error "gather(): Expected dtype int64 
-            # for index" because unsqueeze returns an int tensor and gather requires 
-            # them to be int64.
-            self.net(states).gather(1, actions.unsqueeze(-1).long()).squeeze(-1)   
+            # added .long() - Compatibility with newer versions of pytorch: without it actions.unsqueeze(-1) results in error "gather(): Expected dtype int64 for index" because unsqueeze returns an int tensor and gather requires them to be int64.
+            self.net(states)
+            .gather(1, actions.unsqueeze(-1).long())
+            .squeeze(-1)
         )
 
         with torch.no_grad():
