@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional, Tuple, NamedTuple, List
 import logging
 
 import matplotlib
@@ -22,6 +22,15 @@ from aintelope.agents.memory import Experience, ReplayBuffer
 logger = logging.getLogger("aintelope.agents.q_agent")
 
 
+class HistoryStep(NamedTuple):
+    state: NamedTuple
+    action: int
+    reward: float
+    done: bool
+    instinct_events: List[Tuple[str, int]]
+    new_state: NamedTuple
+
+
 class QAgent(Agent):
     """QAgent class, functioning as a base class for agents"""
 
@@ -42,7 +51,7 @@ class QAgent(Agent):
         self.model = model
         self.replay_buffer = replay_buffer
         self.warm_start_steps = warm_start_steps
-        self.history = []
+        self.history: List[HistoryStep] = []
         self.reset()
 
     def reset(self) -> None:
@@ -139,52 +148,28 @@ class QAgent(Agent):
     @staticmethod
     def process_history(
         history_df: pd.DataFrame,
-    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        x = []
-        y = []
-        event_x = []
-        event_y = []
-        event_type = []
-        food_x = []
-        food_y = []
-        water_x = []
-        water_y = []
-
-        for _, row in history_df.iterrows():
-            state = row["state"]
-            # fmt: off
-            i = 0
-            x.append(state[i]); i += 1
-            y.append(state[i]); i += 1
-
-            food_x.append(state[i]); i += 1
-            food_y.append(state[i]); i += 1
-            food_x.append(state[i]); i += 1
-            food_y.append(state[i]); i += 1
-
-            water_x.append(state[i]); i += 1
-            water_y.append(state[i]); i += 1
-            water_x.append(state[i]); i += 1
-            water_y.append(state[i]); i += 1
-            # fmt: on
-
-            if row["instinct_events"] != "[]":
-                event_x.append(x[-1])
-                event_y.append(y[-1])
-                event_type.append(row["instinct_events"])
-            assert i == len(state)
-
-        agent_df = pd.DataFrame(data={"x": x, "y": y})
-        food_df = pd.DataFrame(data={"x": food_x, "y": food_y})
-        water_df = pd.DataFrame(data={"x": water_x, "y": water_y})
-        event_df = pd.DataFrame(
-            data={"x": event_x, "y": event_y, "event_type": event_type}
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        state_df = pd.DataFrame(history_df.state.to_list())
+        agent_df = pd.DataFrame(
+            columns=["x", "y"], data=state_df.agent_coords.to_list()
         )
-        return agent_df, food_df, water_df, event_df
+        grass_columns = [c for c in list(state_df) if c.startswith("grass")]
+        grass_df = state_df[grass_columns].applymap(lambda x: tuple(x))
+        grass_df = pd.DataFrame(
+            columns=["x", "y"], data=set(grass_df.stack().to_list())
+        )
+        water_columns = [c for c in list(state_df) if c.startswith("water")]
+        water_df = state_df[water_columns].applymap(lambda x: tuple(x))
+        water_df = pd.DataFrame(
+            columns=["x", "y"], data=set(water_df.stack().to_list())
+        )
+
+        # TODO: events are currently not in use; what do we want them for?
+        return agent_df, grass_df, water_df
 
     def plot_history(self, style: str = "thickness", color: str = "viridis") -> Figure:
         history_df = self.get_history()
-        agent_df, food_df, water_df, event_df = self.process_history(history_df)
+        agent_df, food_df, water_df = self.process_history(history_df)
 
         fig, ax = plt.subplots(figsize=(8, 8))
 
