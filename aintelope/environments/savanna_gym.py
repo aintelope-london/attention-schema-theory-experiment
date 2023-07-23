@@ -15,6 +15,8 @@ logger = logging.getLogger("aintelope.environments.savanna_gym")
 
 
 class SavannaGymEnv(SavannaEnv, gym.Env):
+    """Savanna environment class intended to be used with a single agent"""
+
     metadata = {
         "name": "savanna-v2",
         "render_fps": 3,

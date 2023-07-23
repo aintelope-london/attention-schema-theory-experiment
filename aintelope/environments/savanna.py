@@ -1,9 +1,10 @@
-import typing as typ
+from typing import Dict, List, Optional, NamedTuple
 from typing import Tuple, Dict
 import logging
-import functools
+from collections import namedtuple
 
 import numpy as np
+import numpy.typing as npt
 import pygame
 from gym.spaces import Box, Discrete
 from gym.utils import seeding
@@ -18,7 +19,7 @@ ObservationFloat = np.float32
 PositionFloat = np.float32
 Action = int
 AgentId = str
-AgentStates = typ.Dict[AgentId, np.ndarray]
+AgentStates = Dict[AgentId, np.ndarray]
 
 Observation = np.ndarray
 Reward = float
@@ -119,7 +120,7 @@ def move_agent(
     return agent_pos
 
 
-def get_agent_pos_from_state(agent_state) -> typ.List[PositionFloat]:
+def get_agent_pos_from_state(agent_state) -> List[PositionFloat]:
     return [agent_state[0], agent_state[1]]
 
 
@@ -187,10 +188,10 @@ class SavannaEnv:
         self.ascii_render_state = None
         self.dones = None
 
-    def seed(self, seed: typ.Optional[int] = None) -> None:
+    def seed(self, seed: Optional[int] = None) -> None:
         self.np_random, seed = seeding.np_random(seed)
 
-    def reset(self, seed: typ.Optional[int] = None, options=None):
+    def reset(self, seed: Optional[int] = None, options=None):
         """Reset needs to initialize the following attributes:
             - agents
             - rewards
@@ -233,7 +234,7 @@ class SavannaEnv:
         observations = {agent: self.observe(agent) for agent in self.agents}
         return observations
 
-    def step(self, actions: typ.Dict[str, Action]) -> Step:
+    def step(self, actions: Dict[str, Action]) -> Step:
         """step(action) takes in an action for each agent and should return the
         - observations
         - rewards
@@ -290,10 +291,10 @@ class SavannaEnv:
         logger.debug("debug return", observations, rewards, self.dones, infos)
         return observations, rewards, self.dones, infos
 
-    def observe(self, agent: str):
+    def observe(self, agent: str) -> npt.NDArray[ObservationFloat]:
         """Return observation of given agent."""
 
-        def stack(*args):
+        def stack(*args) -> npt.NDArray[ObservationFloat]:
             return np.hstack(args, dtype=ObservationFloat)
 
         observations = stack(self.agent_states[agent])
@@ -307,6 +308,28 @@ class SavannaEnv:
             res.shape == next(iter(self._observation_spaces.values())).shape
         ), "observation / observation space shape mismatch"
         return res
+
+    def state_to_namedtuple(self, state: npt.NDArray[ObservationFloat]) -> NamedTuple:
+        """Method to convert a state array into a named tuple."""
+        agent_coords = {"agent_coords": state[:2]}
+        grass_patches_coords = {}
+        gp_offset = 2
+        water_holes_coords = {}
+        wh_offset = 2 + self.metadata["amount_grass_patches"] * 2
+        for i in range(self.metadata["amount_grass_patches"]):
+            grass_patches_coords[f"grass_patch_{i}"] = state[
+                gp_offset + i : gp_offset + i + 2
+            ]
+        for i in range(self.metadata["amount_water_holes"]):
+            water_holes_coords[f"water_hole_{i}"] = state[
+                wh_offset + i : wh_offset + i + 2
+            ]
+
+        keys = (
+            list(agent_coords) + list(grass_patches_coords) + list(water_holes_coords)
+        )
+        StateTuple = namedtuple("StateTuple", {k: np.ndarray for k in keys})
+        return StateTuple(**agent_coords, **grass_patches_coords, **water_holes_coords)
 
     def render(self, mode="human"):
         """Render the environment."""
