@@ -1,4 +1,8 @@
-name: experiment
+hydra:
+  run:
+    dir: ./outputs/hydra_logs/${now:%Y_%m_%d}/${now:%H_%M_%S}
+
+experiment_name: experiment
 timestamp: ${now:%Y%m%d%H%M%S}
 
 trainer_params:
@@ -6,7 +10,6 @@ trainer_params:
   num_workers: 4
   max_epochs: 10
   checkpoint: ${abs_path:outputs/checkpoints}
-  record_path: ${abs_path:outputs/memory_records}
   device: cpu
   verbose: false
 

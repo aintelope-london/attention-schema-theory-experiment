@@ -215,12 +215,12 @@ class DQNLightning(LightningModule):
 
 
 def run_experiment(cfg: DictConfig) -> None:
+    dir_out, dir_logs, exp_name = "outputs", "lightning_logs", f"{cfg.experiment_name}"
+    dir_experiment = Path("/".join([dir_out, dir_logs, exp_name]))
     lightning_module = DQNLightning(cfg.hparams)
 
-    # save any arbitrary metrics like `val_loss`, etc. in name
-    # saves a file like: my/path/epoch=2-val_loss=0.02-other_metric=0.03.ckpt
     checkpoint_callback = ModelCheckpoint(
-        dirpath="checkpoints",
+        dirpath=dir_experiment / "checkpoints",
         filename="savanna-{epoch}-{val_loss:.2f}",
         auto_insert_metric_name=True,
         train_time_interval=timedelta(minutes=20),
@@ -230,10 +230,12 @@ def run_experiment(cfg: DictConfig) -> None:
 
     if cfg.trainer_params.resume_from_checkpoint:
         checkpoint = cfg.trainer_params.checkpoint / "model.ckpt"
+        logger.info(f"Checkpoint path: {checkpoint}")
     else:
         checkpoint = None
-    logger.info(f"checkpoint: {checkpoint}")
-    tb_logger = pl_loggers.TensorBoardLogger(save_dir="outputs")
+    tb_logger = pl_loggers.TensorBoardLogger(
+        save_dir=dir_out, name=dir_logs, version=exp_name
+    )
 
     trainer = Trainer(
         gpus=AVAIL_GPUS,
@@ -246,8 +248,9 @@ def run_experiment(cfg: DictConfig) -> None:
 
     trainer.fit(lightning_module, ckpt_path=checkpoint)
 
-    record_path = cfg.trainer_params.record_path / f"{cfg.timestamp}_records.csv"
+    record_path = dir_experiment / f"memory_records/{cfg.timestamp}.csv"
     logger.info(f"Saving training records to disk at {record_path}")
+    Path(record_path).parent.mkdir(exist_ok=True)
     lightning_module.agent.get_history().to_csv(record_path, index=False)
 
     # Notes
