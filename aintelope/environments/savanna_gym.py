@@ -46,14 +46,7 @@ class SavannaGymEnv(SavannaEnv, gym.Env):
         # but per agent
         res = SavannaEnv.step(self, actions)
 
-        if gym_v26:
-            observations, rewards, terminateds, truncateds, infos = res
-            dones = [
-                terminated or truncated
-                for (terminated, truncated) in zip(terminateds, truncateds)
-            ]
-        else:
-            observations, rewards, dones, infos = res
+        observations, rewards, dones, infos = res
 
         # so just return the first
         i = self._agent_id
@@ -62,7 +55,12 @@ class SavannaGymEnv(SavannaEnv, gym.Env):
         done = dones[i]
         info = infos[i]
         logger.warning(res)
-        return observation, reward, done, info
+
+        if gym_v26:
+            truncated = False
+            return observation, reward, done, truncated, info
+        else:
+            return observation, reward, done, info
 
     def reset(self, seed=None, options={}):
         observations = SavannaEnv.reset(self, seed, options)

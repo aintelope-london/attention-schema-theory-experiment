@@ -298,6 +298,7 @@ class SavannaEnv:
         if env_done:
             self.agents = []
         logger.debug("debug return", observations, rewards, self.dones, infos)
+
         return observations, rewards, self.dones, infos
 
     def observe(self, agent: str) -> npt.NDArray[ObservationFloat]:

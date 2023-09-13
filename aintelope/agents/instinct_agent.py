@@ -15,7 +15,7 @@ except:
 
     gym_v26 = False
 
-from aintelope.agents import Environment, register_agent_class
+from aintelope.agents import Environment, register_agent_class, GymEnv, PettingZooEnv
 from aintelope.agents.q_agent import QAgent, HistoryStep
 from aintelope.agents.memory import Experience, ReplayBuffer
 from aintelope.agents.instincts.savanna_instincts import available_instincts_dict
