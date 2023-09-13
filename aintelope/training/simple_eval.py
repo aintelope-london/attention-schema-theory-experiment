@@ -144,10 +144,10 @@ def run_episode(tparams: DictConfig, hparams: DictConfig) -> None:
             )  # TODO: is this a bug? env.step() is called two times - on this line and below
             if gym_v26:  # zoo interface has also changed with gym_v26
                 observations, rewards, terminateds, truncateds, infos = env.step(action)
-                dones = [
-                    terminated or truncated
-                    for (terminated, truncated) in zip(terminateds, truncateds)
-                ]
+                dones = {
+                    key: terminated or truncateds[key]
+                    for (key, terminated) in terminateds.items()
+                }
             else:
                 observations, rewards, dones, infos = env.step(actions)
         else:
@@ -181,10 +181,10 @@ def run_episode(tparams: DictConfig, hparams: DictConfig) -> None:
 
             if gym_v26:  # zoo interface has also changed with gym_v26
                 observations, rewards, terminateds, truncateds, infos = env.step(action)
-                dones = [
-                    terminated or truncated
-                    for (terminated, truncated) in zip(terminateds, truncateds)
-                ]
+                dones = {
+                    key: terminated or truncateds[key]
+                    for (key, terminated) in terminateds.items()
+                }
             else:
                 observations, rewards, dones, infos = env.step(actions)
         else:

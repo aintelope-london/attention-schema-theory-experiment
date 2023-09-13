@@ -134,10 +134,10 @@ def test_step_result():
 
     if gym_v26:  # zoo interface has also changed with gym_v26
         observations, rewards, terminateds, truncateds, infos = env.step(action)
-        dones = [
-            terminated or truncated
-            for (terminated, truncated) in zip(terminateds, truncateds)
-        ]
+        dones = {
+            key: terminated or truncateds[key]
+            for (key, terminated) in terminateds.items()
+        }
     else:
         observations, rewards, dones, info = env.step(action)
 
@@ -160,10 +160,10 @@ def test_done_step():
         action = {agent: env.action_space(agent).sample()}
         if gym_v26:  # zoo interface has also changed with gym_v26
             _, _, terminateds, truncateds, _ = env.step(action)
-            dones = [
-                terminated or truncated
-                for (terminated, truncated) in zip(terminateds, truncateds)
-            ]
+            dones = {
+                key: terminated or truncateds[key]
+                for (key, terminated) in terminateds.items()
+            }
         else:
             _, _, dones, _ = env.step(action)
 

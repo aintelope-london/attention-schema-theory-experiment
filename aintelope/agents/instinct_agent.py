@@ -120,11 +120,17 @@ class InstinctAgent(QAgent):
 
         # do step in the environment
         # the environment reports the result of that decision
-        if gym_v26 and (
-            isinstance(self.env, GymEnv) or isinstance(self.env, PettingZooEnv)
-        ):  # zoo interface has also changed with gym_v26
+        if gym_v26 and isinstance(self.env, GymEnv):
             new_state, env_reward, terminated, truncated, info = self.env.step(action)
             done = terminated or truncated
+        elif gym_v26 and isinstance(
+            self.env, PettingZooEnv
+        ):  # zoo interface has also changed with gym_v26
+            new_state, env_reward, terminateds, truncateds, info = self.env.step(action)
+            done = {
+                key: terminated or truncateds[key]
+                for (key, terminated) in terminateds.items()
+            }
         else:
             new_state, env_reward, done, info = self.env.step(action)
 

@@ -299,7 +299,11 @@ class SavannaEnv:
             self.agents = []
         logger.debug("debug return", observations, rewards, self.dones, infos)
 
-        return observations, rewards, self.dones, infos
+        if gym_v26:
+            terminateds = {key: False for key in self.dones.keys()}
+            return observations, rewards, self.dones, terminateds, infos
+        else:
+            return observations, rewards, self.dones, infos
 
     def observe(self, agent: str) -> npt.NDArray[ObservationFloat]:
         """Return observation of given agent."""

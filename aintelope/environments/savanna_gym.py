@@ -46,7 +46,14 @@ class SavannaGymEnv(SavannaEnv, gym.Env):
         # but per agent
         res = SavannaEnv.step(self, actions)
 
-        observations, rewards, dones, infos = res
+        if gym_v26:
+            observations, rewards, terminateds, truncateds, infos = res
+            dones = {
+                key: terminated or truncateds[key]
+                for (key, terminated) in terminateds.items()
+            }
+        else:
+            observations, rewards, dones, infos = res
 
         # so just return the first
         i = self._agent_id
