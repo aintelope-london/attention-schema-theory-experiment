@@ -61,7 +61,7 @@ class QAgent(Agent):
         if isinstance(self.state, tuple):
             self.state = self.state[0]
 
-    def get_action(self, epsilon: float, device: str) -> Optional[int]:
+    def get_action(self, net: nn.Module, epsilon: float, device: str) -> Optional[int]:
         """Using the given network, decide what action to carry out using an
         epsilon-greedy policy.
 

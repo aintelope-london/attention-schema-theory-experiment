@@ -4,10 +4,10 @@ TESTS = tests
 VENV = venv_$(PROJECT)
 
 run-training-baseline:
-	python -m ${PROJECT} baseline
+	python -m ${PROJECT} config_baseline_experiment.yaml
 
 run-training-instinct:
-	python -m ${PROJECT} instinct
+	python -m ${PROJECT} config_instinct_experiment.yaml
 
 .PHONY: venv
 venv: ## create virtual environment
