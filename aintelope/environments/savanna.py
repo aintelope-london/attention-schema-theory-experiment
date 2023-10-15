@@ -1,5 +1,4 @@
-from typing import Dict, List, Optional, NamedTuple
-from typing import Tuple, Dict
+from typing import Dict, List, Optional, Tuple, NamedTuple
 import logging
 from collections import namedtuple
 
@@ -143,7 +142,9 @@ class SavannaEnv:
         "num_iters": 1,
     }
 
-    def __init__(self, env_params={}):
+    def __init__(self, env_params: Optional[Dict] = None):
+        if env_params is None:
+            env_params = {}
         self.metadata.update(env_params)
         logger.info(f"initializing savanna env with params: {self.metadata}")
 
