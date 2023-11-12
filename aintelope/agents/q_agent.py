@@ -42,6 +42,7 @@ class QAgent(Agent):
         warm_start_steps: int,
         target_instincts: List[str] = [],
     ) -> None:
+        # TODO: remove env calss from agent class
         self.env = env
         if isinstance(env, GymEnv):
             self.action_space = self.env.action_space
@@ -62,7 +63,9 @@ class QAgent(Agent):
         if isinstance(self.state, tuple):
             self.state = self.state[0]
 
-    def get_action(self, net: nn.Module, epsilon: float, device: str) -> Optional[int]:
+    def get_action(
+        self, state, net: nn.Module, epsilon: float, device: str
+    ) -> Optional[int]:
         """Using the given network, decide what action to carry out using an
         epsilon-greedy policy.
 
@@ -79,18 +82,20 @@ class QAgent(Agent):
         elif np.random.random() < epsilon:
             action = self.action_space.sample()
         else:
-            logger.debug("debug state", type(self.state))
-            state = torch.tensor(np.expand_dims(self.state, 0))
-            logger.debug("debug state tensor", type(self.state), state.shape)
+            logger.debug("debug state", type(state))
+            state = torch.tensor(np.expand_dims(state, 0))
+            logger.debug("debug state tensor", type(state), state.shape)
             if device not in ["cpu"]:
                 state = state.cuda(device)
 
-            q_values = net(state)  # self.model(state)
+            q_values = net(state)
             _, action = torch.max(q_values, dim=1)
             action = int(action.item())
 
         return action
 
+    # double check that all the logic of `play_step` is within experiments.py and then
+    # delete this method
     @torch.no_grad()
     def play_step(
         self,
