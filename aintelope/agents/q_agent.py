@@ -53,7 +53,7 @@ class QAgent(Agent):
         # env: Environment,
         # model: nn.Module,
         # replay_buffer: ReplayBuffer,
-        agent_id: int,
+        agent_id: str,
         trainer: Trainer,
         action_space: Discrete, 
         #warm_start_steps: int, # needs to go to experiment
