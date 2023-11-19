@@ -44,8 +44,9 @@ def main(cfg: DictConfig) -> None:
     
     # Agents
     #agents = {}
-    agent_id = 0
-    #for agent_id in range(cfg.params.amount_agents?):
+    #for i in range(cfg.params.amount_agents?):
+    i = 0
+    agent_id = f"agent_{i}"
     #    agents["agent_"+agent_id] = 
     agent = get_agent_class(cfg.hparams.agent_id)(
         agent_id,
@@ -54,7 +55,8 @@ def main(cfg: DictConfig) -> None:
         **cfg.hparams.agent_params,
     )
     # TODO: savanna_gym interface will reduce {agent_0:obs} to obs... take into account here
-    agent.reset(env.observe(f"agent_{agent.id}"))
+    agent.reset(env.observe(agent.id))
+    trainer.add_agent(agent.id)
     #.... end of for-loop
     
     # buffer should be associated with agent
@@ -77,7 +79,7 @@ def main(cfg: DictConfig) -> None:
         # Reset
         state, info = env.reset() # remove state and info from here
         #for agent in agents:
-        agent.reset(env.observe(f"agent_{agent.id}"))
+        agent.reset(env.observe(agent.id))
         #state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
 
         for step in range(1): #TODO
@@ -89,7 +91,7 @@ def main(cfg: DictConfig) -> None:
             )
             '''
             # for agent in agents:
-            observation = env.observe(f"agent_{agent.id}")
+            observation = env.observe(agent.id)
             action = agent.get_action(observation, step)#state, policy_net, epsilon, "cpu")
             
             # Env step

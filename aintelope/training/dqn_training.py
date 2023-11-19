@@ -60,11 +60,11 @@ class Trainer:
             DQN(self.n_observations, self.action_space.n).parameters(), lr=LR, amsgrad=True
         ) #refactor, making a dummy network now. problem is add_agent inits first ---v
 
-    def add_agent(self,agent_id):
+    def add_agent(self, agent_id):
         self.replay_buffers[agent_id] = ReplayBuffer(self.hparams.replay_size)
         self.policy_nets[agent_id] = DQN(self.n_observations, self.action_space.n).to(self.device)
         self.target_nets[agent_id] = DQN(self.n_observations, self.action_space.n).to(self.device)
-        self.target_net.load_state_dict(self.policy_nets[agent_id].state_dict())
+        self.target_nets[agent_id].load_state_dict(self.policy_nets[agent_id].state_dict())
 
     @torch.no_grad() # TODO this might not be in the right place!
     def get_action(self, 
@@ -101,7 +101,7 @@ class Trainer:
 
     #TODO: is optimizer supposed to be done one step at a time?
     def optimize_models(self, step): #optimizer, memory, policy_net, target_net):
-        for agent_id in self.agents:
+        for agent_id in self.policy_nets.keys():
             
             #if len(memory) < BATCH_SIZE:
             if len(self.replay_buffers[agent_id]) < self.hparams.batch_size:
