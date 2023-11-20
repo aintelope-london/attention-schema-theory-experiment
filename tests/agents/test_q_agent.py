@@ -2,14 +2,14 @@ from typing import Tuple
 
 from omegaconf import OmegaConf, DictConfig
 
-from aintelope.tests.test_config import root_dir, tparams_hparams
+from tests.test_config import root_dir, tparams_hparams
 from aintelope.training.simple_eval import run_episode
 
 
 # TODO: implementation and tests for sequential zoo envs
 
 
-def test_qagent_in_savanna_zoo_parallel(   # TODO
+def test_qagent_in_savanna_zoo_parallel(  # TODO
     tparams_hparams: Tuple[DictConfig, DictConfig]
 ) -> None:
     tparams, hparams = tparams_hparams
@@ -56,5 +56,3 @@ def test_qagent_in_savanna_gridworlds_parallel(
     }
     OmegaConf.merge(hparams, params_zoo_parallel)
     run_episode(tparams=tparams, hparams=hparams)
-
-

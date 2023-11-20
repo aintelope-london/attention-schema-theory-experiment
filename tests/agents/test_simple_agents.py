@@ -81,7 +81,6 @@ def test_iterativeweightoptimizationagent_in_savanna_zoo_parallel(
     run_episode(tparams=tparams, hparams=hparams)
 
 
-
 def test_randomwalkagent_in_savanna_gridworlds_parallel(
     tparams_hparams: Tuple[DictConfig, DictConfig]
 ) -> None:

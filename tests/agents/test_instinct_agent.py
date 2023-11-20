@@ -30,7 +30,7 @@ def test_instinctagent_in_savanna_zoo_parallel(
     }
     OmegaConf.merge(hparams, params_savanna_gym)
     run_episode(tparams=tparams, hparams=hparams)
-    
+
 
 def test_instinctagent_in_savanna_gridworlds_parallel(
     tparams_hparams: Tuple[DictConfig, DictConfig]
@@ -53,4 +53,3 @@ def test_instinctagent_in_savanna_gridworlds_parallel(
     }
     OmegaConf.merge(hparams, params_savanna_gym)
     run_episode(tparams=tparams, hparams=hparams)
-
