@@ -322,6 +322,8 @@ class SavannaEnv:
 
     def state_to_namedtuple(self, state: npt.NDArray[ObservationFloat]) -> NamedTuple:
         """Method to convert a state array into a named tuple."""
+        if state is None:
+            return None
         agent_coords = {"agent_coords": state[:2]}
         grass_patches_coords = {}
         gp_offset = 2

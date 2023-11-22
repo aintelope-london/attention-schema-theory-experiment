@@ -111,7 +111,13 @@ class QAgent(Agent):
         """
         next_state = observation 
         # For future: add state (interoception) handling here when needed
-        #exp = Experience(self.state, self.last_action, score, done, next_state)
+        # TODO: hacky. empty next states introduced by new example code,
+        # and I'm wondering if we need to save these steps too due to agent death
+        # Discussion in slack.
+        if next_state is not None: 
+            next_s_hist = env.state_to_namedtuple(next_state.tolist())
+        else:
+            next_s_hist = None
         self.history.append(
             HistoryStep(
                 state=env.state_to_namedtuple(self.state.tolist()),
@@ -119,7 +125,7 @@ class QAgent(Agent):
                 reward=score,
                 done=done,
                 instinct_events=[],
-                next_state=env.state_to_namedtuple(next_state.tolist()),
+                next_state=next_s_hist,
             )
         )
 
@@ -139,11 +145,6 @@ class QAgent(Agent):
 
         self.trainer.update_memory(self.id, self.state, self.last_action, score, done, next_state) #exp)
         self.state = next_state
-
-        # if scenario is complete or agent experiences catastrophic failure,
-        # end the agent.
-        if done:
-            self.reset()
 
     def get_history(self) -> pd.DataFrame:
         """

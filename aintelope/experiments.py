@@ -23,7 +23,7 @@ from aintelope.training.dqn_training import Trainer
 def main(cfg: DictConfig) -> None:
     logger = logging.getLogger("aintelope.experiment")
     
-    episode_durations = []
+    #episode_durations = []
 
     # Environment
     env = SavannaGymEnv(env_params=cfg.hparams.env_params) #TODO: get env from parameters
@@ -38,6 +38,7 @@ def main(cfg: DictConfig) -> None:
     
     # Agents
     agents = []
+    dones = {} # are agents done
     for i in range(cfg.hparams.env_params.amount_agents):
         agent_id = f"agent_{i}"
         agents.append(get_agent_class(cfg.hparams.agent_id)(
@@ -49,11 +50,11 @@ def main(cfg: DictConfig) -> None:
         # TODO: savanna_gym interface will reduce {agent_0:obs} to obs... take into account here
         agents[-1].reset(env.observe(agent_id)) 
         trainer.add_agent(agent_id)
-    
+        
     # Warmup not supported atm, maybe not needed?
     #for _ in range(hparams.warm_start_steps):
     #     agents.play_step(self.net, epsilon=1.0) # TODO
-    steps_done = 0
+    #steps_done = 0
     
     # Main loop
     for i_episode in range(cfg.hparams.num_episodes):
@@ -61,6 +62,7 @@ def main(cfg: DictConfig) -> None:
         _, _ = env.reset()
         for agent in agents:
             agent.reset(env.observe(agent.id))
+            dones[agent.id] = False
 
         for step in range(cfg.hparams.env_params.num_iters):
             for agent in agents:
@@ -85,6 +87,7 @@ def main(cfg: DictConfig) -> None:
 
                 # Agent is updated based on what the env shows. All commented above included ^
                 done = terminated or truncated
+                dones[agent.id] = True
                 if terminated:
                     observation = None
                 agent.update(env, observation, score, done) # note that score is used ONLY by baseline
@@ -94,10 +97,10 @@ def main(cfg: DictConfig) -> None:
                 # is filled only with a batch worth of stuff, and it might overrepresent?
                 trainer.optimize_models(step)
                 
-            # TODO: break when all agents are don
-            #if done:
-            #    episode_durations.append(step + 1)
-            #    break 
+            # Break when all agents are don
+            if all(dones.values()):
+                #episode_durations.append(step + 1)
+                break 
         
 if __name__ == "__main__":
     main()
