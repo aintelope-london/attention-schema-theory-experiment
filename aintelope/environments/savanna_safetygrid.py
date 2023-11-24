@@ -315,6 +315,7 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
             infos[agent] = info
             observations2[agent] = self.transform_observation(agent, info)
 
+        self._last_infos = infos
         return observations2, infos
 
     def step(self, actions: Dict[str, Action]) -> Step:
@@ -375,6 +376,8 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
 
         terminateds = self.terminations
         truncateds = self.truncations
+
+        self._last_infos = infos
 
         logger.debug(
             "debug return", observations2, rewards2, terminateds, truncateds, infos
