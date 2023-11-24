@@ -268,9 +268,13 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
         if not actions:
             return {}, {}, {}, {}, {}
 
-        observations, rewards, dones, terminateds, infos = GridworldZooParallelEnv.step(
-            self, actions
-        )
+        (
+            observations,
+            rewards,
+            terminateds,
+            truncateds,
+            infos,
+        ) = GridworldZooParallelEnv.step(self, actions)
         self._last_infos = infos
 
         observations2 = {}
@@ -283,8 +287,10 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
             min_grass_distance = self.calc_min_grass_distance(agent, infos[agent])
             rewards2[agent] = self.reward_agent(min_grass_distance)
 
-        logger.debug("debug return", observations2, rewards, dones, terminateds, infos)
-        return observations2, rewards2, dones, terminateds, infos
+        logger.debug(
+            "debug return", observations2, rewards, terminateds, truncateds, infos
+        )
+        return observations2, rewards2, terminateds, truncateds, infos
 
 
 class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
@@ -303,11 +309,13 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
 
         # observe observations, transform observations
         observations2 = {}
+        infos = {}
         for agent in self.possible_agents:
             info = self.observe_info(agent)
+            infos[agent] = info
             observations2[agent] = self.transform_observation(agent, info)
 
-        return observations2, infos  # TODO: infos
+        return observations2, infos
 
     def step(self, actions: Dict[str, Action]) -> Step:
         """step(action) takes in an action for each agent and should return the
@@ -327,27 +335,31 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         alive_agents = []
         observations2 = {}
         rewards2 = {}
+        infos = {}
 
         # loop over all agents in ENV NOT IN ACTIONS DICT
-        for index in range(0, self.max_num_agents):  # do one iteration over all agents
-            agent = self.agent_selection
-            done = self.terminations[agent] or self.truncations[agent]
-            if not done:
-                alive_agents.append(agent)
-                action = actions.get(agent, None)
-                if action is None:
-                    action = Actions.NOOP
-                GridworldZooAecEnv.step(self, action)
+        for index in range(
+            0, self.num_agents
+        ):  # do one iteration over all ALIVE agents
+            agent = self.agent_selection  # this returns only alive agents
+            alive_agents.append(agent)
+            action = actions.get(agent, None)
+            if action is None:
+                action = (
+                    Actions.NOOP
+                )  # all agents need to take a step, the stepping order cannot be modified
+            GridworldZooAecEnv.step(self, action)
 
-                if (
-                    self.observe_immediately_after_agent_action
-                ):  # observe BEFORE next agent takes its step?
-                    # observe observations, transform observations and rewards
-                    info = self.observe_info(agent)
-                    observations2[agent] = self.transform_observation(agent, info)
+            if (
+                self.observe_immediately_after_agent_action
+            ):  # observe BEFORE next agent takes its step?
+                # observe observations, transform observations and rewards
+                info = self.observe_info(agent)
+                infos[agent] = info
+                observations2[agent] = self.transform_observation(agent, info)
 
-                    min_grass_distance = self.calc_min_grass_distance(agent, info)
-                    rewards[agent] = self.reward_agent(min_grass_distance)
+                min_grass_distance = self.calc_min_grass_distance(agent, info)
+                rewards2[agent] = self.reward_agent(min_grass_distance)
 
         if (
             not self.observe_immediately_after_agent_action
@@ -355,10 +367,16 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
             # observe observations, transform observations and rewards
             for agent in alive_agents:
                 info = self.observe_info(agent)
+                infos[agent] = info
                 observations2[agent] = self.transform_observation(agent, info)
 
                 min_grass_distance = self.calc_min_grass_distance(agent, info)
-                rewards[agent] = self.reward_agent(min_grass_distance)
+                rewards2[agent] = self.reward_agent(min_grass_distance)
 
-        logger.debug("debug return", observations, rewards, dones, terminateds, infos)
-        return observations2, rewards2, dones, terminateds, infos  # TODO: infos
+        terminateds = self.terminations
+        truncateds = self.truncations
+
+        logger.debug(
+            "debug return", observations2, rewards2, terminateds, truncateds, infos
+        )
+        return observations2, rewards2, terminateds, truncateds, infos

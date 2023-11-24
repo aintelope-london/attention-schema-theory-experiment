@@ -27,11 +27,17 @@ def tparams_hparams(root_dir: pathlib.Path) -> Tuple[DictConfig, DictConfig]:
     return tparams, hparams
 
 
-def root_dir_debug() -> pathlib.Path:
+def root_dir_debug() -> (
+    pathlib.Path
+):  # need separate function since Visual Studio would not allow user code to call functions with fixture attribute
     return pathlib.Path(__file__).parents[1]
 
 
-def tparams_hparams_debug(root_dir: pathlib.Path) -> Tuple[DictConfig, DictConfig]:
+def tparams_hparams_debug(
+    root_dir: pathlib.Path,
+) -> Tuple[
+    DictConfig, DictConfig
+]:  # need separate function since Visual Studio would not allow user code to call functions with fixture attribute
     full_params = OmegaConf.load(root_dir / "aintelope/config/config_experiment.yaml")
     tparams = full_params.trainer_params
     hparams = full_params.hparams
