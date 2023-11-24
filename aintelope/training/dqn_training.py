@@ -188,7 +188,7 @@ class Trainer:
                 state_action_values, expected_state_action_values.unsqueeze(1)
             )
             self.losses[agent_id] = loss
-            
+
             # Optimize the model
             self.optimizer.zero_grad()
             loss.backward()
@@ -212,7 +212,7 @@ class Trainer:
         for agent_id in self.policy_nets.keys():
             model = self.policy_nets[agent_id]
             loss = 1.0
-            if agent_id in self.losses: 
+            if agent_id in self.losses:
                 loss = self.losses[agent_id]
             torch.save(
                 {

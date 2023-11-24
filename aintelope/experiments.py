@@ -93,7 +93,7 @@ def run_experiment(cfg: DictConfig) -> None:
 
                 # Perform one step of the optimization (on the policy network)
                 trainer.optimize_models(step)
-            
+
             # Break when all agents are done
             if all(dones.values()):
                 break
