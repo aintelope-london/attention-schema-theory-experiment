@@ -2,7 +2,8 @@ from collections import namedtuple
 
 import logging
 from omegaconf import DictConfig
-import hydra
+#import hydra
+import os
 
 from aintelope.environments.savanna_gym import SavannaGymEnv
 from aintelope.models.dqn import DQN
@@ -103,7 +104,9 @@ def run_experiment(cfg: DictConfig) -> None:
         dir_out = f"{cfg.experiment_dir}"
         file_name = f"{i_episode}"
         if i_episode % cfg.hparams.every_n_episodes == 0:
-            trainer.save_models(i_episode, dir_out + "/" + file_name)
+            dir_cp = dir_out + "checkpoints/"
+            os.makedirs(dir_cp, exist_ok=True)
+            trainer.save_models(i_episode, dir_cp)
 
 
 # @hydra.main(version_base=None, config_path="config", config_name="config_experiment")
