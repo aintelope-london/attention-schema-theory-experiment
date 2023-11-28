@@ -128,14 +128,16 @@ class QAgent(Agent):
                 for (key, terminated) in terminateds.items()
             }
         else:
+            logger.warning(f"{self.env} is not of type GymEnv or PettingZooEnv")
             new_state, score, done, info = self.env.step(action)
         reward = score  # temporary, until play_step is separated from agent
         exp = Experience(self.state, action, reward, done, new_state)
+
         self.history.append(
             HistoryStep(
                 state=self.env.state_to_namedtuple(self.state.tolist()),
                 action=action,
-                reward=reward,
+                reward=env_reward,
                 done=done,
                 instinct_events=[],
                 new_state=self.env.state_to_namedtuple(new_state.tolist()),
@@ -149,9 +151,9 @@ class QAgent(Agent):
                     [
                         self.state.tolist(),
                         action,
-                        reward,
+                        env_reward,
                         done,
-                        instinct_events,
+                        [],
                         new_state,
                     ]
                 )
@@ -159,7 +161,8 @@ class QAgent(Agent):
         self.replay_buffer.append(exp)
         self.state = new_state
 
-        # if scenario is complete or agent experiences catastrophic failure, end the agent.
+        # if scenario is complete or agent experiences catastrophic failure,
+        # end the agent.
         if done:
             self.reset()
 

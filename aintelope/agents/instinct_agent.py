@@ -102,7 +102,7 @@ class InstinctAgent(QAgent):
             new_state, score, done, info = self.env.step(action)
 
         if len(self.instincts) == 0:
-            # use env reward as default
+            # use env reward if no instincts available
             instinct_events = []
             reward = score
         else:
@@ -114,11 +114,15 @@ class InstinctAgent(QAgent):
                     self, new_state
                 )
                 reward += instinct_reward
-                logger.debug("debug reward instinct", reward)
+                logger.debug(
+                    f"Reward of {instinct_name}: {instinct_reward}; "
+                    f"total reward: {reward}"
+                )
                 if instinct_event != 0:
                     instinct_events.append((instinct_name, instinct_event))
 
-        # the action taken, the environment's response, and the body's reward are all recorded together in memory
+        # the action taken, the environment's response, and the body's reward are all
+        # recorded together in memory
         exp = Experience(self.state, action, reward, done, new_state)
         self.history.append(
             HistoryStep(
@@ -148,13 +152,14 @@ class InstinctAgent(QAgent):
         self.replay_buffer.append(exp)
         self.state = new_state
 
-        # if scenario is complete or agent experiences catastrophic failure, end the agent.
+        # if scenario is complete or agent experiences catastrophic failure,
+        # end the agent.
         if done:
             self.reset()
         return reward, score, done
 
     def init_instincts(self) -> None:
-        logger.debug("debug target_instincts", self.target_instincts)
+        logger.debug(f"target_instincts: {self.target_instincts}")
         for instinct_name in self.target_instincts:
             if instinct_name not in available_instincts_dict:
                 logger.warning(
