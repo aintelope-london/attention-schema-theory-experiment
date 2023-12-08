@@ -122,6 +122,13 @@ def move_agent(
     return agent_pos
 
 
+# These methods are temporary, and will not scale for more agents nor more grasses
+# they are for instincts, and should be rewritten such that state (observation)
+# contains the information necessary for instincts (and distinction for models)
+def get_grass_pos_from_state(agent_state) -> List[PositionFloat]:
+    return [agent_state[2], agent_state[3]]
+
+
 def get_agent_pos_from_state(agent_state) -> List[PositionFloat]:
     return [agent_state[0], agent_state[1]]
 
@@ -237,7 +244,7 @@ class SavannaEnv:
         self.dones = {agent: False for agent in self.agents}
         observations = {agent: self.observe(agent) for agent in self.agents}
         infos = {agent: {} for agent in self.agents}
-        return observations, infos
+        return observations, infos  # TODO remove these returns as unused?
 
     def step(self, actions: Dict[str, Action]) -> Step:
         """step(action) takes in an action for each agent and should return the
@@ -322,6 +329,8 @@ class SavannaEnv:
 
     def state_to_namedtuple(self, state: npt.NDArray[ObservationFloat]) -> NamedTuple:
         """Method to convert a state array into a named tuple."""
+        if state is None:
+            return None
         agent_coords = {"agent_coords": state[:2]}
         grass_patches_coords = {}
         gp_offset = 2
