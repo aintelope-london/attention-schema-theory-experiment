@@ -112,7 +112,7 @@ def run_experiment(cfg: DictConfig) -> None:
             if isinstance(env, ParallelEnv):
                 # loop: get observations and collect actions
                 actions = {}
-                for agent in agents:
+                for agent in agents:  # TODO: exclude terminated agents
                     observation = env.observe(agent.id)
                     actions[agent.id] = agent.get_action(observation, step)
 
@@ -138,7 +138,7 @@ def run_experiment(cfg: DictConfig) -> None:
             elif isinstance(env, AECEnv):
                 # loop: observe, collect action, send action, get observation, update
                 for (
-                    agent
+                    agent  # TODO: use env's agent iterator
                 ) in agents:  # TODO: the order of agents needs to be obtained from env
                     observation = env.observe(agent.id)
                     action = agent.get_action(observation, step)
