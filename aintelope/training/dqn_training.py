@@ -186,7 +186,7 @@ class Trainer:
             # for each batch state according to policy_net
             policy_net = self.policy_nets[agent_id]
             target_net = self.target_nets[agent_id]
-            state_action_values = policy_net(state_batch).gather(1, action_batch)
+            state_action_values = policy_net(state_batch).gather(1, action_batch.long())
 
             # Compute V(s_{t+1}) for all next states.
             # Expected values of actions for non_final_next_states are computed based
