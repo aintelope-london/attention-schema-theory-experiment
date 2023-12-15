@@ -60,11 +60,9 @@ def run_experiment(cfg: DictConfig) -> None:
         agents[-1].reset(observation)
         trainer.add_agent(agent_id, observation.shape, env.action_space)
 
-    agents_dict = {agent.id: agent for agent in agents}
-
-    # Warmup not supported atm, would be here
-    # for _ in range(hparams.warm_start_steps):
-    #     agents.play_step(self.net, epsilon=1.0)
+    # Warmup NIY
+    #for _ in range(hparams.warm_start_steps):
+    #    agents.play_step(self.net, epsilon=1.0)
 
     # Main loop
     for i_episode in range(cfg.hparams.num_episodes):
@@ -83,7 +81,8 @@ def run_experiment(cfg: DictConfig) -> None:
             for agent in agents:
                 agent.reset(env.observe(agent.id))
                 dones[agent.id] = False
-
+        
+        # Iterations within the episode 
         for step in range(cfg.hparams.env_params.num_iters):
             if isinstance(env, ParallelEnv):
                 # loop: get observations and collect actions
@@ -113,6 +112,7 @@ def run_experiment(cfg: DictConfig) -> None:
 
             elif isinstance(env, AECEnv):
                 # loop: observe, collect action, send action, get observation, update
+                agents_dict = {agent.id: agent for agent in agents}
                 for agent_id in env.agent_iter(
                     max_iter=env.num_agents
                 ):  # num_agents returns number of alive (non-done) agents
