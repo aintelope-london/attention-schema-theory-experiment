@@ -114,27 +114,35 @@ def run_episode(full_params: Dict) -> None:
     else:
         models = [MODEL_LOOKUP[model_spec](obs_size, n_actions)]
 
-    agent_spec = hparams["agent_id"]
-    if isinstance(agent_spec, list) or env_params["amount_agents"] > 1:
+    agent_spec = hparams["agent_id"]  # TODO: why is this value a list?
+    if isinstance(agent_spec, list) and len(agent_spec) == 1:
+        agent_spec = agent_spec[0]
+    if isinstance(agent_spec, list):  # or env_params["amount_agents"] > 1:
         if not isinstance(agent_spec, list):
             agent_spec = [agent_spec]
         if len(models) < len(agent_spec):
-            models *= len(agent_spec)
-        agents = [
-            AGENT_LOOKUP[agent](
-                agent_id="agent_0",
-                trainer=trainer,
-                target_instincts=[],
-            )
-            for agent in agent_spec
+            models *= len(
+                agent_spec
+            )  # TODO: shouldnt it be env_params["amount_agents"] here?
+        agents = [  # TODO: this nested list structure probably will not work in below code. What is the intention of using multiple agent_specs?
+            [
+                AGENT_LOOKUP[agent](
+                    agent_id=f"agent_{i}",
+                    trainer=trainer,
+                    target_instincts=[],
+                )
+                for agent in agent_spec
+            ]
+            for i in range(env_params["amount_agents"])
         ]
     else:
         agents = [
             AGENT_LOOKUP[agent_spec](
-                agent_id="agent_0",
+                agent_id=f"agent_{i}",
                 trainer=trainer,
                 target_instincts=[],
             )
+            for i in range(env_params["amount_agents"])
         ]
 
     # Agents
