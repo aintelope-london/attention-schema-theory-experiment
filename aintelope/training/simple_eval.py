@@ -99,13 +99,9 @@ def run_episode(full_params: Dict) -> None:
         (
             observations,
             infos,
-        ) = env.reset()  # TODO: each agent has their own state, refactor
-        # TODO: each agent has their own observation size    # observation_space and action_space require agent argument: https://pettingzoo.farama.org/content/basic_usage/#additional-environment-api
-        observation = observations["agent_0"]
+        ) = env.reset()
     elif isinstance(env, AECEnv):
         env.reset()
-        # TODO: each agent has their own observation size    # observation_space and action_space require agent argument: https://pettingzoo.farama.org/content/basic_usage/#additional-environment-api
-        observation = env.observe("agent_0")
     else:
         raise NotImplementedError(f"Unknown environment type {type(env)}")
 
@@ -143,7 +139,11 @@ def run_episode(full_params: Dict) -> None:
 
     # Agents
     for agent in agents:
-        observation = env.observe(agent.id)  # TODO parallel env observation handling
+        if isinstance(env, ParallelEnv):
+            observation = observations[agent.id]
+        elif isinstance(env, AECEnv):
+            observation = env.observe(agent.id)
+
         agent.reset(observation)
         trainer.add_agent(agent.id, observation.shape, env.action_space)
 
