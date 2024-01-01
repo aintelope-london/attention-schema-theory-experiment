@@ -12,5 +12,5 @@ jobs:
         with:
           flake8-version: "6.1.0"
           max-line-length: "88"
-          ignore: "E203"
+          extend-ignore: "E203"
           path: "aintelope tests site"
