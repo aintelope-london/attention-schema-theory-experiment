@@ -42,7 +42,6 @@ def test_training_pipeline_main_with_dead_agents():
 
 
 def test_training_pipeline_baseline():
-    const = constants()
     if os.name == "nt":  # run all code in single process in case of debugging
         # TODO: find a way to parse Makefile and get sys.argv that way
         # sys.argv = [""] + shlex.split(const.BASELINE_ARGS, comments=False, posix=True) # posix=True removes quotes around arguments
@@ -57,12 +56,12 @@ def test_training_pipeline_baseline():
         aintelope_main()
         sys.argv = [""]
     else:  # TODO: For consistency, I am planning to remove this code branch so that the test is always running in single process
+        const = constants()
         ret = subprocess.run(["make", f"{const.BASELINE}"])
         assert ret.returncode == 0, "Trainer baseline caused an error!"
 
 
 def test_training_pipeline_baseline_with_dead_agents():
-    const = constants()
     # run all code in single process always in order to pass seed argument
     for index in range(
         0, 10
@@ -84,7 +83,6 @@ def test_training_pipeline_baseline_with_dead_agents():
 
 
 def test_training_pipeline_instinct():
-    const = constants()
     if os.name == "nt":  # run all code in single process in case of debugging
         # TODO: find a way to parse Makefile and get sys.argv that way
         # sys.argv = [""] + shlex.split(const.INSTINCT_ARGS, comments=False, posix=True) # posix=True removes quotes around arguments
@@ -99,12 +97,12 @@ def test_training_pipeline_instinct():
         aintelope_main()
         sys.argv = [""]
     else:  # TODO: For consistency, I am planning to remove this code branch so that the test is always running in single process
+        const = constants()
         ret = subprocess.run(["make", f"{const.INSTINCT}"])
         assert ret.returncode == 0, "Trainer baseline caused an error!"
 
 
 def test_training_pipeline_instinct_with_dead_agents():
-    const = constants()
     # run all code in single process always in order to pass seed argument
     for index in range(
         0, 10

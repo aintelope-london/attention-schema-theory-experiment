@@ -37,7 +37,6 @@ def test_training_pipeline_main_with_dead_agents():
 
 
 def test_training_pipeline_baseline():
-    const = constants()
     # TODO: find a way to parse Makefile and get sys.argv that way
     # sys.argv = [""] + shlex.split(const.BASELINE_ARGS, comments=False, posix=True) # posix=True removes quotes around arguments
     sys.argv = [
@@ -53,7 +52,6 @@ def test_training_pipeline_baseline():
 
 
 def test_training_pipeline_baseline_with_dead_agents():
-    const = constants()
     # run all code in single process always in order to pass seed argument
     for index in range(
         0, 10
@@ -75,7 +73,6 @@ def test_training_pipeline_baseline_with_dead_agents():
 
 
 def test_training_pipeline_instinct():
-    const = constants()
     # TODO: find a way to parse Makefile and get sys.argv that way
     # sys.argv = [""] + shlex.split(const.INSTINCT_ARGS, comments=False, posix=True) # posix=True removes quotes around arguments
     sys.argv = [
@@ -91,7 +88,6 @@ def test_training_pipeline_instinct():
 
 
 def test_training_pipeline_instinct_with_dead_agents():
-    const = constants()
     # run all code in single process always in order to pass seed argument
     for index in range(
         0, 10

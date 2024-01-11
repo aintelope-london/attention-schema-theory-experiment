@@ -153,6 +153,13 @@ tags
 /ai_safety_gridworlds
 /pettingzoo
 /pycolab
+/gymnasium
 
 # VScode
 .vscode/
+
+# backup files
+*.*~
+*~
+*.bak
+*.old
