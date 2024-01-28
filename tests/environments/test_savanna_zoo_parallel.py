@@ -7,7 +7,7 @@ from gymnasium.spaces import Discrete
 from pettingzoo.test.parallel_test import parallel_api_test
 from pettingzoo.test.seed_test import parallel_seed_test
 
-from aintelope.environments import savanna_zoo as zoo
+from aintelope.environments.savanna_zoo import SavannaZooParallelEnv
 from aintelope.environments.env_utils.distance import distance_to_closest_item
 from aintelope.environments.savanna import ACTION_MAP, move_agent, reward_agent
 from aintelope.environments.typing import PositionFloat
@@ -25,7 +25,7 @@ def test_pettingzoo_api_parallel(execution_number):
         "amount_grass_patches": 2,
         "amount_water_holes": 2,
     }
-    env = zoo.SavannaZooParallelEnv(env_params=env_params)
+    env = SavannaZooParallelEnv(env_params=env_params)
     env.seed(execution_number)
 
     # sequential_env = parallel_to_aec(env)
@@ -45,7 +45,7 @@ def test_pettingzoo_api_parallel_with_death(execution_number):
         "amount_water_holes": 2,
         "test_death": True,
     }
-    env = zoo.SavannaZooParallelEnv(env_params=env_params)
+    env = SavannaZooParallelEnv(env_params=env_params)
     env.seed(execution_number)
 
     # sequential_env = parallel_to_aec(env)
@@ -57,15 +57,15 @@ def test_zoo_seed(execution_number):
     np.random.seed(execution_number)
 
     try:
-        parallel_seed_test(zoo.SavannaZooParallelEnv, num_cycles=10)
+        parallel_seed_test(SavannaZooParallelEnv, num_cycles=10)
     except TypeError:
         # for some reason the test env in Git does not recognise the num_cycles
         # neither as named or positional argument
-        parallel_seed_test(zoo.SavannaZooParallelEnv)
+        parallel_seed_test(SavannaZooParallelEnv)
 
 
 def test_zoo_agent_states():
-    env = zoo.SavannaZooParallelEnv()
+    env = SavannaZooParallelEnv()
 
     env.reset()
     assert isinstance(env.unwrapped.agent_states, dict)
@@ -80,7 +80,7 @@ def test_zoo_agent_states():
 
 @pytest.mark.parametrize("execution_number", range(10))
 def test_zoo_reward_agent(execution_number):
-    env = zoo.SavannaZooParallelEnv()
+    env = SavannaZooParallelEnv()
     env.reset(seed=execution_number)
     # single grass patch
     agent_pos = np.random.randint(env.metadata["map_min"], env.metadata["map_max"], 2)
@@ -101,7 +101,7 @@ def test_zoo_reward_agent(execution_number):
 
 
 def test_zoo_move_agent():
-    env = zoo.SavannaZooParallelEnv()
+    env = SavannaZooParallelEnv()
     env.reset()
 
     agent = env.possible_agents[0]
@@ -135,7 +135,7 @@ def test_zoo_move_agent():
 
 @pytest.mark.parametrize("execution_number", range(10))
 def test_zoo_step_result(execution_number):
-    env = zoo.SavannaZooParallelEnv(
+    env = SavannaZooParallelEnv(
         env_params={"num_iters": 2}
     )  # default is 1 iter which means that the env is done after 1 step below and the test will fail
     num_agents = len(env.possible_agents)
@@ -162,7 +162,7 @@ def test_zoo_step_result(execution_number):
 
 @pytest.mark.parametrize("execution_number", range(10))
 def test_zoo_done_step(execution_number):
-    env = zoo.SavannaZooParallelEnv(env_params={"amount_agents": 1})
+    env = SavannaZooParallelEnv(env_params={"amount_agents": 1})
     assert len(env.possible_agents) == 1
     env.seed(execution_number)
     env.reset()
@@ -183,7 +183,7 @@ def test_zoo_done_step(execution_number):
 
 
 def test_zoo_agents():
-    env = zoo.SavannaZooParallelEnv()
+    env = SavannaZooParallelEnv()
 
     assert len(env.possible_agents) == env.metadata["amount_agents"]
     assert isinstance(env.possible_agents, list)
@@ -195,7 +195,7 @@ def test_zoo_agents():
 
 
 def test_zoo_action_spaces():
-    env = zoo.SavannaZooParallelEnv()
+    env = SavannaZooParallelEnv()
 
     for agent in env.possible_agents:
         assert isinstance(env.action_space(agent), Discrete)
@@ -203,7 +203,7 @@ def test_zoo_action_spaces():
 
 
 def test_zoo_action_space_valid_step():
-    env = zoo.SavannaZooParallelEnv()
+    env = SavannaZooParallelEnv()
     env.reset()
     map_min, map_max = env.metadata["map_min"], env.metadata["map_max"]
 
@@ -228,19 +228,19 @@ def test_zoo_action_space_valid_step():
 
 def test_max_cycles():
     # currently the environment does not accept parameters like max_cycles
-    # max_cycles_test(zoo.SavannaZooParallelEnv)
+    # max_cycles_test(SavannaZooParallelEnv)
     pass
 
 
 def test_render():
     # TODO: close method not implemented
-    # render_test(zoo.SavannaZooParallelEnv)
+    # render_test(SavannaZooParallelEnv)
     pass
 
 
 def test_performance_benchmark():
     # will print only timing to stdout; not shown per default
-    # performance_benchmark(zoo.SavannaZooParallelEnv())
+    # performance_benchmark(SavannaZooParallelEnv())
     pass
 
 
