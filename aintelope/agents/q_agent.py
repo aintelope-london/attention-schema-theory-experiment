@@ -82,7 +82,7 @@ class QAgent(Agent):
         score: float = 0.0,
         done: bool = False,
         save_path: Optional[str] = None,
-    ) -> float:
+    ) -> list:
         """
         Takes observations and updates trainer on perceived experiences. Needed here to catch instincts.
 
@@ -93,8 +93,14 @@ class QAgent(Agent):
             done: boolean whether run is done
             save_path: str
         Returns:
-            reward: float
+            agent_id (str): same as elsewhere ("agent_0" among them)
+            state (npt.NDArray[ObservationFloat]): input for the net
+            action (int): index of action
+            reward (float): reward signal
+            done (bool): if agent is done
+            next_state (npt.NDArray[ObservationFloat]): input for the net
         """
+        
         next_state = observation
         # For future: add state (interoception) handling here when needed
 
@@ -126,12 +132,10 @@ class QAgent(Agent):
                         next_state,
                     ]
                 )
-
-        self.trainer.update_memory(
-            self.id, self.state, self.last_action, score, done, next_state
-        )
+        event = [self.id, self.state, self.last_action, score, done, next_state]
+        self.trainer.update_memory(*event)
         self.state = next_state
-        return score
-
+        
+        return event
 
 register_agent_class("q_agent", QAgent)

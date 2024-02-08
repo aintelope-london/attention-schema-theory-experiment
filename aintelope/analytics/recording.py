@@ -13,41 +13,14 @@ import csv
 logger = logging.getLogger("aintelope.analytics.recording")
 
 
-def record_history(record_path, agents, environment, run_scores):
+def record_history(record_path, history):
     """
     Record history of the training to given path.
     Data is saved step-wise, with each column containing what happened at one time period.
     """
     logger.info(f"Saving training records to disk at {record_path}")
     record_path.parent.mkdir(exist_ok=True, parents=True)
-
-    # TODO: Add history of environments
-    # TODO: The old dataformat will not make sense in the old schema, now "all agents are one"
-    # and all episodes are one. Basically gather the info step by step in the main loop
-    # with columns: agents, episodes, iterations, score, env-info from step, -therest-
-
-    for agent in agents:
-        agent_data = get_agent_history(agent)
-        agent_data.insert(3, "Score", run_scores[agent.id])
-        agent_data.to_csv(record_path, index=False)
-
-
-def get_agent_history(agent) -> pd.DataFrame:
-    """
-    Method to get the history of the agent. Note that warm_start_steps are excluded.
-    warm_start_steps not used atm.
-    """
-    return pd.DataFrame(
-        columns=[
-            "state",
-            "action",
-            "reward",
-            "done",
-            "instinct_events",
-            "next_state",
-        ],
-        data=agent.history,  # self.warm_start_steps :],
-    )
+    history.to_csv(record_path, index=False)
 
 
 def process_history(

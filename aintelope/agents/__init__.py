@@ -4,7 +4,10 @@ from abc import ABC, abstractmethod
 import gymnasium as gym
 
 from pettingzoo import AECEnv, ParallelEnv
-import pandas as pd
+import numpy.typing as npt
+from aintelope.environments.typing import (
+    ObservationFloat,
+)
 
 PettingZooEnv = Union[AECEnv, ParallelEnv]
 Environment = Union[gym.Env, PettingZooEnv]
@@ -19,6 +22,13 @@ class Agent(ABC):
     def get_action(self, epsilon: float, device: str) -> Optional[int]:
         ...
 
+    @abstractmethod
+    def update(self, env: Environment,
+        observation: npt.NDArray[ObservationFloat],
+        score: float,
+        done: bool,
+        save_path: Optional[str]) -> list:
+        ...
 
 AGENT_REGISTRY: Mapping[str, Type[Agent]] = {}
 

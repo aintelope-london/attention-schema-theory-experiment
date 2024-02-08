@@ -6,6 +6,7 @@ from omegaconf import DictConfig
 import os
 from pathlib import Path
 import numpy as np
+import pandas as pd
 
 from aintelope.training.dqn_training import Trainer
 from aintelope.analytics import recording as rec
@@ -83,7 +84,9 @@ def run_experiment(cfg: DictConfig) -> None:
     #    agents.play_step(self.net, epsilon=1.0)
 
     # Main loop
-    run_scores = dict(zip([a.id for a in agents], len(agents) * [[]]))
+    history = pd.DataFrame(columns=["Episode","Step","Agent_id","State","Action",
+                                    "Reward","Done","Next_state"]
+                                    +["Score"]) #TODO: replace this with env.score_titles
 
     for i_episode in range(cfg.hparams.num_episodes):
         # Reset
@@ -124,19 +127,20 @@ def run_experiment(cfg: DictConfig) -> None:
                 for agent in agents:
                     observation = observations[agent.id]
                     score = scores[agent.id]
-
-                    run_scores[agent.id].append(score)  # Save the score for records
-
                     done = dones[agent.id]
                     terminated = terminateds[agent.id]
                     if terminated:
-                        observation = None  # TODO: why is this here?
-                    agent.update(
+                        observation = None
+                    agent_step_info = agent.update(
                         env,
                         observation,
                         score,  # TODO: make a function to handle obs->rew in Q-agent too, remove this
                         done,  # TODO: should it be "terminated" in place of "done" here?
-                    )  # note that score is used ONLY by baseline
+                    )
+
+                    # Record what just happened
+                    env_step_info = [score] #TODO package the score info into a list
+                    history.loc[len(history)] = [i_episode,step]+agent_step_info+env_step_info
 
             elif isinstance(env, AECEnv):
                 # loop: observe, collect action, send action, get observation, update
@@ -166,19 +170,21 @@ def run_experiment(cfg: DictConfig) -> None:
                             info,
                         ) = result
 
-                        run_scores[agent.id].append(score)  # Save the score for records
-
                         done = terminated or truncated
 
                         # Agent is updated based on what the env shows. All commented above included ^
                         if terminated:
                             observation = None  # TODO: why is this here?
-                        agent.update(
+                        agent_step_info = agent.update(
                             env,
                             observation,
                             score,
                             done,  # TODO: should it be "terminated" in place of "done" here?
                         )  # note that score is used ONLY by baseline
+
+                        # Record what just happened
+                        env_step_info = [score] #TODO package the score info into a list
+                        history.loc[len(history)] = [i_episode,step]+agent_step_info+env_step_info
 
                         # NB! any agent could die at any other agent's step
                         for agent_id in env.agents:
@@ -205,10 +211,9 @@ def run_experiment(cfg: DictConfig) -> None:
             os.makedirs(dir_cp, exist_ok=True)
             trainer.save_models(i_episode, dir_cp)
 
-    record_path = Path(cfg.experiment_dir) / "memory_records.csv"
-    rec.record_history(
-        record_path, agents, env, run_scores
-    )  # TODO: consider packaging these in this file
+    record_path = Path(cfg.experiment_dir) / "history.csv"
+    rec.record_history(record_path, history)  
+
 
 
 # @hydra.main(version_base=None, config_path="config", config_name="config_experiment")
