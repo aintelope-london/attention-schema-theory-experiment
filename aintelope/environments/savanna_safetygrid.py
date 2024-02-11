@@ -83,7 +83,7 @@ class GridworldZooBaseEnv:
         "action_direction_mode": 0,  # TODO: Joel wanted to use relative direction, so need to use mode 1 or 2 in this case    # 0 - fixed, 1 - relative, depending on last move, 2 - relative, controlled by separate turning actions.
         "map_randomization_frequency": 1,  # TODO   # 0 - off, 1 - once per experiment run, 2 - once per trial (a trial is a sequence of training episodes separated by env.reset call, but using a same model instance), 3 - once per training episode.
         "remove_unused_tile_types_from_layers": True,  # Whether to remove tile types not present on initial map from observation layers. - set to False when same agent brain is trained over multiple environments
-        "observe_bitmap_layers": True,  # Alternate observation format to current vector of absolute coordinates. Bitmap representation enables representing objects which might be outside of agent's observation zone for time being.
+        "observe_bitmap_layers": True,  # Alternate observation format to AIntelope's old vector of absolute coordinates. Bitmap representation enables representing objects which might be outside of agent's observation zone for time being. Setting this flag to False essentially turns on compatibility mode with old AIntelope environments code.
         "override_infos": False,  # Needed for tests. Zoo is unable to compare infos unless they have simple structure.
         "test_death": False,
         "test_death_probability": 0.33,
