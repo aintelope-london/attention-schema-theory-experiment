@@ -49,16 +49,18 @@ class QAgent(Agent):
         self.done = False
         self.last_action = 0
 
-    def reset(self, state) -> None:
+    def reset(self, state, info) -> None:
         """Resets self and updates the state."""
         self.done = False
         self.state = state
+        self.info = info
         if isinstance(self.state, tuple):
             self.state = self.state[0]
 
     def get_action(
         self,
         observation: npt.NDArray[ObservationFloat] = None,
+        info: dict = {},
         step: int = 0,  # net: nn.Module, epsilon: float, device: str
     ) -> Optional[int]:
         """Given an observation, ask your net what to do. State is needed to be given here
@@ -76,7 +78,7 @@ class QAgent(Agent):
             return None
         else:
             # For future: observation can go to instincts here
-            action = self.trainer.get_action(self.id, self.state, step)
+            action = self.trainer.get_action(self.id, self.state, self.info, step)
 
         self.last_action = action
         return action
@@ -85,6 +87,7 @@ class QAgent(Agent):
         self,
         env: SavannaGymEnv = None,  # TODO hack, figure out if state_to_namedtuple can be static somewhere
         observation: npt.NDArray[ObservationFloat] = None,
+        info: dict = {},
         score: float = 0.0,
         done: bool = False,
         save_path: Optional[str] = None,
@@ -136,6 +139,7 @@ class QAgent(Agent):
             self.id, self.state, self.last_action, score, done, next_state
         )
         self.state = next_state
+        self.info = info
         return score
 
     def get_history(self) -> pd.DataFrame:

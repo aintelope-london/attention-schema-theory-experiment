@@ -19,10 +19,12 @@ from ai_safety_gridworlds.helpers.gridworld_zoo_parallel_env import (
     Actions,
     INFO_OBSERVATION_COORDINATES,
     INFO_OBSERVATION_LAYERS_DICT,
+    INFO_OBSERVATION_LAYERS_ORDER,
     INFO_OBSERVATION_LAYERS_CUBE,
     INFO_AGENT_OBSERVATIONS,
     INFO_AGENT_OBSERVATION_COORDINATES,
-    INFO_AGENT_OBSERVATION_LAYERS_DICT,
+    # INFO_AGENT_OBSERVATION_LAYERS_DICT, # not implemented
+    INFO_AGENT_OBSERVATION_LAYERS_ORDER,
     INFO_AGENT_OBSERVATION_LAYERS_CUBE,
 )
 
@@ -82,7 +84,7 @@ class GridworldZooBaseEnv:
         "observation_direction_mode": 0,  # TODO: Joel wanted to use relative direction, so need to use mode 1 or 2 in this case  # 0 - fixed, 1 - relative, depending on last move, 2 - relative, controlled by separate turning actions.
         "action_direction_mode": 0,  # TODO: Joel wanted to use relative direction, so need to use mode 1 or 2 in this case    # 0 - fixed, 1 - relative, depending on last move, 2 - relative, controlled by separate turning actions.
         "map_randomization_frequency": 1,  # TODO   # 0 - off, 1 - once per experiment run, 2 - once per trial (a trial is a sequence of training episodes separated by env.reset call, but using a same model instance), 3 - once per training episode.
-        "remove_unused_tile_types_from_layers": True,  # Whether to remove tile types not present on initial map from observation layers. - set to False when same agent brain is trained over multiple environments
+        "remove_unused_tile_types_from_layers": False,  # Whether to remove tile types not present on initial map from observation layers. - set to False when same agent brain is trained over multiple environments
         "observe_bitmap_layers": True,  # Alternate observation format to AIntelope's old vector of absolute coordinates. Bitmap representation enables representing objects which might be outside of agent's observation zone for time being. Setting this flag to False essentially turns on compatibility mode with old AIntelope environments code.
         "override_infos": False,  # Needed for tests. Zoo is unable to compare infos unless they have simple structure.
         "test_death": False,
@@ -157,7 +159,10 @@ class GridworldZooBaseEnv:
     # this method has no side effects
     def transform_observation(self, agent: str, info) -> npt.NDArray[ObservationFloat]:
         if self._observe_bitmap_layers:
-            return info[INFO_OBSERVATION_LAYERS_CUBE].astype(np.float32)
+            if agent is None:
+                return info[INFO_OBSERVATION_LAYERS_CUBE].astype(np.float32)
+            else:  # the info is already agent-specific, so no need to find agent subkey here
+                return info[INFO_AGENT_OBSERVATION_LAYERS_CUBE].astype(np.float32)
 
         else:
             # NB! So far the savanna code has been using absolute coordinates, not relative coordinates.
@@ -184,6 +189,26 @@ class GridworldZooBaseEnv:
             ), "observation / observation space shape mismatch"
 
             return agent_observations
+
+    def filter_info(self, info):
+        # keep only necessary fields of infos
+        return {
+            INFO_AGENT_OBSERVATION_COORDINATES: info[
+                INFO_AGENT_OBSERVATION_COORDINATES
+            ],
+            INFO_AGENT_OBSERVATION_LAYERS_ORDER: info[
+                INFO_AGENT_OBSERVATION_LAYERS_ORDER
+            ],
+            INFO_AGENT_OBSERVATION_LAYERS_CUBE: info[
+                INFO_AGENT_OBSERVATION_LAYERS_CUBE
+            ],
+        }
+
+    def filter_infos(self, infos):
+        # keep only necessary fields of infos
+        return {
+            agent: self.filter_info(agent_info) for agent, agent_info in infos.items()
+        }
 
     @property
     def grass_patches(self):
@@ -279,6 +304,30 @@ class GridworldZooBaseEnv:
         else:
             return self.observations2[agent]
 
+    # This API is intended primarily as input for the instincts, documenting the order of layers in observation cube
+    def relative_observation_layers_order(
+        self, agent=None
+    ) -> Union[Dict[AgentId, Observation], Observation]:
+        if agent is None:
+            return {
+                agent: self._last_infos[agent][INFO_AGENT_OBSERVATION_LAYERS_ORDER]
+                for agent in self._last_infos.keys()
+            }
+        else:
+            return self._last_infos[agent][INFO_AGENT_OBSERVATION_LAYERS_ORDER]
+
+    # This API is intended primarily as input for the instincts, documenting the order of layers in observation cube
+    def absolute_observation_layers_order(
+        self, agent=None
+    ) -> Union[Dict[AgentId, Observation], Observation]:
+        if agent is None:
+            return {
+                agent: self._last_infos[agent][INFO_OBSERVATION_LAYERS_ORDER]
+                for agent in self._last_infos.keys()
+            }
+        else:
+            return self._last_infos[agent][INFO_OBSERVATION_LAYERS_ORDER]
+
     # This API is intended primarily as input for the neural network. Relative observation bitmap is agent centric and considers the agent's observation radius. Environments with different sizes will have same-shaped relative observation bitmaps as long as the agent's observation radius is same.
     # if observe_bitmap_layers == True then observe() method returns same value as observe_relative_bitmaps()
     def observe_relative_bitmaps(
@@ -363,6 +412,7 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
         observations, infos = GridworldZooParallelEnv.reset(
             self, seed=seed, options=options, *args, **kwargs
         )
+        infos = self.filter_infos(infos)
         self._last_infos = infos
         # transform observations
         for agent in infos.keys():
@@ -398,6 +448,7 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
             self,
             OrderedDict({agent: {"step": action} for agent, action in actions.items()}),
         )
+        infos = self.filter_infos(infos)
         self._last_infos = infos
 
         rewards2 = {}
@@ -456,11 +507,17 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         infos = GridworldZooAecEnv.infos.fget(
             self
         )  # property needs .fget() to become callable
+        infos = self.filter_infos(infos)
 
         if self._override_infos:
             return {agent: {} for agent in infos.keys()}
         else:
             return infos
+
+    def observe_info(self, agent):
+        info = GridworldZooAecEnv.observe_info(self, agent)
+        info = self.filter_info(info)
+        return info
 
     # def observe_from_location(self, agents_coordinates: Dict):
     #    """This method is read-only (does not change the actual state of the environment nor the actual state of agents).
@@ -490,6 +547,7 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
             infos[agent] = info
             self.observations2[agent] = self.transform_observation(agent, info)
 
+        infos = self.filter_infos(infos)
         self._last_infos = infos
         self._last_rewards2 = {
             agent: np.float64(0) for agent in self.possible_agents
@@ -517,6 +575,7 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
                 agent
             ] = info  # TODO: is this correct to update infos only when observe=True?
             observation2 = self.transform_observation(agent, info)
+            info = self.filter_info(info)
             self.observations2[agent] = observation2
         else:
             observation2 = None  # that's how Zoo api_test.py requires it
@@ -554,6 +613,7 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
             return
 
         info = self.observe_info(agent)
+        info = self.filter_info(info)
         min_grass_distance = self.calc_min_grass_distance(agent, info)
         reward2 = self.reward_agent(min_grass_distance)
         self._last_rewards2[agent] = reward2
@@ -594,6 +654,7 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
 
         # observe observations, transform observations and rewards
         info = self.observe_info(agent)
+        info = self.filter_info(info)
         # self.observe_from_location({agent: [1, 1]})    # for debugging
         self._last_infos[agent] = info
         observation2 = self.transform_observation(agent, info)
@@ -706,6 +767,8 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
 
         terminateds = self.terminations
         truncateds = self.truncations
+
+        infos = self.filter_infos(infos)
 
         if self._override_infos:
             infos = {agent: {} for agent in infos.keys()}

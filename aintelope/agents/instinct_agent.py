@@ -34,14 +34,15 @@ class InstinctAgent(QAgent):
             trainer=trainer,
         )
 
-    def reset(self, state) -> None:
+    def reset(self, state, info) -> None:
         """Resets self and updates the state."""
-        super().reset(state)
+        super().reset(state, info)
         self.init_instincts()
 
     def get_action(
         self,
         observation: npt.NDArray[ObservationFloat] = None,
+        info: dict = {},
         step: int = 0,  # net: nn.Module, epsilon: float, device: str
     ) -> Optional[int]:
         """Given an observation, ask your net what to do. State is needed to be given here
@@ -55,12 +56,13 @@ class InstinctAgent(QAgent):
         Returns:
             action (Optional[int]): index of action
         """
-        return super().get_action(observation, step)
+        return super().get_action(observation, info, step)
 
     def update(
         self,
         env: PettingZooEnv = None,  # TODO hack, figure out if state_to_namedtuple can be static somewhere
         observation: npt.NDArray[ObservationFloat] = None,
+        info: dict = {},
         score: float = 0.0,
         done: bool = False,
         save_path: Optional[str] = None,
@@ -135,6 +137,7 @@ class InstinctAgent(QAgent):
             self.id, self.state, self.last_action, score, done, next_state
         )
         self.state = next_state
+        self.info = info
         return reward
 
     def init_instincts(self) -> None:

@@ -67,11 +67,13 @@ def run_experiment(cfg: DictConfig) -> None:
         # TODO: IF agent.reset() below is not needed then it is possible to call env.observation_space(agent_id) directly to get the observation shape. No need to call observe().
         if isinstance(env, ParallelEnv):
             observation = observations[agent_id]
+            info = infos[agent_id]
         elif isinstance(env, AECEnv):
             observation = env.observe(agent_id)
+            info = env.observe_info(agent_id)
 
         agents[-1].reset(
-            observation
+            observation, info
         )  # TODO: is this reset necessary here? In main loop below, there is also a reset call
         trainer.add_agent(agent_id, observation.shape, env.action_space)
         dones[agent_id] = False
@@ -89,13 +91,13 @@ def run_experiment(cfg: DictConfig) -> None:
                 infos,
             ) = env.reset()
             for agent in agents:
-                agent.reset(observations[agent.id])
+                agent.reset(observations[agent.id], infos[agent.id])
                 dones[agent.id] = False
 
         elif isinstance(env, AECEnv):
             env.reset()
             for agent in agents:
-                agent.reset(env.observe(agent.id))
+                agent.reset(env.observe(agent.id), env.observe_info(agent_id))
                 dones[agent.id] = False
 
         # Iterations within the episode
@@ -105,10 +107,11 @@ def run_experiment(cfg: DictConfig) -> None:
                 actions = {}
                 for agent in agents:  # TODO: exclude terminated agents
                     observation = observations[agent.id]
-                    actions[agent.id] = agent.get_action(observation, step)
+                    info = infos[agent.id]
+                    actions[agent.id] = agent.get_action(observation, info, step)
 
                 # call: send actions and get observations
-                observations, scores, terminateds, truncateds, _ = env.step(actions)
+                observations, scores, terminateds, truncateds, infos = env.step(actions)
                 dones.update(
                     {  # call update since the list of terminateds will become smaller on second step after agents have died
                         key: terminated or truncateds[key]
@@ -119,6 +122,7 @@ def run_experiment(cfg: DictConfig) -> None:
                 # loop: update
                 for agent in agents:
                     observation = observations[agent.id]
+                    info = infos[agent.id]
                     score = scores[agent.id]
                     done = dones[agent.id]
                     terminated = terminateds[agent.id]
@@ -127,6 +131,7 @@ def run_experiment(cfg: DictConfig) -> None:
                     agent.update(
                         env,
                         observation,
+                        info,
                         score,
                         done,  # TODO: should it be "terminated" in place of "done" here?
                     )  # note that score is used ONLY by baseline
@@ -144,7 +149,8 @@ def run_experiment(cfg: DictConfig) -> None:
                         action = None
                     else:
                         observation = env.observe(agent.id)
-                        action = agent.get_action(observation, step)
+                        info = env.observe_info(agent.id)
+                        action = agent.get_action(observation, info, step)
 
                     # Env step
                     # NB! both AIntelope Zoo and Gridworlds Zoo wrapper in AIntelope provide slightly modified Zoo API. Normal Zoo sequential API step() method does not return values and is not allowed to return values else Zoo API tests will fail.
@@ -167,6 +173,7 @@ def run_experiment(cfg: DictConfig) -> None:
                         agent.update(
                             env,
                             observation,
+                            info,
                             score,
                             done,  # TODO: should it be "terminated" in place of "done" here?
                         )  # note that score is used ONLY by baseline

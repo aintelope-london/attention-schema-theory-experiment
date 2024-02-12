@@ -100,6 +100,7 @@ class Trainer:
         self,
         agent_id: str = "",
         observation: npt.NDArray[ObservationFloat] = None,
+        info: dict = {},
         step: int = 0,
     ) -> Optional[int]:
         """
