@@ -111,12 +111,16 @@ class QAgent(Agent):
         # For future: add state (interoception) handling here when needed
 
         if next_state is not None:
-            next_s_hist = env.state_to_namedtuple(next_state.tolist())
+            next_s_hist = env.state_to_namedtuple(
+                next_state[0].tolist()
+            )  # TODO Joel: I think state has no longer namedtuple representation
         else:
             next_s_hist = None
         self.history.append(
             HistoryStep(
-                state=env.state_to_namedtuple(self.state.tolist()),
+                state=env.state_to_namedtuple(
+                    self.state[0].tolist()
+                ),  # TODO Joel: I think state has no longer namedtuple representation
                 action=self.last_action,
                 reward=score,
                 done=done,
@@ -130,7 +134,7 @@ class QAgent(Agent):
                 csv_writer = csv.writer(f)
                 csv_writer.writerow(
                     [
-                        self.state.tolist(),
+                        self.state[0].tolist(),  # TODO Joel
                         self.last_action,
                         score,
                         done,

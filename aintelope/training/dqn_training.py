@@ -182,27 +182,18 @@ class Trainer:
         # add experience to torch device if bugged
         if done:
             return
-        state = (
-            torch.tensor(state[0], dtype=torch.float32, device=self.device).unsqueeze(
-                0
-            ),
-            torch.tensor(state[1], dtype=torch.float32, device=self.device).unsqueeze(
-                0
-            ),
-        )
+        # TODO Joel: handle state[1] which contains interoception
+        state = torch.tensor(
+            state[0], dtype=torch.float32, device=self.device
+        ).unsqueeze(0)
         action = torch.tensor(action, device=self.device).unsqueeze(0).view(1, 1)
         reward = torch.tensor(
             reward, dtype=torch.float32, device=self.device
         ).unsqueeze(0)
-        next_state = (
-            torch.tensor(
-                next_state[0], dtype=torch.float32, device=self.device
-            ).unsqueeze(0),
-            torch.tensor(
-                next_state[1], dtype=torch.float32, device=self.device
-            ).unsqueeze(0),
-        )
-        # TODO Joel: handle state[1] and next_state[1] which contains interoception
+        # TODO Joel: handle next_state[1] which contains interoception
+        next_state = torch.tensor(
+            next_state[0], dtype=torch.float32, device=self.device
+        ).unsqueeze(0)
         self.replay_memories[agent_id].push(state, action, reward, done, next_state)
 
     def optimize_models(self):
