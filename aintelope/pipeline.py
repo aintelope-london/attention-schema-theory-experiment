@@ -6,7 +6,8 @@ from omegaconf import DictConfig, OmegaConf
 
 from aintelope.config.config_utils import register_resolvers
 from aintelope.experiments import run_experiment
-#from aintelope.analytics import plotting
+
+# from aintelope.analytics import plotting
 
 logger = logging.getLogger("aintelope.__main__")
 
@@ -22,10 +23,12 @@ def pipeline(cfg: DictConfig) -> None:
         run_experiment(cfg)
     analytics(cfg)
 
+
 def analytics(cfg):
-    #path = cfg.?
-    #plotting.plot_performance(path, savepath)
+    # path = cfg.?
+    # plotting.plot_performance(path, savepath)
     print("NYI")
+
 
 if __name__ == "__main__":
     register_resolvers()
