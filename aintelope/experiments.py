@@ -1,39 +1,32 @@
-from collections import namedtuple
-
 import logging
-from omegaconf import DictConfig
-
 import os
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
 from aintelope.training.dqn_training import Trainer
 from aintelope.analytics import recording as rec
 
-from aintelope.agents import (
-    Agent,
-    PettingZooEnv,
-    Environment,
-    register_agent_class,
-)
+import glob
 
-# initialize environment registries
+from omegaconf import DictConfig
 from pettingzoo import AECEnv, ParallelEnv
-from aintelope.environments.savanna_zoo import (
-    SavannaZooParallelEnv,
-    SavannaZooSequentialEnv,
-)
-from aintelope.environments.savanna_safetygrid import (
+
+from aintelope.training.dqn_training import Trainer
+from aintelope.agents import get_agent_class
+from aintelope.environments import get_env_class
+import aintelope.agents.instinct_agent  # noqa: F401
+from aintelope.agents.instinct_agent import InstinctAgent  # noqa: F401
+from aintelope.agents.q_agent import QAgent  # noqa: F401
+from aintelope.environments.savanna_safetygrid import (  # noqa: F401
     SavannaGridworldParallelEnv,
     SavannaGridworldSequentialEnv,
 )
-from aintelope.environments import get_env_class
-
-# initialize agent registries
-from aintelope.agents.instinct_agent import InstinctAgent
-from aintelope.agents.q_agent import QAgent
-from aintelope.agents import get_agent_class
+from aintelope.environments.savanna_zoo import (  # noqa: F401
+    SavannaZooParallelEnv,
+    SavannaZooSequentialEnv,
+)
 
 
 def run_experiment(cfg: DictConfig) -> None:
@@ -53,6 +46,8 @@ def run_experiment(cfg: DictConfig) -> None:
 
     # Common trainer for each agent's models
     trainer = Trainer(cfg)
+    dir_out = f"{cfg.log_dir}"
+    dir_cp = dir_out + "checkpoints/"
 
     # Agents
     agents = []
@@ -67,16 +62,24 @@ def run_experiment(cfg: DictConfig) -> None:
             )
         )
 
-        # TODO: IF agent.reset() below is not needed then it is possible to call env.observation_space(agent_id) directly to get the observation shape. No need to call observe().
+        # TODO: IF agent.reset() below is not needed then it is possible to call
+        # env.observation_space(agent_id) directly to get the observation shape.
+        # No need to call observe().
         if isinstance(env, ParallelEnv):
             observation = observations[agent_id]
         elif isinstance(env, AECEnv):
             observation = env.observe(agent_id)
 
-        agents[-1].reset(
-            observation
-        )  # TODO: is this reset necessary here? In main loop below, there is also a reset call
-        trainer.add_agent(agent_id, observation.shape, env.action_space)
+        # TODO: is this reset necessary here? In main loop below,
+        # there is also a reset call
+        agents[-1].reset(observation)
+        # Get latest checkpoint if existing
+        checkpoint = None
+        checkpoints = glob.glob(dir_cp + agent_id + "*")
+        if len(checkpoints) > 0:
+            checkpoint = max(checkpoints, key=os.path.getctime)
+        # Add agent, with potential checkpoint
+        trainer.add_agent(agent_id, observation.shape, env.action_space, checkpoint)
         dones[agent_id] = False
 
     # Warmup not yet implemented
@@ -127,8 +130,10 @@ def run_experiment(cfg: DictConfig) -> None:
 
                 # call: send actions and get observations
                 observations, scores, terminateds, truncateds, _ = env.step(actions)
+                # call update since the list of terminateds will become smaller on
+                # second step after agents have died
                 dones.update(
-                    {  # call update since the list of terminateds will become smaller on second step after agents have died
+                    {
                         key: terminated or truncateds[key]
                         for (key, terminated) in terminateds.items()
                     }
@@ -165,7 +170,9 @@ def run_experiment(cfg: DictConfig) -> None:
                 ):  # num_agents returns number of alive (non-done) agents
                     agent = agents_dict[agent_id]
 
-                    # Per Zoo API, a dead agent must call .step(None) once more after becoming dead. Only after that call will this dead agent be removed from various dictionaries and from .agent_iter loop.
+                    # Per Zoo API, a dead agent must call .step(None) once more after
+                    # becoming dead. Only after that call will this dead agent be
+                    # removed from various dictionaries and from .agent_iter loop.
                     if env.terminations[agent.id] or env.truncations[agent.id]:
                         action = None
                     else:
@@ -173,13 +180,21 @@ def run_experiment(cfg: DictConfig) -> None:
                         action = agent.get_action(observation, step)
 
                     # Env step
-                    # NB! both AIntelope Zoo and Gridworlds Zoo wrapper in AIntelope provide slightly modified Zoo API. Normal Zoo sequential API step() method does not return values and is not allowed to return values else Zoo API tests will fail.
+                    # NB! both AIntelope Zoo and Gridworlds Zoo wrapper in AIntelope
+                    # provide slightly modified Zoo API. Normal Zoo sequential API
+                    # step() method does not return values and is not allowed to return
+                    # values else Zoo API tests will fail.
                     result = env.step_single_agent(action)
 
                     if agent.id in env.agents:  # was not "dead step"
+                        # NB! This is only initial reward upon agent's own step.
+                        # When other agents take their turns then the reward of the
+                        # agent may change. If you need to learn an agent's accumulated
+                        # reward over other agents turns (plus its own step's reward)
+                        # then use env.last property.
                         (
                             observation,
-                            score,  # NB! This is only initial reward upon agent's own step. When other agents take their turns then the reward of the agent may change. If you need to learn an agent's accumulated reward over other agents turns (plus its own step's reward) then use env.last property.
+                            score,
                             terminated,
                             truncated,
                             info,
@@ -187,14 +202,15 @@ def run_experiment(cfg: DictConfig) -> None:
 
                         done = terminated or truncated
 
-                        # Agent is updated based on what the env shows. All commented above included ^
+                        # Agent is updated based on what the env shows.
+                        # All commented above included ^
                         if terminated:
                             observation = None  # TODO: why is this here?
                         agent_step_info = agent.update(
                             env,
                             observation,
                             score,
-                            done,  # TODO: should it be "terminated" in place of "done" here?
+                            done,  # TODO: "terminated" in place of "done" here?
                         )  # note that score is used ONLY by baseline
 
                         # Record what just happened
@@ -212,7 +228,9 @@ def run_experiment(cfg: DictConfig) -> None:
                             dones[agent_id] = (
                                 env.terminations[agent_id] or env.truncations[agent.id]
                             )
-                            # TODO: if the agent died during some other agents step, should we call agent.update() on the dead agent, else it will be never called?
+                            # TODO: if the agent died during some other agents step,
+                            # should we call agent.update() on the dead agent,
+                            # else it will be never called?
 
             else:
                 raise NotImplementedError(f"Unknown environment type {type(env)}")
@@ -225,9 +243,9 @@ def run_experiment(cfg: DictConfig) -> None:
                 break
 
         # Save models
-        # https://pytorch.org/tutorials/recipes/recipes/saving_and_loading_a_general_checkpoint.html
+        # https://pytorch.org/tutorials/recipes/recipes/
+        # saving_and_loading_a_general_checkpoint.html
         if i_episode % cfg.hparams.every_n_episodes == 0:
-            dir_cp = f"{cfg.experiment_dir}" + f"{cfg.checkpoint_dir}"
             os.makedirs(dir_cp, exist_ok=True)
             trainer.save_models(i_episode, dir_cp)
 

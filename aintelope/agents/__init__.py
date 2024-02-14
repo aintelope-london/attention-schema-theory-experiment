@@ -1,5 +1,5 @@
-from typing import Union, Mapping, Optional, Type
 from abc import ABC, abstractmethod
+from typing import Mapping, Optional, Type, Union
 
 import gymnasium as gym
 
@@ -8,6 +8,7 @@ import numpy.typing as npt
 from aintelope.environments.typing import (
     ObservationFloat,
 )
+import pandas as pd
 
 PettingZooEnv = Union[AECEnv, ParallelEnv]
 Environment = Union[gym.Env, PettingZooEnv]
