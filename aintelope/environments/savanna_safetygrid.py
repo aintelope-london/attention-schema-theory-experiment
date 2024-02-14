@@ -135,6 +135,9 @@ class GridworldZooBaseEnv:
             "test_death_probability": self.metadata["test_death_probability"],
         }
 
+        if "amount_agents" in self.metadata:
+            self.super_initargs["amount_agents"] = self.metadata["amount_agents"]
+
         self._observe_bitmap_layers = self.metadata["observe_bitmap_layers"]
         self._override_infos = self.metadata["override_infos"]
 

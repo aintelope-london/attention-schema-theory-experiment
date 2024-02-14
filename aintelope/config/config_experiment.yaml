@@ -37,7 +37,7 @@ hparams:
     map_max: 5
     render_mode: null
     render_map_max: 5
-    # amount_agents: 1 
+    amount_agents: 1  
     # amount_grass_patches: 1
     # amount_water_holes: 0
     test_death: False      # needed for trainer tests
