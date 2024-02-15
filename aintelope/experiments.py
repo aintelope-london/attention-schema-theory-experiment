@@ -6,8 +6,11 @@ from omegaconf import DictConfig
 import os
 from pathlib import Path
 import glob
+import numpy as np
+import pandas as pd
 
 from aintelope.training.dqn_training import Trainer
+from aintelope.analytics import recording as rec
 
 from aintelope.agents import (
     Agent,
@@ -51,10 +54,10 @@ def run_experiment(cfg: DictConfig) -> None:
 
     # Common trainer for each agent's models
     trainer = Trainer(cfg)
-	
+
     dir_out = f"{cfg.log_dir}"
     dir_cp = dir_out + "checkpoints/"
-	
+
     unit_test_mode = (
         cfg.hparams.unit_test_mode
     )  # is set during tests in order to speed up DQN computations
@@ -104,6 +107,21 @@ def run_experiment(cfg: DictConfig) -> None:
     #    agents.play_step(self.net, epsilon=1.0)
 
     # Main loop
+    events = pd.DataFrame(
+        columns=[
+            "Run_id",
+            "Episode",
+            "Step",
+            "Agent_id",
+            "State",
+            "Action",
+            "Reward",
+            "Done",
+            "Next_state",
+        ]
+        + ["Score"]
+    )  # TODO: replace this with env.score_titles    # TODO: multidimensional and multi-agent score handling
+
     for i_episode in range(cfg.hparams.num_episodes):
         # Reset
         if isinstance(env, ParallelEnv):
@@ -148,14 +166,25 @@ def run_experiment(cfg: DictConfig) -> None:
                     done = dones[agent.id]
                     terminated = terminateds[agent.id]
                     if terminated:
-                        observation = None  # TODO: why is this here?
-                    agent.update(
+                        observation = None
+                    agent_step_info = agent.update(
                         env,
                         observation,
                         info,
-                        score,
+                        score,  # TODO: make a function to handle obs->rew in Q-agent too, remove this
                         done,  # TODO: should it be "terminated" in place of "done" here?
-                    )  # note that score is used ONLY by baseline
+                        done,  # TODO: should it be "terminated" in place of "done" here?
+                    )
+
+                    # Record what just happened
+                    env_step_info = [
+                        score
+                    ]  # TODO package the score info into a list    # TODO: multidimensional and multi-agent score handling
+                    events.loc[len(events)] = (
+                        [cfg.experiment_name, i_episode, step]
+                        + agent_step_info
+                        + env_step_info
+                    )
 
             elif isinstance(env, AECEnv):
                 # loop: observe, collect action, send action, get observation, update
@@ -191,13 +220,23 @@ def run_experiment(cfg: DictConfig) -> None:
                         # Agent is updated based on what the env shows. All commented above included ^
                         if terminated:
                             observation = None  # TODO: why is this here?
-                        agent.update(
+                        agent_step_info = agent.update(
                             env,
                             observation,
                             info,
                             score,
                             done,  # TODO: should it be "terminated" in place of "done" here?
                         )  # note that score is used ONLY by baseline
+
+                        # Record what just happened
+                        env_step_info = [
+                            score  # TODO: multidimensional and multi-agent score handling
+                        ]  # TODO package the score info into a list
+                        events.loc[len(events)] = (
+                            [cfg.experiment_name, i_episode, step]
+                            + agent_step_info
+                            + env_step_info
+                        )
 
                         # NB! any agent could die at any other agent's step
                         for agent_id in env.agents:
@@ -219,14 +258,12 @@ def run_experiment(cfg: DictConfig) -> None:
         # Save models
         # https://pytorch.org/tutorials/recipes/recipes/saving_and_loading_a_general_checkpoint.html
         if i_episode % cfg.hparams.every_n_episodes == 0:
+            dir_cp = f"{cfg.experiment_dir}" + f"{cfg.checkpoint_dir}"
             os.makedirs(dir_cp, exist_ok=True)
             trainer.save_models(i_episode, dir_cp)
 
-    record_path = Path(cfg.experiment_dir) / "memory_records.csv"
-    logger.info(f"Saving training records to disk at {record_path}")
-    record_path.parent.mkdir(exist_ok=True, parents=True)
-    for agent in agents:
-        agent.get_history().to_csv(record_path, index=False)
+    record_path = Path(f"{cfg.experiment_dir}" + f"{cfg.events_dir}")
+    rec.record_events(record_path, events)
 
 
 # @hydra.main(version_base=None, config_path="config", config_name="config_experiment")

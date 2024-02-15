@@ -92,7 +92,7 @@ class Trainer:
 
         if not checkpoint:
             self.policy_nets[agent_id] = DQN(
-                self.observation_shapes[agent_id], 
+                self.observation_shapes[agent_id],
                 self.action_spaces[agent_id].n,
                 unit_test_mode=unit_test_mode,
             ).to(self.device)
