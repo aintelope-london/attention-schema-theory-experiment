@@ -1,4 +1,5 @@
 import logging
+
 # Code to enable Visual Studio debugging with non-legacy-debugger.
 # If you want to avoid exceptions during code start altogether then an alternative is to use "legacy debugger":
 # Visual Studio -> Tools -> Options -> Python -> Debugging -> Enable "Use legacy debugger".

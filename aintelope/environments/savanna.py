@@ -10,11 +10,22 @@ import gymnasium.spaces  # cannot import gymnasium.spaces.Tuple directly since i
 from aintelope.environments.env_utils.distance import distance_to_closest_item
 from aintelope.environments.env_utils.render_ascii import AsciiRenderState
 from aintelope.environments.savanna_safetygrid import (
-    AGENT_CHR1, AGENT_CHR2, FOOD_CHR, INFO_AGENT_OBSERVATION_COORDINATES,
-    INFO_AGENT_OBSERVATION_LAYERS_ORDER)
-from aintelope.environments.typing import (Action, AgentId, AgentStates, Info,
-                                           Observation, ObservationFloat, PositionFloat,
-                                           Reward)
+    AGENT_CHR1,
+    AGENT_CHR2,
+    FOOD_CHR,
+    INFO_AGENT_OBSERVATION_COORDINATES,
+    INFO_AGENT_OBSERVATION_LAYERS_ORDER,
+)
+from aintelope.environments.typing import (
+    Action,
+    AgentId,
+    AgentStates,
+    Info,
+    Observation,
+    ObservationFloat,
+    PositionFloat,
+    Reward,
+)
 from gymnasium.spaces import Box, Discrete
 from gymnasium.utils import seeding
 

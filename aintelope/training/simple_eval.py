@@ -7,13 +7,19 @@ from omegaconf import DictConfig, OmegaConf
 import gymnasium as gym
 from aintelope.agents.instinct_agent import InstinctAgent
 from aintelope.agents.q_agent import QAgent
-from aintelope.agents.simple_agents import (IterativeWeightOptimizationAgent,
-                                            OneStepPerfectPredictionAgent,
-                                            RandomWalkAgent)
-from aintelope.environments.savanna_safetygrid import (SavannaGridworldParallelEnv,
-                                                       SavannaGridworldSequentialEnv)
-from aintelope.environments.savanna_zoo import (SavannaZooParallelEnv,
-                                                SavannaZooSequentialEnv)
+from aintelope.agents.simple_agents import (
+    IterativeWeightOptimizationAgent,
+    OneStepPerfectPredictionAgent,
+    RandomWalkAgent,
+)
+from aintelope.environments.savanna_safetygrid import (
+    SavannaGridworldParallelEnv,
+    SavannaGridworldSequentialEnv,
+)
+from aintelope.environments.savanna_zoo import (
+    SavannaZooParallelEnv,
+    SavannaZooSequentialEnv,
+)
 from aintelope.models.dqn import DQN
 from aintelope.training.dqn_training import Trainer
 from pettingzoo import AECEnv, ParallelEnv

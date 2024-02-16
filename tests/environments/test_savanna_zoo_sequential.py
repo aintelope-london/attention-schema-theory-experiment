@@ -10,8 +10,12 @@ from aintelope.environments.env_utils.distance import distance_to_closest_item
 from aintelope.environments.savanna import ACTION_MAP
 from aintelope.environments.savanna_zoo import SavannaZooSequentialEnv
 from gymnasium.spaces import Discrete, MultiDiscrete
-from pettingzoo.test import (api_test, max_cycles_test, performance_benchmark,
-                             render_test)
+from pettingzoo.test import (
+    api_test,
+    max_cycles_test,
+    performance_benchmark,
+    render_test,
+)
 from pettingzoo.test.seed_test import seed_test
 
 # from pettingzoo.utils import parallel_to_aec
