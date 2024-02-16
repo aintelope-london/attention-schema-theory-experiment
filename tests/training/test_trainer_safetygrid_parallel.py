@@ -13,7 +13,10 @@ def test_training_pipeline_main():
     sys.argv = [
         "",
         "hparams.env=savanna-safetygrid-parallel-v1",
-        "hparams.env_entry_point=aintelope.environments.savanna_safetygrid:SavannaGridworldParallelEnv",
+        (
+            "hparams.env_entry_point="
+            "aintelope.environments.savanna_safetygrid:SavannaGridworldParallelEnv"
+        ),
         "hparams.env_type=zoo",
         "hparams.unit_test_mode=True",
         "hparams.num_episodes=5",
@@ -30,7 +33,10 @@ def test_training_pipeline_main_with_dead_agents(execution_number):
     sys.argv = [
         "",
         "hparams.env=savanna-safetygrid-parallel-v1",
-        "hparams.env_entry_point=aintelope.environments.savanna_safetygrid:SavannaGridworldParallelEnv",
+        (
+            "hparams.env_entry_point="
+            "aintelope.environments.savanna_safetygrid:SavannaGridworldParallelEnv"
+        ),
         "hparams.env_type=zoo",
         "hparams.env_params.seed=" + str(execution_number),
         "hparams.env_params.test_death=True",
@@ -45,11 +51,15 @@ def test_training_pipeline_main_with_dead_agents(execution_number):
 
 def test_training_pipeline_baseline():
     # TODO: find a way to parse Makefile and get sys.argv that way
-    # sys.argv = [""] + shlex.split(const.BASELINE_ARGS, comments=False, posix=True) # posix=True removes quotes around arguments
+    # sys.argv = [""] + shlex.split(const.BASELINE_ARGS, comments=False, posix=True)
+    # posix=True removes quotes around arguments
     sys.argv = [
         "",
         "hparams.env=savanna-safetygrid-parallel-v1",
-        "hparams.env_entry_point=aintelope.environments.savanna_safetygrid:SavannaGridworldParallelEnv",
+        (
+            "hparams.env_entry_point="
+            "aintelope.environments.savanna_safetygrid:SavannaGridworldParallelEnv"
+        ),
         "hparams.env_type=zoo",
         "hparams.agent_id=q_agent",
         "hparams.agent_params.target_instincts=[]",
@@ -66,11 +76,15 @@ def test_training_pipeline_baseline():
 def test_training_pipeline_baseline_with_dead_agents(execution_number):
     # run all code in single process always in order to pass seed argument
     # TODO: find a way to parse Makefile and get sys.argv that way
-    # sys.argv = [""] + shlex.split(const.BASELINE_ARGS, comments=False, posix=True) # posix=True removes quotes around arguments
+    # sys.argv = [""] + shlex.split(const.BASELINE_ARGS, comments=False, posix=True)
+    # posix=True removes quotes around arguments
     sys.argv = [
         "",
         "hparams.env=savanna-safetygrid-parallel-v1",
-        "hparams.env_entry_point=aintelope.environments.savanna_safetygrid:SavannaGridworldParallelEnv",
+        (
+            "hparams.env_entry_point="
+            "aintelope.environments.savanna_safetygrid:SavannaGridworldParallelEnv"
+        ),
         "hparams.env_type=zoo",
         "hparams.agent_id=q_agent",
         "hparams.agent_params.target_instincts=[]",
@@ -87,11 +101,15 @@ def test_training_pipeline_baseline_with_dead_agents(execution_number):
 
 def test_training_pipeline_instinct():
     # TODO: find a way to parse Makefile and get sys.argv that way
-    # sys.argv = [""] + shlex.split(const.INSTINCT_ARGS, comments=False, posix=True) # posix=True removes quotes around arguments
+    # sys.argv = [""] + shlex.split(const.INSTINCT_ARGS, comments=False, posix=True)
+    # posix=True removes quotes around arguments
     sys.argv = [
         "",
         "hparams.env=savanna-safetygrid-parallel-v1",
-        "hparams.env_entry_point=aintelope.environments.savanna_safetygrid:SavannaGridworldParallelEnv",
+        (
+            "hparams.env_entry_point="
+            "aintelope.environments.savanna_safetygrid:SavannaGridworldParallelEnv"
+        ),
         "hparams.env_type=zoo",
         "hparams.agent_id=instinct_agent",
         "hparams.agent_params.target_instincts=[smell]",
@@ -108,11 +126,15 @@ def test_training_pipeline_instinct():
 def test_training_pipeline_instinct_with_dead_agents(execution_number):
     # run all code in single process always in order to pass seed argument
     # TODO: find a way to parse Makefile and get sys.argv that way
-    # sys.argv = [""] + shlex.split(const.INSTINCT_ARGS, comments=False, posix=True) # posix=True removes quotes around arguments
+    # sys.argv = [""] + shlex.split(const.INSTINCT_ARGS, comments=False, posix=True)
+    # posix=True removes quotes around arguments
     sys.argv = [
         "",
         "hparams.env=savanna-safetygrid-parallel-v1",
-        "hparams.env_entry_point=aintelope.environments.savanna_safetygrid:SavannaGridworldParallelEnv",
+        (
+            "hparams.env_entry_point="
+            "aintelope.environments.savanna_safetygrid:SavannaGridworldParallelEnv"
+        ),
         "hparams.env_type=zoo",
         "hparams.agent_id=instinct_agent",
         "hparams.agent_params.target_instincts=[smell]",

@@ -1,8 +1,8 @@
 import pathlib
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Union
 
 import pytest
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig, ListConfig, OmegaConf
 
 
 def constants() -> DictConfig:
@@ -20,7 +20,7 @@ def root_dir() -> pathlib.Path:
 
 
 @pytest.fixture
-def tparams_hparams(root_dir: pathlib.Path) -> Dict:
+def tparams_hparams(root_dir: pathlib.Path) -> Union[DictConfig, ListConfig]:
     full_params = OmegaConf.load(root_dir / "aintelope/config/config_experiment.yaml")
 
     # override some parameters during tests in order to speed up computations

@@ -1,6 +1,4 @@
 import os
-import sys
-import time
 
 import numpy as np
 import numpy.testing as npt
@@ -50,6 +48,9 @@ def test_gridworlds_api_sequential_with_death(execution_number):
     # seed = int(time.time()) & 0xFFFFFFFF
     # np.random.seed(seed)
     # print(seed)
+
+    # for Gridworlds, the seed needs to be specified during environment construction
+    # since it affects map randomisation, while seed called later does not change map
     env_params = {
         "num_iters": 500,  # duration of the game
         "map_min": 0,
@@ -59,7 +60,7 @@ def test_gridworlds_api_sequential_with_death(execution_number):
         "amount_grass_patches": 2,
         "amount_water_holes": 2,
         "test_death": False,
-        "seed": execution_number,  # for Gridworlds, the seed needs to be specified during environment construction since it affects map randomisation, while seed called later does not change map
+        "seed": execution_number,
     }
     env = safetygrid.SavannaGridworldSequentialEnv(env_params=env_params)
 
@@ -69,18 +70,24 @@ def test_gridworlds_api_sequential_with_death(execution_number):
 
 @pytest.mark.parametrize("execution_number", range(1))
 def test_gridworlds_seed(execution_number):
+    # override_infos: Zoo seed_test is unable to compare infos unless they have simple structure.
+    # seed: for Gridworlds, the seed needs to be specified during environment construction
+    # since it affects map randomisation, while seed called later does not change map
     env_params = {
-        "override_infos": True,  # Zoo seed_test is unable to compare infos unless they have simple structure.
-        "seed": execution_number,  # for Gridworlds, the seed needs to be specified during environment construction since it affects map randomisation, while seed called later does not change map
+        "override_infos": True,
+        "seed": execution_number,
     }
-    env = lambda: safetygrid.SavannaGridworldSequentialEnv(
-        env_params=env_params
-    )  # seed test requires lambda
+
+    def get_env_instance() -> safetygrid.SavannaGridworldSequentialEnv:
+        """Method for seed_test"""
+        return safetygrid.SavannaGridworldSequentialEnv(env_params=env_params)
+
     try:
-        seed_test(env, num_cycles=10)
+        seed_test(get_env_instance, num_cycles=10)
     except TypeError:
-        # for some reason the test env in Git does not recognise the num_cycles neither as named or positional argument
-        seed_test(env)
+        # for some reason the test env in Git does not recognise the num_cycles neither
+        # as named or positional argument
+        seed_test(get_env_instance)
 
 
 def test_gridworlds_agent_states():
@@ -97,12 +104,14 @@ def test_gridworlds_move_agent():
 
 @pytest.mark.parametrize("execution_number", range(1))
 def test_gridworlds_step_result(execution_number):
+    # default is 1 iter which means that the env is done after 1 step below and the
+    # test will fail
     env = safetygrid.SavannaGridworldSequentialEnv(
         env_params={
             "num_iters": 2,
             "seed": execution_number,
         }
-    )  # default is 1 iter which means that the env is done after 1 step below and the test will fail
+    )
     num_agents = len(env.possible_agents)
     assert num_agents, f"expected 1 agent, got: {num_agents}"
     env.reset()
@@ -111,7 +120,8 @@ def test_gridworlds_step_result(execution_number):
     action = env.action_space(agent).sample()
 
     env.step(action)
-    # NB! env.last() provides observation from NEXT agent in case of multi-agent environment
+    # NB! env.last() provides observation from NEXT agent in case of multi-agent
+    # environment
     (
         observation,
         reward,
@@ -146,7 +156,8 @@ def test_gridworlds_done_step(execution_number):
         agent = env.agent_selection
         action = env.action_space(agent).sample()
         env.step(action)
-        # env.last() provides observation from NEXT agent in case of multi-agent environment
+        # env.last() provides observation from NEXT agent in case of multi-agent
+        # environment
         terminated = env.terminations[agent]
         truncated = env.truncations[agent]
         done = terminated or truncated

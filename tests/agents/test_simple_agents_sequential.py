@@ -103,7 +103,9 @@ def test_randomwalkagent_in_savanna_gridworlds_sequential(
     params_randomwalkagent = {
         "agent": "random_walk_agent",
         "env": "savanna-safetygrid-sequential-v1",
-        "env_entry_point": "aintelope.environments.savanna_safetygrid:SavannaGridworldSequentialEnv",
+        "env_entry_point": (
+            "aintelope.environments.savanna_safetygrid:SavannaGridworldSequentialEnv"
+        ),
         "env_type": "zoo",
         "env_params": {
             "num_iters": 40,  # duration of the game
@@ -129,7 +131,9 @@ def test_onestepperfectpredictionagent_in_savanna_gridworlds_sequential(
     params_perfectpredictionagent = {
         "agent": "one_step_perfect_prediction_agent",
         "env": "savanna-safetygrid-sequential-v1",
-        "env_entry_point": "aintelope.environments.savanna_safetygrid:SavannaGridworldSequentialEnv",
+        "env_entry_point": (
+            "aintelope.environments.savanna_safetygrid:SavannaGridworldSequentialEnv"
+        ),
         "env_type": "zoo",
         "env_params": {
             "num_iters": 40,  # duration of the game
@@ -157,7 +161,9 @@ def test_iterativeweightoptimizationagent_in_savanna_gridworlds_sequential(
     params_weightoptimizationagent = {
         "agent": "iterative_weight_optimization_agent",
         "env": "savanna-safetygrid-sequential-v1",
-        "env_entry_point": "aintelope.environments.savanna_safetygrid:SavannaGridworldSequentialEnv",
+        "env_entry_point": (
+            "aintelope.environments.savanna_safetygrid:" "SavannaGridworldSequentialEnv"
+        ),
         "env_type": "zoo",
         "env_params": {
             "num_iters": 40,  # duration of the game

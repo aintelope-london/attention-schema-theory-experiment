@@ -53,8 +53,8 @@ class QAgent(Agent):
         info: dict = {},
         step: int = 0,  # net: nn.Module, epsilon: float, device: str
     ) -> Optional[int]:
-        """Given an observation, ask your net what to do. State is needed to be given here
-        as other agents have changed the state!
+        """Given an observation, ask your net what to do. State is needed to be given
+        here as other agents have changed the state!
 
         Args:
             net: pytorch Module instance, the model
@@ -73,9 +73,10 @@ class QAgent(Agent):
         self.last_action = action
         return action
 
+    # TODO hack, figure out if state_to_namedtuple can be static somewhere
     def update(
         self,
-        env: SavannaGymEnv = None,  # TODO hack, figure out if state_to_namedtuple can be static somewhere
+        env: SavannaGymEnv = None,
         observation: Tuple[
             npt.NDArray[ObservationFloat], npt.NDArray[ObservationFloat]
         ] = None,
@@ -85,7 +86,8 @@ class QAgent(Agent):
         save_path: Optional[str] = None,
     ) -> list:
         """
-        Takes observations and updates trainer on perceived experiences. Needed here to catch instincts.
+        Takes observations and updates trainer on perceived experiences.
+        Needed here to catch instincts.
 
         Args:
             env: Environment

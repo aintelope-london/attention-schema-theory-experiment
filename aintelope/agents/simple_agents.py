@@ -46,7 +46,9 @@ class OneStepPerfectPredictionAgent(QAgent):
             # GYM_INTERACTION
             action = self.action_space.sample()
         else:
-            agent_pos = get_agent_pos_from_state(self.state[0], info, agent.id)
+            agent_pos = get_agent_pos_from_state(
+                self.state[0], info={}, agent_name=self.id
+            )
             grass = self.env.grass_patches  # TODO: 3D observation support
             min_grass_distance = distance_to_closest_item(agent_pos, grass)
             # agent_pos, grass = observation[:2], observation[2:].reshape(2, -1)
@@ -77,10 +79,6 @@ class IterativeWeightOptimizationAgent(QAgent):
         learning_rate = 0.01
         learning_randomness = 0.00
 
-        LAST_ACTION_KEY = "last_action"
-        LAST_REWARD_KEY = "last_reward"
-        ACTIONS_WEIGHTS = "actions_weights"
-
         if np.random.random() < epsilon:
             # GYM_INTERACTION
             action = self.action_space.sample()
@@ -89,10 +87,6 @@ class IterativeWeightOptimizationAgent(QAgent):
         recent_memories = self.replay_buffer.fetch_recent_memories(2)
 
         logger.info("info", recent_memories)
-
-        # last_action = info.get(LAST_ACTION_KEY)
-        # last_reward = info.get(LAST_REWARD_KEY, 0)
-        # action_weights = info[ACTIONS_WEIGHTS]
 
         reward = self.replay_buffer.get_reward_from_memory(recent_memories[0])
         previous_reward = self.replay_buffer.get_reward_from_memory(recent_memories[1])

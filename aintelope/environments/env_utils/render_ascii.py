@@ -100,8 +100,6 @@ class AsciiRenderState:
             # collisions handled elsewhere, don't have rendering engine do that
             self.agent_sprites[agent_name].move(agent_movement, collide=False)
 
-        for x in self.grass_sprites:
-            x = None
         self.grass_sprites = []
         for grass_pos in np.argwhere(grass_patches == 1):
             grass_image = """x""".replace("x", self.ascii_symbols["food"])

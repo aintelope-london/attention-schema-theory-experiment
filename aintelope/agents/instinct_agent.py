@@ -42,8 +42,8 @@ class InstinctAgent(QAgent):
         info: dict = {},
         step: int = 0,  # net: nn.Module, epsilon: float, device: str
     ) -> Optional[int]:
-        """Given an observation, ask your net what to do. State is needed to be given here
-        as other agents have changed the state!
+        """Given an observation, ask your net what to do. State is needed to be
+        given here as other agents have changed the state!
 
         Args:
             net: pytorch Module instance, the model
@@ -55,9 +55,10 @@ class InstinctAgent(QAgent):
         """
         return super().get_action(observation, info, step)
 
+    # TODO hack, figure out if state_to_namedtuple can be static somewhere
     def update(
         self,
-        env: PettingZooEnv = None,  # TODO hack, figure out if state_to_namedtuple can be static somewhere
+        env: PettingZooEnv = None,
         observation: npt.NDArray[ObservationFloat] = None,
         info: dict = {},
         score: float = 0.0,
@@ -65,7 +66,8 @@ class InstinctAgent(QAgent):
         save_path: Optional[str] = None,
     ) -> list:
         """
-        Takes observations and updates trainer on perceived experiences. Needed here to catch instincts.
+        Takes observations and updates trainer on perceived experiences.
+        Needed here to catch instincts.
 
         Args:
             env: Environment
@@ -130,7 +132,8 @@ class InstinctAgent(QAgent):
         for instinct_name in self.target_instincts:
             if instinct_name not in available_instincts_dict:
                 logger.warning(
-                    f"Warning: could not find {instinct_name} in available_instincts_dict"
+                    f"Warning: could not find {instinct_name} "
+                    "in available_instincts_dict"
                 )
                 continue
 

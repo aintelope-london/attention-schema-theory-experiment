@@ -51,17 +51,18 @@ def run_episode(full_params: Dict) -> None:
     hparams = full_params.hparams
 
     env_params = hparams["env_params"]
-    agent_params = hparams["agent_params"]
     render_mode = env_params["render_mode"]
     verbose = tparams["verbose"]
 
     env_type = hparams["env_type"]
     logger.info("env type", env_type)
-    # gym_vec_env_v0(env, num_envs) creates a Gym vector environment with num_envs copies of the environment.
+    # gym_vec_env_v0(env, num_envs) creates a Gym vector environment with num_envs
+    # copies of the environment.
     # https://tristandeleu.github.io/gym/vector/
     # https://github.com/Farama-Foundation/SuperSuit
 
-    # stable_baselines3_vec_env_v0(env, num_envs) creates a stable_baselines vector environment with num_envs copies of the environment.
+    # stable_baselines3_vec_env_v0(env, num_envs) creates a stable_baselines vector
+    # environment with num_envs copies of the environment.
 
     if env_type == "zoo":
         env = ENV_LOOKUP[hparams["env"]](env_params=env_params)
@@ -121,15 +122,17 @@ def run_episode(full_params: Dict) -> None:
 
     agent_spec = hparams["agent_id"]  # TODO: why is this value a list?
     if isinstance(agent_spec, list) and len(agent_spec) == 1:
-        # NB! after this step the agent_spec is not a list anymore and the following if condition will be False, so do not try to merge these "if" branches.
+        # NB! after this step the agent_spec is not a list anymore and the following
+        # if condition will be False, so do not try to merge these "if" branches.
         agent_spec = agent_spec[0]
 
     if isinstance(agent_spec, list):
         if len(models) < len(agent_spec):
-            models *= len(
-                agent_spec
-            )  # TODO: shouldnt it be env_params["amount_agents"] here?
-        agents = [  # TODO: this nested list structure probably will not work in below code. What is the intention of using multiple agent_specs?
+            # TODO: shouldnt it be env_params["amount_agents"] here?
+            models *= len(agent_spec)
+        # TODO: this nested list structure probably will not work in below code.
+        # What is the intention of using multiple agent_specs?
+        agents = [
             [
                 AGENT_LOOKUP[agent](
                     agent_id=f"agent_{i}",
@@ -169,12 +172,12 @@ def run_episode(full_params: Dict) -> None:
 
     agents_dict = {agent.id: agent for agent in agents}
 
-    episode_rewards = Counter(
-        {agent.id: 0.0 for agent in agents}
-    )  # cannot use list since some of the agents may be terminated in the middle of the episode
-    dones = {
-        agent.id: False for agent in agents
-    }  # cannot use list since some of the agents may be terminated in the middle of the episode
+    # cannot use list since some of the agents may be terminated in the middle of
+    # the episode
+    episode_rewards = Counter({agent.id: 0.0 for agent in agents})
+    # cannot use list since some of the agents may be terminated in the middle of
+    # the episode
+    dones = {agent.id: False for agent in agents}
     warm_start_steps = hparams["warm_start_steps"]
 
     for step in range(warm_start_steps):
@@ -199,8 +202,10 @@ def run_episode(full_params: Dict) -> None:
                 )
 
                 logger.debug((observations, rewards, terminateds, truncateds, infos))
+                # call update since the list of terminateds will become smaller on
+                # second step after agents have died
                 dones.update(
-                    {  # call update since the list of terminateds will become smaller on second step after agents have died
+                    {
                         key: terminated or truncateds[key]
                         for (key, terminated) in terminateds.items()
                     }
@@ -213,9 +218,12 @@ def run_episode(full_params: Dict) -> None:
                     agent = agents_dict[agent_id]
                     observation = env.observe(agent.id)
                     info = env.observe_info(agent.id)
-                    # agent doesn't get to play_step, only env can, for multi-agent env compatibility
+                    # agent doesn't get to play_step, only env can,
+                    # for multi-agent env compatibility
                     # reward, score, done = agent.play_step(nets[i], epsilon=1.0)
-                    # Per Zoo API, a dead agent must call .step(None) once more after becoming dead. Only after that call will this dead agent be removed from various dictionaries and from .agent_iter loop.
+                    # Per Zoo API, a dead agent must call .step(None) once more after
+                    # becoming dead. Only after that call will this dead agent be
+                    # removed from various dictionaries and from .agent_iter loop.
                     if env.terminations[agent_id] or env.truncations[agent.id]:
                         action = None
                     else:
@@ -223,20 +231,28 @@ def run_episode(full_params: Dict) -> None:
                         action = agent.get_action(
                             observation,
                             info,
-                            step,  # TODO: there was step=0 but we have step index available in this iteration. So is it okay if I use the step variable here?
+                            step,
                         )
 
                     logger.debug("debug action", action)
                     logger.debug("debug step")
                     logger.debug(env.__dict__)
 
-                    # NB! both AIntelope Zoo and Gridworlds Zoo wrapper in AIntelope provide slightly modified Zoo API. Normal Zoo sequential API step() method does not return values and is not allowed to return values else Zoo API tests will fail.
+                    # NB! both AIntelope Zoo and Gridworlds Zoo wrapper in AIntelope
+                    # provide slightly modified Zoo API. Normal Zoo sequential API
+                    # step() method does not return values and is not allowed to
+                    # return values else Zoo API tests will fail.
                     result = env.step_single_agent(action)  # TODO: parallel env support
 
+                    # NB! This is only initial reward upon agent's own step.
+                    # When other agents take their turns then the reward of the agent
+                    # may change. If you need to learn an agent's accumulated reward
+                    # over other agents turns (plus its own step's reward)
+                    # then use env.last property.
                     if agent.id in env.agents:  # was not "dead step"
                         (
                             observation,
-                            reward,  # NB! This is only initial reward upon agent's own step. When other agents take their turns then the reward of the agent may change. If you need to learn an agent's accumulated reward over other agents turns (plus its own step's reward) then use env.last property.
+                            reward,
                             terminated,
                             truncated,
                             info,
@@ -289,8 +305,10 @@ def run_episode(full_params: Dict) -> None:
                 )
 
                 logger.debug((observations, rewards, terminateds, truncateds, infos))
+                # call update since the list of terminateds will become smaller on
+                # second step after agents have died
                 dones.update(
-                    {  # call update since the list of terminateds will become smaller on second step after agents have died
+                    {
                         key: terminated or truncateds[key]
                         for (key, terminated) in terminateds.items()
                     }
@@ -303,29 +321,40 @@ def run_episode(full_params: Dict) -> None:
                     max_iter=env.num_agents
                 ):  # num_agents returns number of alive (non-done) agents
                     agent = agents_dict[agent_id]
-                    # agent doesn't get to play_step, only env can, for multi-agent env compatibility
+                    # agent doesn't get to play_step, only env can,
+                    # for multi-agent env compatibility
                     # reward, score, done = agent.play_step(nets[i], epsilon=1.0)
-                    # Per Zoo API, a dead agent must call .step(None) once more after becoming dead. Only after that call will this dead agent be removed from various dictionaries and from .agent_iter loop.
+                    # Per Zoo API, a dead agent must call .step(None) once more
+                    # after becoming dead. Only after that call will this dead agent be
+                    # removed from various dictionaries and from .agent_iter loop.
                     if env.terminations[agent_id] or env.truncations[agent.id]:
                         action = None
                     else:
                         # action = action_space(agent.id).sample()
                         action = agent.get_action(
                             observation,
-                            step,  # TODO: there was step=0 but we have step index available in this iteration. So is it okay if I use the step variable here?
+                            step,
                         )
 
                     logger.debug("debug action", action)
                     logger.debug("debug step")
                     logger.debug(env.__dict__)
 
-                    # NB! both AIntelope Zoo and Gridworlds Zoo wrapper in AIntelope provide slightly modified Zoo API. Normal Zoo sequential API step() method does not return values and is not allowed to return values else Zoo API tests will fail.
+                    # NB! both AIntelope Zoo and Gridworlds Zoo wrapper in AIntelope
+                    # provide slightly modified Zoo API. Normal Zoo sequential API
+                    # step() method does not return values and is not allowed to
+                    # return values else Zoo API tests will fail.
                     result = env.step_single_agent(action)  # TODO: parallel env support
 
+                    # NB! This is only initial reward upon agent's own step.
+                    # When other agents take their turns then the reward of the
+                    # agent may change. If you need to learn an agent's accumulated
+                    # reward over other agents turns (plus its own step's reward)
+                    # then use env.last property.
                     if agent.id in env.agents:  # was not "dead step"
                         (
                             observation,
-                            reward,  # NB! This is only initial reward upon agent's own step. When other agents take their turns then the reward of the agent may change. If you need to learn an agent's accumulated reward over other agents turns (plus its own step's reward) then use env.last property.
+                            reward,
                             terminated,
                             truncated,
                             info,
@@ -349,6 +378,6 @@ def run_episode(full_params: Dict) -> None:
 
     if verbose:
         logger.info(
-            f"Simple Episode Evaluation completed."
+            "Simple Episode Evaluation completed."
             "Final episode rewards: {episode_rewards}"
         )
