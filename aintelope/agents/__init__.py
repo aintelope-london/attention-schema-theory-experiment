@@ -13,21 +13,31 @@ Environment = Union[gym.Env, PettingZooEnv]
 
 class Agent(ABC):
     @abstractmethod
-    def reset(self) -> None:
+    def reset(self, state, info) -> None:
         ...
 
     @abstractmethod
-    def get_action(self, epsilon: float, device: str) -> Optional[int]:
+    def get_action(
+        self,
+        observation: Tuple[
+            npt.NDArray[ObservationFloat], npt.NDArray[ObservationFloat]
+        ] = None,
+        info: dict = {},
+        step: int = 0,  # net: nn.Module, epsilon: float, device: str
+    ) -> Optional[int]:
         ...
 
     @abstractmethod
     def update(
         self,
-        env: Environment,
-        observation: npt.NDArray[ObservationFloat],
-        score: float,
-        done: bool,
-        save_path: Optional[str],
+        env: PettingZooEnv = None,
+        observation: Tuple[
+            npt.NDArray[ObservationFloat], npt.NDArray[ObservationFloat]
+        ] = None,
+        info: dict = {},
+        score: float = 0.0,
+        done: bool = False,
+        save_path: Optional[str] = None,
     ) -> list:
         ...
 
