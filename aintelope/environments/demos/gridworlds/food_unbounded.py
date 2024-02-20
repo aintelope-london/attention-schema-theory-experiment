@@ -62,7 +62,7 @@ def main(unused_argv):
     FLAGS = init_experiment_flags()
     env = AIntelopeSavannaEnvironmentMaExperiment()
 
-    for episode_no in range(0, 2):
+    for episode_no in range(0, 1000):
         env.reset()
         ui = safety_ui_ex.make_human_curses_ui_with_noop_keys(
             GAME_BG_COLOURS, GAME_FG_COLOURS, noop_keys=FLAGS.noops
