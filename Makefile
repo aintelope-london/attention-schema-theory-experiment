@@ -24,6 +24,7 @@ clean-venv: ## remove virtual environment
 	if [ -d $(VENV) ]; then rm -r $(VENV) ; fi;
 
 install: ## Install packages
+	pip uninstall ai_safety_gridworlds
 	pip install -r requirements/api.txt
 
 install-dev: ## Install development packages
@@ -45,7 +46,7 @@ typecheck-local: ## Local typechecking
 	mypy $(CODEBASE)
 
 # ---------- formatting ----------
-.PHONY: format format-check isort isort-check
+.PHONY: isort isort-check format format-check
 format: ## apply automatic code formatter to repository
 	black $(CODEBASE)
 

@@ -1,6 +1,6 @@
 import csv
 import logging
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import numpy.typing as npt
 
@@ -37,7 +37,9 @@ class InstinctAgent(QAgent):
 
     def get_action(
         self,
-        observation: npt.NDArray[ObservationFloat] = None,
+        observation: Tuple[
+            npt.NDArray[ObservationFloat], npt.NDArray[ObservationFloat]
+        ] = None,
         info: dict = {},
         step: int = 0,  # net: nn.Module, epsilon: float, device: str
     ) -> Optional[int]:
@@ -58,7 +60,9 @@ class InstinctAgent(QAgent):
     def update(
         self,
         env: PettingZooEnv = None,
-        observation: npt.NDArray[ObservationFloat] = None,
+        observation: Tuple[
+            npt.NDArray[ObservationFloat], npt.NDArray[ObservationFloat]
+        ] = None,
         info: dict = {},
         score: float = 0.0,
         done: bool = False,

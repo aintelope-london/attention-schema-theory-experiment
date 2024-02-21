@@ -65,26 +65,30 @@ class GridworldZooBaseEnv:
         "seed": None,
         # "name": "savanna-safetygrid-v1",
         # "render_fps": 3,
-        "render_agent_radius": 5,
-        # "render_agent_color": (200, 50, 0),
-        # "render_grass_radius": 5,
-        # "render_grass_color": (20, 200, 0),
+        "render_agent_radius": 10,
         # "render_modes": ("human", "ascii", "offline"),
-        # "render_window_size": 512,
-        # "amount_agents": 1,
         # "map_min": 0,
         # "map_max": 10,   # TODO
-        # "amount_grass_patches": 2,
-        # "amount_water_holes": 0,
+        #
+        "amount_agents": 1,
+        "amount_grass_patches": 2,
+        "amount_water_holes": 0,
+        "amount_danger_tiles": 0,
+        "amount_predators": 0,
+        "enable_homeostasis": False,
+        "sustainability_challenge": False,
+        "amount_gold_deposits": 0,
+        "amount_silver_deposits": 0,
+        #
+        "FOOD_SCORE": None,
+        #
         "num_iters": 1,
-        # TODO: Joel wanted to use relative direction, so need to use mode 1 or 2 in
-        # this case  # 0 - fixed, 1 - relative, depending on last move, 2 - relative,
+        # 0 - fixed, 1 - relative, depending on last move, 2 - relative,
         # controlled by separate turning actions.
-        "observation_direction_mode": 0,
-        # TODO: Joel wanted to use relative direction, so need to use mode 1 or 2 in
-        # this case    # 0 - fixed, 1 - relative, depending on last move, 2 - relative,
+        "observation_direction_mode": 1,
+        # 0 - fixed, 1 - relative, depending on last move, 2 - relative,
         # controlled by separate turning actions.
-        "action_direction_mode": 0,
+        "action_direction_mode": 1,
         # TODO   # 0 - off, 1 - once per experiment run, 2 - once per trial
         # (a trial is a sequence of training episodes separated by env.reset call,
         # but using a same model instance), 3 - once per training episode.
@@ -114,43 +118,83 @@ class GridworldZooBaseEnv:
         self.metadata.update(env_params)
         logger.info(f"initializing savanna env with params: {self.metadata}")
 
-        self.super_initargs = {
-            "env_name": self.metadata.get(
-                "env_experiment", "aintelope.aintelope_savanna"
-            ),
+        metadata_to_super_initargs_dict = {
             # This seed is used mainly for environment map randomisation.
             # Later the test calls .seed() method on the wrapper and this will
             # determine the random action sampling and other random events
             # during the game play.
-            "seed": self.metadata["seed"],
-            "max_iterations": self.metadata["num_iters"],
-            # "amount_food_patches": self.metadata["amount_grass_patches"],
-            # "amount_drink_holes": self.metadata["amount_water_holes"],
-            # "amount_agents": self.metadata["amount_agents"],
+            "seed": "seed",
+            "max_iterations": "num_iters",
+            #
+            "amount_agents": "amount_agents",
+            "amount_food_patches": "amount_grass_patches",
+            "amount_drink_holes": "amount_water_holes",
+            "amount_water_tiles": "amount_danger_tiles",
+            "amount_predators": "amount_predators",
+            "penalise_oversatiation": "enable_homeostasis",
+            "sustainability_challenge": "sustainability_challenge",
+            "amount_gold_deposits": "amount_gold_deposits",
+            "amount_silver_deposits": "amount_silver_deposits",
+            #
+            "DANGER_TILE_SCORE": "DANGER_TILE_SCORE",
+            "PREDATOR_NPC_SCORE": "PREDATOR_NPC_SCORE",
+            "MOVEMENT_SCORE": "MOVEMENT_SCORE",
+            "COOPERATION_SCORE": "COOPERATION_SCORE",
+            #
+            "FOOD_SCORE": "FOOD_SCORE",
+            "FOOD_DEFICIENCY_SCORE": "FOOD_DEFICIENCY_SCORE",
+            "FOOD_OVERSATIATION_SCORE": "FOOD_OVERSATIATION_SCORE",
+            #
+            "FOOD_DEFICIENCY_INITIAL": "FOOD_DEFICIENCY_INITIAL",
+            "FOOD_EXTRACTION_RATE": "FOOD_EXTRACTION_RATE",
+            "FOOD_DEFICIENCY_RATE": "FOOD_DEFICIENCY_RATE",
+            "FOOD_OVERSATIATION_LIMIT": "FOOD_OVERSATIATION_LIMIT",
+            #
+            "FOOD_GROWTH_LIMIT": "FOOD_GROWTH_LIMIT",
+            "FOOD_REGROWTH_EXPONENT": "FOOD_REGROWTH_EXPONENT",
+            #
+            "DRINK_SCORE": "DRINK_SCORE",
+            "DRINK_DEFICIENCY_SCORE": "DRINK_DEFICIENCY_SCORE",
+            "DRINK_OVERSATIATION_SCORE": "DRINK_OVERSATIATION_SCORE",
+            #
+            "DRINK_DEFICIENCY_INITIAL": "DRINK_DEFICIENCY_INITIAL",
+            "DRINK_EXTRACTION_RATE": "DRINK_EXTRACTION_RATE",
+            "DRINK_DEFICIENCY_RATE": "DRINK_DEFICIENCY_RATE",
+            "DRINK_OVERSATIATION_LIMIT": "DRINK_OVERSATIATION_LIMIT",
+            #
+            "DRINK_GROWTH_LIMIT": "DRINK_GROWTH_LIMIT",
+            "DRINK_REGROWTH_EXPONENT": "DRINK_REGROWTH_EXPONENT",
+            #
             # TODO: is render_agent_radius meant as diameter actually?
-            "observation_radius": self.metadata["render_agent_radius"],
+            "observation_radius": "render_agent_radius",
             # 0 - fixed, 1 - relative, depending on last move, 2 - relative,
             # controlled by separate turning actions.
-            "observation_direction_mode": self.metadata["observation_direction_mode"],
+            "observation_direction_mode": "observation_direction_mode",
             # 0 - fixed, 1 - relative, depending on last move, 2 - relative,
             # controlled by separate turning actions.
-            "action_direction_mode": self.metadata["action_direction_mode"],
+            "action_direction_mode": "action_direction_mode",
             # 0 - off, 1 - once per experiment run, 2 - once per trial (a trial is a
             # sequence of training episodes separated by env.reset call,
             # but using a same model instance), 3 - once per training episode.
-            "map_randomization_frequency": self.metadata["map_randomization_frequency"],
+            "map_randomization_frequency": "map_randomization_frequency",
             # Whether to remove tile types not present on initial map from observation
             # layers. - set to False when same agent brain is trained over multiple
             # environments
-            "remove_unused_tile_types_from_layers": self.metadata[
-                "remove_unused_tile_types_from_layers"
-            ],
-            "test_death": self.metadata["test_death"],
-            "test_death_probability": self.metadata["test_death_probability"],
+            "remove_unused_tile_types_from_layers": "remove_unused_tile_types_from_layers",
+            "test_death": "test_death",
+            "test_death_probability": "test_death_probability",
+            "amount_agents": "amount_agents",
         }
 
-        if "amount_agents" in self.metadata:
-            self.super_initargs["amount_agents"] = self.metadata["amount_agents"]
+        self.super_initargs = {
+            "env_name": self.metadata.get(
+                "env_experiment", "aintelope.aintelope_savanna"
+            )
+        }
+
+        for super_initargs_key, metadata_key in metadata_to_super_initargs_dict.items():
+            if self.metadata.get(metadata_key, None) is not None:
+                self.super_initargs[super_initargs_key] = self.metadata[metadata_key]
 
         self._observe_bitmap_layers = self.metadata["observe_bitmap_layers"]
         self._override_infos = self.metadata["override_infos"]
