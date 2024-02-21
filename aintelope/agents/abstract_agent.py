@@ -26,7 +26,7 @@ class Agent(ABC):
     @abstractmethod
     def update(
         self,
-        env: PettingZooEnv = None,
+        env: Environment = None,
         observation: Tuple[
             npt.NDArray[ObservationFloat], npt.NDArray[ObservationFloat]
         ] = None,
