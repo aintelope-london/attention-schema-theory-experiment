@@ -59,6 +59,7 @@ Step = Tuple[
 
 class GridworldZooBaseEnv:
     metadata = {
+        "level": 0,  # selects the map template
         # This seed is used mainly for environment map randomisation.
         # Later the test calls .seed() method on the wrapper and this will determine
         # the random action sampling and other random events during the game play.
@@ -79,8 +80,6 @@ class GridworldZooBaseEnv:
         "sustainability_challenge": False,
         "amount_gold_deposits": 0,
         "amount_silver_deposits": 0,
-        #
-        "FOOD_SCORE": None,
         #
         "num_iters": 1,
         # 0 - fixed, 1 - relative, depending on last move, 2 - relative,
@@ -119,6 +118,7 @@ class GridworldZooBaseEnv:
         logger.info(f"initializing savanna env with params: {self.metadata}")
 
         metadata_to_super_initargs_dict = {
+            "level": "level",
             # This seed is used mainly for environment map randomisation.
             # Later the test calls .seed() method on the wrapper and this will
             # determine the random action sampling and other random events

@@ -68,6 +68,8 @@ hparams:
     FOOD_EXTRACTION_RATE: 1
     FOOD_DEFICIENCY_RATE: -0.2   
     FOOD_OVERSATIATION_LIMIT: 2
+    FOOD_GROWTH_LIMIT: 20
+    FOOD_REGROWTH_EXPONENT: 1.1
     # drink
     DRINK_SCORE: '{"DRINK": 20}'
     DRINK_DEFICIENCY_SCORE: '{"DRINK_DEFICIENCY": -100}'
@@ -76,6 +78,8 @@ hparams:
     DRINK_EXTRACTION_RATE: 1
     DRINK_DEFICIENCY_RATE: -0.2   
     DRINK_OVERSATIATION_LIMIT: 2
+    DRINK_GROWTH_LIMIT: 20
+    DRINK_REGROWTH_EXPONENT: 1.1
     #
     # 0 - fixed, 1 - relative, depending on last move, 2 - relative,
     # controlled by separate turning actions.
