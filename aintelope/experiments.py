@@ -32,8 +32,10 @@ def run_experiment(cfg: DictConfig, score_dimensions: list) -> None:
     # Common trainer for each agent's models
     trainer = Trainer(cfg)
 
-    dir_out = f"{cfg.log_dir}"
-    dir_cp = os.path.join(dir_out, "checkpoints")
+    # normalise slashes in paths. This is not mandatory, but will be cleaner to debug
+    dir_out = os.path.normpath(cfg.log_dir)
+    checkpoint_dir = os.path.normpath(cfg.checkpoint_dir)
+    dir_cp = os.path.join(dir_out, checkpoint_dir)
 
     unit_test_mode = (
         cfg.hparams.unit_test_mode
@@ -266,8 +268,12 @@ def run_experiment(cfg: DictConfig, score_dimensions: list) -> None:
         os.makedirs(dir_cp, exist_ok=True)
         trainer.save_models(i_episode, dir_cp)
 
-    record_path = Path(f"{cfg.experiment_dir}" + f"{cfg.events_dir}")
-    rec.record_events(
+    # normalise slashes in paths. This is not mandatory, but will be cleaner to debug
+    experiment_dir = os.path.normpath(cfg.experiment_dir)
+    events_dir = os.path.normpath(cfg.events_dir)
+
+    record_path = Path(os.path.join(experiment_dir, events_dir))
+    rec.record_events(  # the experiment_dir path is automatically created
         record_path, events
     )  # TODO: flush the events log every once a while and later append new rows
 
