@@ -14,7 +14,7 @@ from aintelope.training.dqn_training import Trainer
 from pettingzoo import AECEnv, ParallelEnv
 
 
-def run_experiment(cfg: DictConfig) -> None:
+def run_experiment(cfg: DictConfig, score_dimensions: list) -> None:
     logger = logging.getLogger("aintelope.experiment")
 
     # Environment
@@ -85,7 +85,6 @@ def run_experiment(cfg: DictConfig) -> None:
     #    agents.play_step(self.net, epsilon=1.0)
 
     # Main loop
-    score_titles = [title.keys()[0] for title in cfg.hparams.env_params.scores]
     events = pd.DataFrame(
         columns=[
             "Run_id",
@@ -98,7 +97,7 @@ def run_experiment(cfg: DictConfig) -> None:
             "Done",
             "Next_state",
         ]
-        + score_titles
+        + score_dimensions
     )
 
     for i_episode in range(cfg.hparams.num_episodes):
@@ -159,10 +158,14 @@ def run_experiment(cfg: DictConfig) -> None:
                         done,  # TODO: should it be "terminated" in place of "done" here?
                     )
 
+                    # Record what just happened
+                    env_step_info = [
+                        score.get(dimension, 0) for dimension in score_dimensions
+                    ]
                     events.loc[len(events)] = (
                         [cfg.experiment_name, i_episode, step]
                         + agent_step_info
-                        + score.values()
+                        + env_step_info
                     )
 
             elif isinstance(env, AECEnv):
@@ -219,10 +222,13 @@ def run_experiment(cfg: DictConfig) -> None:
                         )  # note that score is used ONLY by baseline
 
                         # Record what just happened
+                        env_step_info = [
+                            score.get(dimension, 0) for dimension in score_dimensions
+                        ]
                         events.loc[len(events)] = (
                             [cfg.experiment_name, i_episode, step]
                             + agent_step_info
-                            + score.values()
+                            + env_step_info
                         )
 
                         # NB! any agent could die at any other agent's step
@@ -257,4 +263,4 @@ def run_experiment(cfg: DictConfig) -> None:
 
 # @hydra.main(version_base=None, config_path="config", config_name="config_experiment")
 if __name__ == "__main__":
-    run_experiment()
+    run_experiment()  # TODO: cfg, score_dimensions

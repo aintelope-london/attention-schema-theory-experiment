@@ -117,7 +117,7 @@ class GridworldZooBaseEnv:
         # NB! Need to clone in order to not modify the default dict.
         # Similar problem to mutable default arguments.
         self.metadata = dict(self.metadata)
-        scores = env_params.pop("scores", None)
+        scores = env_params.get("scores", None)
         self.metadata.update(env_params)
         if scores is not None:  # tests do not have scores config
             self.metadata.update(
