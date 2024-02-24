@@ -127,6 +127,8 @@ class GridworldZooBaseEnv:
 
         metadata_to_super_initargs_dict = {
             "level": "level",
+            "map_width": "map_width",
+            "map_height": "map_height",
             # This seed is used mainly for environment map randomisation.
             # Later the test calls .seed() method on the wrapper and this will
             # determine the random action sampling and other random events
