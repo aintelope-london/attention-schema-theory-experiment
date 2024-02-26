@@ -25,7 +25,7 @@ hparams:
   agent_id: q_agent
   num_episodes: 5   # TEMP for tests only atm
   traintest_mode: train
-  train_episodes: 100
+  train_episodes: 1000
   test_episodes: 3
   warm_start_steps: 100
   save_frequency: 1000 # how often save a model TEMP offline
