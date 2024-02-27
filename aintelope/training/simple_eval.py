@@ -163,7 +163,7 @@ def run_episode(full_params: Dict) -> None:
                     observation = observations[agent.id]
                     info = infos[agent.id]
                     actions[agent.id] = agent.get_action(
-                        observation, info, step, episode=0
+                        agent.id, observation, info, step, episode=0
                     )
 
                 logger.debug("debug actions", actions)
@@ -198,11 +198,12 @@ def run_episode(full_params: Dict) -> None:
                     # Per Zoo API, a dead agent must call .step(None) once more after
                     # becoming dead. Only after that call will this dead agent be
                     # removed from various dictionaries and from .agent_iter loop.
-                    if env.terminations[agent_id] or env.truncations[agent.id]:
+                    if env.terminations[agent.id] or env.truncations[agent.id]:
                         action = None
                     else:
                         # action = action_space(agent.id).sample()
                         action = agent.get_action(
+                            agent.id,
                             observation,
                             info,
                             step,
@@ -238,7 +239,7 @@ def run_episode(full_params: Dict) -> None:
                         # NB! any agent could die at any other agent's step
                         for agent_id in env.agents:
                             dones[agent_id] = (
-                                env.terminations[agent_id] or env.truncations[agent.id]
+                                env.terminations[agent.id] or env.truncations[agent.id]
                             )
 
         else:
@@ -270,7 +271,7 @@ def run_episode(full_params: Dict) -> None:
                     observation = observations[agent.id]
                     info = infos[agent.id]
                     actions[agent.id] = agent.get_action(
-                        observation, step, info, episode=0
+                        agent.id, observation, step, info, episode=0
                     )
 
                 logger.debug("debug actions", actions)
@@ -307,11 +308,12 @@ def run_episode(full_params: Dict) -> None:
                     # Per Zoo API, a dead agent must call .step(None) once more
                     # after becoming dead. Only after that call will this dead agent be
                     # removed from various dictionaries and from .agent_iter loop.
-                    if env.terminations[agent_id] or env.truncations[agent.id]:
+                    if env.terminations[agent.id] or env.truncations[agent.id]:
                         action = None
                     else:
                         # action = action_space(agent.id).sample()
                         action = agent.get_action(
+                            agent.id,
                             observation,
                             info,
                             step,
@@ -348,7 +350,7 @@ def run_episode(full_params: Dict) -> None:
                         # NB! any agent could die at any other agent's step
                         for agent_id in env.agents:
                             dones[agent_id] = (
-                                env.terminations[agent_id] or env.truncations[agent.id]
+                                env.terminations[agent.id] or env.truncations[agent.id]
                             )
         else:
             logger.warning("Simple_eval: non-zoo env, test not yet implemented!")
