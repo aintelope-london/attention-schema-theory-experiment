@@ -127,7 +127,7 @@ class GridworldZooBaseEnv:
         logger.info(f"initializing savanna env with params: {self.metadata}")
 
         # TODO: get rid of this override and just ignore truncation flag from the environment?
-        if self.metadata["num_iters"] > 1:  # some unit tests use num_iters = 1
+        if self.metadata["num_iters"] > 50:  # some unit tests use num_iters <= 50
             self.metadata[
                 "num_iters"
             ] = (
