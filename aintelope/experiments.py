@@ -9,7 +9,7 @@ from omegaconf import DictConfig
 from aintelope.agents import get_agent_class
 from aintelope.analytics import recording as rec
 from aintelope.environments import get_env_class
-from aintelope.environments.savanna import SavannaEnv
+from aintelope.environments.savanna_safetygrid import GridworldZooBaseEnv
 from aintelope.training.dqn_training import Trainer
 
 from pettingzoo import AECEnv, ParallelEnv
@@ -100,7 +100,7 @@ def run_experiment(cfg: DictConfig, score_dimensions: list) -> None:
             "Done",
             "Next_state",
         ]
-        + (score_dimensions if not isinstance(env, SavannaEnv) else ["Score"])
+        + (score_dimensions if isinstance(env, GridworldZooBaseEnv) else ["Score"])
     )
 
     num_episodes = cfg.hparams.train_episodes
