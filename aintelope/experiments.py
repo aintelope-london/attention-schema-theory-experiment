@@ -118,12 +118,14 @@ def run_experiment(cfg: DictConfig, score_dimensions: list) -> None:
             ) = env.reset(trial_no=int(i_episode / cfg.hparams.trial_length))
             for agent in agents:
                 agent.reset(observations[agent.id], infos[agent.id])
+                # trainer.reset_agent(agent.id)	# TODO: configuration flag
                 dones[agent.id] = False
 
         elif isinstance(env, AECEnv):
             env.reset(trial_no=int(i_episode / cfg.hparams.trial_length))
             for agent in agents:
                 agent.reset(env.observe(agent.id), env.observe_info(agent.id))
+                # trainer.reset_agent(agent.id)	# TODO: configuration flag
                 dones[agent.id] = False
 
         # Iterations within the episode

@@ -77,6 +77,11 @@ class Trainer:
 
         print("Using GPU: " + str(self.device not in ["cpu"]))
 
+    def reset_agent(self, agent_id):
+        self.replay_memories[agent_id] = ReplayMemory(
+            self.hparams.model_params.replay_size
+        )
+
     def add_agent(
         self,
         agent_id,
