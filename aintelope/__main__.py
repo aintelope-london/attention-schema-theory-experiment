@@ -29,16 +29,17 @@ def aintelope_main(cfg: DictConfig) -> None:
         )
         logger.info("Running training with the following configuration")
         logger.info(OmegaConf.to_yaml(experiment_cfg))
+		title = env_conf
 
         # Training
         OmegaConf.update(experiment_cfg, "hparams.traintest_mode", "train")
         run_experiment(experiment_cfg, score_dimensions)
-        analytics(experiment_cfg, score_dimensions)
+        analytics(experiment_cfg, score_dimensions, title=title)
 
         # Testing
         OmegaConf.update(experiment_cfg, "hparams.traintest_mode", "test")
         run_experiment(experiment_cfg, score_dimensions)
-        analytics(experiment_cfg, score_dimensions)
+        analytics(experiment_cfg, score_dimensions, title=title)
 
 
 def analytics(cfg, score_dimensions):

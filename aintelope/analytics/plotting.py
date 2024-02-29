@@ -46,7 +46,7 @@ def plot_groupby(all_events, group_keys, score_dimensions):
     return plot_data
 
 
-def plot_performance(all_events, score_dimensions, save_path: Optional[str]):
+def plot_performance(all_events, score_dimensions, save_path: Optional[str], title: Optional[str]):
     """
     Plot performance between rewards and scores.
     Accepts a list of event records from which a boxplot is done.
@@ -76,7 +76,7 @@ def plot_performance(all_events, score_dimensions, save_path: Optional[str]):
         for score_dimension in score_dimensions:
             subplot.plot(plot_data[score_dimension].to_numpy(), label=score_dimension)
 
-        subplot.set_title("By " + plot_label)
+        subplot.set_title((title + " by " + plot_label).strip())
         subplot.set(xlabel=plot_label, ylabel="Mean Reward")
         subplot.legend()
 
@@ -84,11 +84,16 @@ def plot_performance(all_events, score_dimensions, save_path: Optional[str]):
         save_plot(fig, save_path)
 
     # enable this code if you want the plot to open automatically
-    # plt.ion()
-    # fig.show()
-    # plt.draw()
-    # plt.pause(0.1)
-    # input("Press [enter] to continue.")
+    #plt.ion()
+    #fig.show()
+    #plt.draw()
+    #plt.pause(1)
+    #if os.name == "nt":
+    #    import msvcrt
+    #    print("Press [enter] to continue.")
+    #    msvcrt.getch()    # uses less CPU on Windows than input() function. Note that the graph window will be frozen, but will still show graphs
+    #else:
+    #    input("Press [enter] to continue.")
 
     return fig
 
