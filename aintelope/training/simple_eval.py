@@ -4,9 +4,9 @@ from typing import Dict
 
 from omegaconf import DictConfig, OmegaConf
 
-
 from aintelope.agents import get_agent_class
 from aintelope.environments import get_env_class
+from aintelope.environments.savanna_safetygrid import GridworldZooBaseEnv
 from aintelope.models.dqn import DQN
 from aintelope.training.dqn_training import Trainer
 from pettingzoo import AECEnv, ParallelEnv
@@ -145,8 +145,12 @@ def run_episode(full_params: Dict) -> None:
 
     # cannot use list since some of the agents may be terminated in the middle of
     # the episode
-    episode_rewards = Counter({agent.id: 0.0 for agent in agents})
-    episode_rewards_upgraded_to_dict_rewards = False
+    if isinstance(env, GridworldZooBaseEnv):    
+        # episode_rewards will be dictionary of dictionaries in case of Gridworld environments
+        episode_rewards = {agent.id: Counter() for agent in agents}
+    else:
+        episode_rewards = Counter({agent.id: 0.0 for agent in agents})
+
     # cannot use list since some of the agents may be terminated in the middle of
     # the episode
     dones = {agent.id: False for agent in agents}
@@ -358,15 +362,7 @@ def run_episode(full_params: Dict) -> None:
             logger.warning("Simple_eval: non-zoo env, test not yet implemented!")
             pass
 
-        if len(rewards) == 0:
-            pass  # needed to avoid an error in the next blocks. Both below blocks may fail when len(rewards) == 0
-        elif isinstance(next(iter(rewards.values())), dict):
-            if (
-                not episode_rewards_upgraded_to_dict_rewards
-            ):  # each agent's reward is a dict, need to upgrade the episode_rewards counter  # TODO: detect this early, before the loops start
-                episode_rewards_upgraded_to_dict_rewards = True
-                episode_rewards = {agent.id: Counter() for agent in agents}
-
+        if isinstance(env, GridworldZooBaseEnv):
             # unfortunately counter does not support nested addition, so we need to do it with a loop here
             for agent, reward in rewards.items():
                 episode_rewards[agent].update(
