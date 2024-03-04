@@ -43,6 +43,7 @@ class InstinctAgent(QAgent):
         step: int = 0,
         trial: int = 0,
         episode: int = 0,
+        pipeline_cycle: int = 0,
         action_biases: list = None,
     ) -> Optional[int]:
         """Given an observation, ask your net what to do. State is needed to be
@@ -57,7 +58,7 @@ class InstinctAgent(QAgent):
             action (Optional[int]): index of action
         """
         action_biases = None
-        return super().get_action(observation, info, step, trial, episode, action_biases)
+        return super().get_action(observation, info, step, trial, episode, pipeline_cycle, action_biases)
 
     # TODO hack, figure out if state_to_namedtuple can be static somewhere
     def update(
@@ -69,6 +70,7 @@ class InstinctAgent(QAgent):
         info: dict = {},
         score: float = 0.0,
         done: bool = False,
+        test_mode: bool = False,
         save_path: Optional[str] = None,  # TODO: this is unused right now
     ) -> list:
         """
@@ -136,7 +138,8 @@ class InstinctAgent(QAgent):
         # )
 
         event = [self.id, self.state, self.last_action, reward, done, next_state]
-        self.trainer.update_memory(*event)
+        if not test_mode:   # TODO: do we need to update replay memories during test?
+            self.trainer.update_memory(*event)
         self.state = next_state
         self.info = info
         return event

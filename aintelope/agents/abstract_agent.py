@@ -23,6 +23,7 @@ class Agent(ABC):
         step: int = 0,
         trial: int = 0,
         episode: int = 0,
+        pipeline_cycle: int = 0,
         action_biases: list = None,
     ) -> Optional[int]:
         ...
@@ -37,6 +38,7 @@ class Agent(ABC):
         info: dict = {},
         score: float = 0.0,
         done: bool = False,
-        save_path: Optional[str] = None,
+        test_mode: bool = False,
+        save_path: Optional[str] = None,  # TODO: this is unused right now
     ) -> list:
         ...

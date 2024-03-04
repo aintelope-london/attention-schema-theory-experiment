@@ -23,7 +23,8 @@ hparams:
   model: dqn
   unit_test_mode: False      # is set during tests in order to speed up DQN computations
   agent_id: q_agent
-  num_episodes: 5   # TEMP for tests only atm
+  num_pipeline_cycles: 300
+  num_episodes: 1   # TEMP for tests only atm
   traintest_mode: train
   train_episodes: 10 
   test_episodes: 3
@@ -42,7 +43,8 @@ hparams:
     tau: 0.05
     eps_last_frame: 800
     eps_last_trial: 8
-    eps_last_episode: 8
+    eps_last_episode: 1
+    eps_last_pipeline_cycle: 300
     eps_start: 1.0
     eps_end: 0.01
     replay_size: 99
