@@ -15,7 +15,7 @@ from aintelope.training.dqn_training import Trainer
 from pettingzoo import AECEnv, ParallelEnv
 
 
-def run_experiment(cfg: DictConfig, score_dimensions: list) -> None:
+def run_experiment(cfg: DictConfig, experiment_name: str = "", score_dimensions: list = [], is_last_pipeline_cycle: bool = True, i_pipeline_cycle: int = 0) -> None:
     logger = logging.getLogger("aintelope.experiment")
 
     # Environment
@@ -45,6 +45,7 @@ def run_experiment(cfg: DictConfig, score_dimensions: list) -> None:
     # Agents
     agents = []
     dones = {}
+    prev_agent_checkpoint = None
     for i in range(env.max_num_agents):
         agent_id = f"agent_{i}"
         agents.append(
@@ -66,16 +67,25 @@ def run_experiment(cfg: DictConfig, score_dimensions: list) -> None:
             info = env.observe_info(agent_id)
 
         observation_shape = (observation[0].shape, observation[1].shape)
-        print(f"Observation shape: {observation_shape}")
+        print(f"Agent {agent_id} observation shape: {observation_shape}")
 
         # TODO: is this reset necessary here? In main loop below,
         # there is also a reset call
         agents[-1].reset(observation, info)
         # Get latest checkpoint if existing
+
         checkpoint = None
-        checkpoints = glob.glob(os.path.join(dir_cp, agent_id + "*"))
-        if len(checkpoints) > 0:
-            checkpoint = max(checkpoints, key=os.path.getctime)
+
+        if prev_agent_checkpoint is not None:   # later experiments may have more agents    # TODO: configuration option for determining whether new agents can copy the checkpoints of earlier agents, and if so then specifically which agent's checkpoint to use
+            checkpoint = prev_agent_checkpoint
+        else:
+            checkpoints = glob.glob(os.path.join(dir_cp, agent_id + "-*"))    # NB! separate agent id from date explicitly in glob arguments using "-" since theoretically the agent id could be a two digit number and we do not want to match agent_10 while looking for agent_1
+            if len(checkpoints) > 0:
+                checkpoint = max(checkpoints, key=os.path.getctime)
+                prev_agent_checkpoint = checkpoint
+            elif prev_agent_checkpoint is not None:   # later experiments may have more agents    # TODO: configuration option for determining whether new agents can copy the checkpoints of earlier agents, and if so then specifically which agent's checkpoint to use
+                checkpoint = prev_agent_checkpoint
+
         # Add agent, with potential checkpoint
         trainer.add_agent(
             agent_id,
@@ -94,7 +104,9 @@ def run_experiment(cfg: DictConfig, score_dimensions: list) -> None:
     events = pd.DataFrame(
         columns=[
             "Run_id",
+            "Pipeline cycle",
             "Episode",
+            "Trial",
             "Step",
             "Agent_id",
             "State",
@@ -106,14 +118,36 @@ def run_experiment(cfg: DictConfig, score_dimensions: list) -> None:
         + (score_dimensions if isinstance(env, GridworldZooBaseEnv) else ["Score"])
     )
 
-    num_episodes = cfg.hparams.train_episodes
-    if cfg.hparams.traintest_mode == "test":
-        num_episodes = cfg.hparams.test_episodes
-
+    last_episode_was_saved = True # if not training episodes are specified then do not save models
+    # num_episodes = cfg.hparams.num_episodes + cfg.hparams.test_episodes
+    num_episodes = (cfg.hparams.num_episodes if not is_last_pipeline_cycle else 0) + (cfg.hparams.test_episodes if is_last_pipeline_cycle else 0)
     for i_episode in range(num_episodes):
-        print(f"episode: {i_episode}")
 
-        trial_no = int(i_episode / cfg.hparams.trial_length)
+        # test_mode = (i_episode >= cfg.hparams.num_episodes)
+        test_mode = is_last_pipeline_cycle
+        trial_no = int(i_episode / cfg.hparams.trial_length) if cfg.hparams.trial_length > 0 else 0
+
+        print(f"i_pipeline_cycle: {i_pipeline_cycle} experiment: {experiment_name} episode: {i_episode} trial_no: {trial_no} test_mode: {test_mode}")
+
+        # TODO: refactor these checks into separate function        # Save models
+        # https://pytorch.org/tutorials/recipes/recipes/
+        # saving_and_loading_a_general_checkpoint.html
+        if i_episode > 0:
+            if not test_mode:
+                last_episode_was_saved = False
+                if i_episode % cfg.hparams.save_frequency == 0:
+                    os.makedirs(dir_cp, exist_ok=True)
+                    trainer.save_models(i_episode, dir_cp)
+                    last_episode_was_saved = True
+            else:   # when test mode starts, save last unsaved model immediately
+                if (
+                    not last_episode_was_saved
+                ):  # happens when num_episodes is not divisible by save frequency
+                    os.makedirs(dir_cp, exist_ok=True)
+                    trainer.save_models(i_episode, dir_cp)
+                    last_episode_was_saved = True
+        elif not test_mode:
+            last_episode_was_saved = False
 
         # Reset
         if isinstance(env, ParallelEnv):
@@ -145,8 +179,10 @@ def run_experiment(cfg: DictConfig, score_dimensions: list) -> None:
                     observation = observations[agent.id]
                     info = infos[agent.id]
                     actions[agent.id] = agent.get_action(
-                        observation, info, step, trial_no, i_episode
+                        observation, info, step, trial_no, i_episode, i_pipeline_cycle
                     )
+
+                # print(f"actions: {actions}")
 
                 # call: send actions and get observations
                 observations, scores, terminateds, truncateds, infos = env.step(actions)
@@ -176,6 +212,7 @@ def run_experiment(cfg: DictConfig, score_dimensions: list) -> None:
                         if isinstance(score, dict)
                         else score,  # TODO: make a function to handle obs->rew in Q-agent too, remove this
                         done,  # TODO: should it be "terminated" in place of "done" here?
+                        test_mode,
                     )
 
                     # Record what just happened
@@ -186,7 +223,7 @@ def run_experiment(cfg: DictConfig, score_dimensions: list) -> None:
                     )
 
                     events.loc[len(events)] = (
-                        [cfg.experiment_name, i_episode, step]
+                        [cfg.experiment_name, i_pipeline_cycle, i_episode, trial_no, step]
                         + agent_step_info
                         + env_step_info
                     )
@@ -207,7 +244,7 @@ def run_experiment(cfg: DictConfig, score_dimensions: list) -> None:
                     else:
                         observation = env.observe(agent.id)
                         info = env.observe_info(agent.id)
-                        action = agent.get_action(observation, info, step, trial_no, i_episode)
+                        action = agent.get_action(observation, info, step, trial_no, i_episode, i_pipeline_cycle)
 
                     # Env step
                     # NB! both AIntelope Zoo and Gridworlds Zoo wrapper in AIntelope
@@ -236,12 +273,14 @@ def run_experiment(cfg: DictConfig, score_dimensions: list) -> None:
                         # All commented above included ^
                         if terminated:
                             observation = None  # TODO: why is this here?
+
                         agent_step_info = agent.update(
                             env,
                             observation,
                             info,
                             sum(score.values()) if isinstance(score, dict) else score,
                             done,  # TODO: should it be "terminated" in place of "done" here?
+                            test_mode,
                         )  # note that score is used ONLY by baseline
 
                         # Record what just happened
@@ -252,7 +291,7 @@ def run_experiment(cfg: DictConfig, score_dimensions: list) -> None:
                         )
 
                         events.loc[len(events)] = (
-                            [cfg.experiment_name, i_episode, step]
+                            [cfg.experiment_name, i_pipeline_cycle, i_episode, trial_no, step]
                             + agent_step_info
                             + env_step_info
                         )
@@ -271,21 +310,17 @@ def run_experiment(cfg: DictConfig, score_dimensions: list) -> None:
                 raise NotImplementedError(f"Unknown environment type {type(env)}")
 
             # Perform one step of the optimization (on the policy network)
-            if cfg.hparams.traintest_mode == "train":
+            if not test_mode:
                 trainer.optimize_models()
 
             # Break when all agents are done
             if all(dones.values()):
                 break
 
-        # Save models
-        # https://pytorch.org/tutorials/recipes/recipes/
-        # saving_and_loading_a_general_checkpoint.html
-        last_episode_was_saved = False
-        if i_episode % cfg.hparams.save_frequency == 0:
-            os.makedirs(dir_cp, exist_ok=True)
-            trainer.save_models(i_episode, dir_cp)
-            last_episode_was_saved = True
+        #/ for step in range(cfg.hparams.env_params.num_iters):
+
+    #/ for i_episode in range(cfg.hparams.num_episodes + cfg.hparams.test_episodes):
+
 
     if (
         not last_episode_was_saved
