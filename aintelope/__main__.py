@@ -57,5 +57,6 @@ if __name__ == "__main__":
 
     set_priorities()
     set_memory_limits() 
+    select_gpu()
 
     aintelope_main()

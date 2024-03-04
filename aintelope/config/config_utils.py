@@ -106,3 +106,69 @@ def set_memory_limits():
 
         from aintelope.config.linux_rlimit import set_mem_limits
         set_mem_limits(data_size_limit, address_space_size_limit)
+
+
+def select_gpu():
+    """Rotates over available GPU-s, selecting a next GPU for each subsequent 
+    program launch in order to distribute the workload of concurrently running 
+    programs over all available GPU-s.
+
+    If you want to restrict the set of GPU-s the program selects from, then 
+    specify the CUDA_VISIBLE_DEVICES environment variable before starting the 
+    program like this:
+
+    In Linux:
+    export CUDA_VISIBLE_DEVICES=3,4
+
+    In Windows:
+    set CUDA_VISIBLE_DEVICES=3,4
+
+    In VSCode, modify launch.json:
+    "env": {
+        "CUDA_VISIBLE_DEVICES": "3,4"
+    }
+
+    where 3,4 are the device numbers you want to enable for the program to choose from.
+    The device numbers start from 0.
+    """
+
+    gpu_count = torch.cuda.device_count()
+    if gpu_count == 0:
+        print(f"No CUDA GPU available")
+        return
+
+    elif gpu_count == 1:
+        # Even if only one device is enabled for CUDA, it might be not the first one by number
+        # if it is set by CUDA_VISIBLE_DEVICES environment variable. Therefore, lets log it.
+        gpu_counter = torch.cuda.current_device()
+        print(f"Using the only available CUDA GPU")
+
+    else:
+        import sqlite3
+        conn = sqlite3.connect("gpu_counter.db")
+
+        cmd = """
+        CREATE TABLE IF NOT EXISTS gpu_counter_table 
+        (gpu_counter INTEGER);
+        INSERT OR IGNORE INTO gpu_counter_table (gpu_counter) VALUES (0);
+        """;
+        cursor = conn.cursor()
+        cursor.executescript(cmd)
+        conn.commit()
+
+        cursor = conn.cursor()
+        cursor.execute("BEGIN EXCLUSIVE TRANSACTION")
+        cursor.execute("UPDATE gpu_counter_table SET gpu_counter = gpu_counter + 1")
+        cursor = cursor.execute("SELECT gpu_counter FROM gpu_counter_table")
+        gpu_counter = cursor.fetchone()[0]
+        conn.commit()
+
+        conn.close()
+
+        gpu_counter = gpu_counter % gpu_count
+
+        torch.cuda.set_device(gpu_counter)
+
+    device_name = torch.cuda.get_device_name(gpu_counter)
+    print(f"Using CUDA GPU {gpu_counter} : {device_name}")
+    return
