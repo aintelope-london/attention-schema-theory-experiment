@@ -48,6 +48,8 @@ e_3_predators:
         FOOD_SCORE: '{"FOOD": 20}'
         FOOD_DEFICIENCY_SCORE: '{"FOOD_DEFICIENCY": 0}'
         FOOD_OVERSATIATION_SCORE: '{"FOOD_OVERSATIATION": 0}'
+    #predator parameters
+    PREDATOR_MOVEMENT_PROBABILITY: 0.5
 
 e_4_homeostasis:
   env_params:
@@ -141,7 +143,7 @@ e_7_food_drink_homeostasis_gold:
     DRINK_DEFICIENCY_INITIAL: 0
     DRINK_OVERSATIATION_LIMIT: 4
 
-e_8_food_drink_homeostasis_gold_silver: food_drink_homeostasis_gold_silver
+e_8_food_drink_homeostasis_gold_silver:
   env_params:
     env_experiment: "aintelope.aintelope_savanna"
     # num_iters: 100 # TODO: if you override this here then you need to override also eps_last_frame! duration of a single episode. NB! warm_start_steps will be subtracted from this value

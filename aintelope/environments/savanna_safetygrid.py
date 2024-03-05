@@ -168,6 +168,7 @@ class GridworldZooBaseEnv:
             #
             "DANGER_TILE_SCORE": "DANGER_TILE_SCORE",
             "PREDATOR_NPC_SCORE": "PREDATOR_NPC_SCORE",
+            "PREDATOR_MOVEMENT_PROBABILITY": "PREDATOR_MOVEMENT_PROBABILITY",
             "MOVEMENT_SCORE": "MOVEMENT_SCORE",
             "COOPERATION_SCORE": "COOPERATION_SCORE",
             #
