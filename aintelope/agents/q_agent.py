@@ -1,5 +1,6 @@
 import logging
 from typing import List, NamedTuple, Optional, Tuple
+from gymnasium.spaces import Discrete
 
 import numpy as np
 import numpy.typing as npt
@@ -98,13 +99,17 @@ class QAgent(Agent):
                 self.id, observation, self.info, step, trial, episode, pipeline_cycle
             )
 
+            if isinstance(action_space, Discrete):
+                min_action = action_space.start
+            else:
+                min_action = action_space.min_action
             action = (
-                self.trainer.tiebreaking_argmax(q_values) + action_space.min_action
+                self.trainer.tiebreaking_argmax(q_values) + min_action
             )  # when no axis is provided, argmax returns index into flattened array
 
             # q_values = self.policy_nets[agent_id](observation)
             # _, action = torch.max(q_values, dim=1)
-            # action = int(action.item()) + action_space.min_action
+            # action = int(action.item()) + min_action
 
         self.last_action = action
         return action

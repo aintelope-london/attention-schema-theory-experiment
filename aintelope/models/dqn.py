@@ -51,7 +51,7 @@ class DQN(nn.Module):
         obs_size: tuple,
         n_actions: int,
         unit_test_mode: bool,
-        hidden_sizes: list = [8, 8],
+        hidden_sizes: list = [8, 16, 8],
         num_conv_layers: int = 1,
         conv_size: int = 3,
     ):
@@ -70,7 +70,7 @@ class DQN(nn.Module):
         if (
             unit_test_mode
         ):  # constrain the size of networks during unit testing for performance purposes
-            hidden_sizes = [8, 8]
+            hidden_sizes = [8, 8, 8]
 
         (vision_size, interoception_size) = obs_size  # TODO: interoception
 

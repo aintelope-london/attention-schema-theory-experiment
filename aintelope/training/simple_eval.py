@@ -91,7 +91,7 @@ def run_episode(full_params: Dict) -> None:
             MODEL_LOOKUP[model_spec](obs_size, n_actions, unit_test_mode=unit_test_mode)
         ]
 
-    agent_spec = hparams["agent_id"]  # TODO: why is this value a list?
+    agent_spec = hparams.agent_class
     if isinstance(agent_spec, list) and len(agent_spec) == 1:
         # NB! after this step the agent_spec is not a list anymore and the following
         # if condition will be False, so do not try to merge these "if" branches.

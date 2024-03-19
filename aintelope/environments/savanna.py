@@ -39,7 +39,14 @@ Step = Tuple[
     Dict[AgentId, bool],
     Dict[AgentId, Info],
 ]
-ACTION_MAP = np.array([[0, 1], [1, 0], [0, -1], [-1, 0]], dtype=PositionFloat)
+ACTION_MAP = np.array(
+    [[0, 1], [1, 0], [0, -1], [-1, 0]], dtype=PositionFloat
+)  # format: pairs of coordinates in the dimension order of x, y
+ACTION_RELATIVE_COORDINATE_MAP = "action_relative_coordinate_map"
+
+action_map_dict = {
+    index: tuple(ACTION_MAP[index]) for index in range(0, len(ACTION_MAP))
+}
 
 
 class RenderSettings:
@@ -263,7 +270,9 @@ class SavannaEnv:
     def seed(self, seed: Optional[int] = None) -> None:
         self.np_random, seed = seeding.np_random(seed)
 
-    def reset(self, seed: Optional[int] = None, options=None):
+    def reset(
+        self, seed: Optional[int] = None, options=None, trial_no=0, **kwargs
+    ):  # trial_no is here for compatibility with gridworlds
         """Reset needs to initialize the following attributes:
             - agents
             - rewards
@@ -307,7 +316,10 @@ class SavannaEnv:
         # # cycle through the agents; needed for wrapper
         self.dones = {agent: False for agent in self.agents}
         observations = {agent: self.observe(agent) for agent in self.agents}
-        self.infos = {agent: {} for agent in self.agents}
+        self.infos = {
+            agent: {ACTION_RELATIVE_COORDINATE_MAP: action_map_dict}
+            for agent in self.agents
+        }
         return observations, self.infos
 
     def step(self, actions: Dict[str, Action]) -> Step:
@@ -375,7 +387,10 @@ class SavannaEnv:
 
         # typically there won't be any information in the infos, but there must
         # still be an entry for each agent
-        infos: Dict[AgentId, dict] = {agent: {} for agent in self.agents}
+        infos: Dict[AgentId, dict] = {
+            agent: {ACTION_RELATIVE_COORDINATE_MAP: action_map_dict}
+            for agent in self.agents
+        }
 
         logger.debug("debug return", observations, self.rewards, self.dones, infos)
 

@@ -10,6 +10,7 @@ from progressbar import ProgressBar
 
 from aintelope.agents import get_agent_class
 from aintelope.analytics import recording as rec
+from aintelope.config.config_utils import DummyContext
 from aintelope.environments import get_env_class
 from aintelope.environments.savanna_safetygrid import GridworldZooBaseEnv
 from aintelope.training.dqn_training import Trainer
@@ -154,9 +155,9 @@ def run_experiment(
         )
     )  # TODO: concatenate test plot in plotting.py
 
-    with ProgressBar(
-        max_value=len(r)
-    ) as episode_bar:  # this is a slow task so lets use a progress bar
+    with (
+        ProgressBar(max_value=len(r)) if not unit_test_mode else DummyContext()
+    ) as episode_bar:  # this is a slow task so lets use a progress bar    # note that ProgressBar crashes under unit test mode, so it will be disabled if unit_test_mode is on
         for i_episode in r:
             # test_mode = (i_episode >= cfg.hparams.num_episodes)
             test_mode = is_last_pipeline_cycle
@@ -219,9 +220,11 @@ def run_experiment(
                     dones[agent.id] = False
 
             # Iterations within the episode
-            with ProgressBar(
-                max_value=cfg.hparams.env_params.num_iters
-            ) as step_bar:  # this is a slow task so lets use a progress bar
+            with (
+                ProgressBar(max_value=cfg.hparams.env_params.num_iters)
+                if not unit_test_mode
+                else DummyContext()
+            ) as step_bar:  # this is a slow task so lets use a progress bar    # note that ProgressBar crashes under unit test mode, so it will be disabled if unit_test_mode is on
                 for step in range(cfg.hparams.env_params.num_iters):
                     # if step > 0 and step % 100 == 0:
                     #    print(f"step: {step}")

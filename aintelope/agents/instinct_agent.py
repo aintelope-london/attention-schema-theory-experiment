@@ -1,10 +1,11 @@
 import csv
 import logging
 from typing import List, Optional, Tuple
+from gymnasium.spaces import Discrete
 
 import numpy.typing as npt
 
-from aintelope.agents.instincts.savanna_instincts import available_instincts_dict
+from aintelope.agents.instincts.savanna_instincts_old import available_instincts_dict
 from aintelope.agents.q_agent import HistoryStep, QAgent
 from aintelope.aintelope_typing import ObservationFloat, PettingZooEnv
 from aintelope.training.dqn_training import Trainer
@@ -56,6 +57,18 @@ class InstinctAgent(QAgent):
         Returns:
             action (Optional[int]): index of action
         """
+
+        if self.done:
+            return None
+
+        action_space = self.trainer.action_spaces[self.id]
+        if isinstance(action_space, Discrete):
+            min_action = action_space.start
+            max_action = action_space.start + action_space.n - 1
+        else:
+            min_action = action_space.min_action
+            max_action = action_space.max_action
+
         return super().get_action(
             observation, info, step, trial, episode, pipeline_cycle
         )

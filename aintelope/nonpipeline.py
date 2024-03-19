@@ -32,19 +32,27 @@ def aintelope_main(cfg: DictConfig) -> None:
     )
 
     title = timestamp + " : Nonpipeline"
-    analytics(cfg, score_dimensions, title=title, experiment_name="Nonpipeline")
+    do_not_show_plot = cfg.hparams.unit_test_mode
+    analytics(
+        cfg,
+        score_dimensions,
+        title=title,
+        experiment_name="Nonpipeline",
+        do_not_show_plot=do_not_show_plot,
+    )
 
-    # keep plots visible until the user decides to close the program
-    if os.name == "nt":
-        import msvcrt
+    if not do_not_show_plot:
+        # keep plots visible until the user decides to close the program
+        if os.name == "nt":
+            import msvcrt
 
-        print("Press [enter] to continue.")
-        msvcrt.getch()  # uses less CPU on Windows than input() function. Note that the graph window will be frozen, but will still show graphs
-    else:
-        input("Press [enter] to continue.")
+            print("Press [enter] to continue.")
+            msvcrt.getch()  # uses less CPU on Windows than input() function. Note that the graph window will be frozen, but will still show graphs
+        else:
+            input("Press [enter] to continue.")
 
 
-def analytics(cfg, score_dimensions, title, experiment_name):
+def analytics(cfg, score_dimensions, title, experiment_name, do_not_show_plot=False):
     # normalise slashes in paths. This is not mandatory, but will be cleaner to debug
     log_dir = os.path.normpath(cfg.log_dir)
     events_fname = cfg.events_fname
@@ -65,6 +73,7 @@ def analytics(cfg, score_dimensions, title, experiment_name):
         save_path=savepath,
         title=title,
         group_by_pipeline_cycle=False,
+        do_not_show_plot=do_not_show_plot,
     )
 
 

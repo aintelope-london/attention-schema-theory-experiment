@@ -3,6 +3,7 @@ import logging
 import os
 from collections import namedtuple
 from typing import Optional, Tuple
+from gymnasium.spaces import Discrete
 
 import numpy as np
 import numpy.typing as npt
@@ -184,15 +185,13 @@ class Trainer:
             Q values array
         """
 
-        # TODO: warn if last_frame=0/1 or last_trial=0/1 or last_episode=0/1 in any of the below values: for disabling the epsilon counting for corresponding variable one should use -1
-
-        # print(f"Epsilon: {epsilon}")
-
         logger.debug("debug observation", type(observation))
 
         observation = (
             torch.tensor(
-                np.expand_dims(observation[0], 0),
+                np.expand_dims(
+                    observation[0], 0
+                ),  # vision     # call .flatten() in case you want to force 1D network even on 3D vision
             ),
             torch.tensor(np.expand_dims(observation[1], 0)),  # interoception
         )
@@ -253,9 +252,13 @@ class Trainer:
             ),
         )
 
-        action -= self.action_spaces[
-            agent_id
-        ].min_action  # offset the action index if min_action is not zero
+        action_space = self.action_spaces[agent_id]
+        if isinstance(action_space, Discrete):
+            min_action = action_space.start
+        else:
+            min_action = action_space.min_action
+        action -= min_action  # offset the action index if min_action is not zero
+
         action = torch.tensor(action, device=self.device).unsqueeze(0).view(1, 1)
         reward = torch.tensor(
             reward, dtype=torch.float32, device=self.device
@@ -365,6 +368,7 @@ class Trainer:
             checkpoint_filename = agent_id
             if use_separate_models_for_each_experiment:
                 checkpoint_filename += "-" + experiment_name
+
             filename = os.path.join(
                 path,
                 checkpoint_filename

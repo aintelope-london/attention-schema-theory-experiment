@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 from omegaconf import OmegaConf
 
+from aintelope.config.config_utils import register_resolvers
 from aintelope.training.simple_eval import run_episode
 from tests.conftest import root_dir, tparams_hparams
 
@@ -183,4 +184,5 @@ def test_iterativeweightoptimizationagent_in_savanna_gridworlds_parallel(
 
 
 if __name__ == "__main__" and os.name == "nt":  # detect debugging
+    register_resolvers()
     pytest.main([__file__])  # run tests only in this file
