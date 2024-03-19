@@ -21,7 +21,13 @@ Transition = namedtuple(
 
 
 def load_checkpoint(
-    path, obs_size, action_space_size, unit_test_mode, hidden_sizes, num_conv_layers, conv_size
+    path,
+    obs_size,
+    action_space_size,
+    unit_test_mode,
+    hidden_sizes,
+    num_conv_layers,
+    conv_size,
 ):
     """
     https://pytorch.org/tutorials/recipes/recipes/saving_and_loading_a_general_checkpoint.html
@@ -186,9 +192,7 @@ class Trainer:
 
         observation = (
             torch.tensor(
-                np.expand_dims(
-                    observation[0], 0
-                ),
+                np.expand_dims(observation[0], 0),
             ),
             torch.tensor(np.expand_dims(observation[1], 0)),  # interoception
         )
@@ -249,7 +253,9 @@ class Trainer:
             ),
         )
 
-        action -= self.action_spaces[agent_id].min_action   # offset the action index if min_action is not zero
+        action -= self.action_spaces[
+            agent_id
+        ].min_action  # offset the action index if min_action is not zero
         action = torch.tensor(action, device=self.device).unsqueeze(0).view(1, 1)
         reward = torch.tensor(
             reward, dtype=torch.float32, device=self.device
@@ -336,7 +342,9 @@ class Trainer:
                 )
             target_net.load_state_dict(target_net_state_dict)
 
-    def save_models(self, episode, path, experiment_name, use_separate_models_for_each_experiment):
+    def save_models(
+        self, episode, path, experiment_name, use_separate_models_for_each_experiment
+    ):
         """
         Save model artifacts to 'path'.
 

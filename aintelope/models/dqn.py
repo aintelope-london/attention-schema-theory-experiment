@@ -114,7 +114,10 @@ class DQN(nn.Module):
                 for i in range(1, self.num_conv_layers):
                     self.conv.append(
                         nn.Conv2d(
-                            hidden_sizes[0], hidden_sizes[0], kernel_size=conv_size, stride=1
+                            hidden_sizes[0],
+                            hidden_sizes[0],
+                            kernel_size=conv_size,
+                            stride=1,
                         )
                     )
                     output_size = self.conv2d_shape(output_size, self.conv[1])

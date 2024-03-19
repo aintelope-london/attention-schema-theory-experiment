@@ -34,8 +34,8 @@ def init_experiment_flags():
     # Need to be at least 7 else the agent does nothing. The bigger the value the more exploration is allowed
     FLAGS.FOOD_SCORE = mo_reward({"FOOD": 20})
 
-    FLAGS.PREDATOR_NPC_SCORE = mo_reward({"INJURY": -100}) 
-    FLAGS.PREDATOR_MOVEMENT_PROBABILITY = 0.5  
+    FLAGS.PREDATOR_NPC_SCORE = mo_reward({"INJURY": -100})
+    FLAGS.PREDATOR_MOVEMENT_PROBABILITY = 0.5
 
     FLAGS.amount_food_patches = 2
     FLAGS.amount_drink_holes = 0

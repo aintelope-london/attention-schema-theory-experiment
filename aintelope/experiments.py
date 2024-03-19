@@ -17,7 +17,13 @@ from aintelope.training.dqn_training import Trainer
 from pettingzoo import AECEnv, ParallelEnv
 
 
-def run_experiment(cfg: DictConfig, experiment_name: str = "", score_dimensions: list = [], is_last_pipeline_cycle: bool = True, i_pipeline_cycle: int = 0) -> None:
+def run_experiment(
+    cfg: DictConfig,
+    experiment_name: str = "",
+    score_dimensions: list = [],
+    is_last_pipeline_cycle: bool = True,
+    i_pipeline_cycle: int = 0,
+) -> None:
     logger = logging.getLogger("aintelope.experiment")
 
     # Environment
@@ -43,7 +49,9 @@ def run_experiment(cfg: DictConfig, experiment_name: str = "", score_dimensions:
     unit_test_mode = (
         cfg.hparams.unit_test_mode
     )  # is set during tests in order to speed up DQN computations
-    use_separate_models_for_each_experiment = cfg.hparams.use_separate_models_for_each_experiment
+    use_separate_models_for_each_experiment = (
+        cfg.hparams.use_separate_models_for_each_experiment
+    )
 
     # Agents
     agents = []
@@ -79,17 +87,23 @@ def run_experiment(cfg: DictConfig, experiment_name: str = "", score_dimensions:
 
         checkpoint = None
 
-        if prev_agent_checkpoint is not None:   # later experiments may have more agents    # TODO: configuration option for determining whether new agents can copy the checkpoints of earlier agents, and if so then specifically which agent's checkpoint to use
+        if (
+            prev_agent_checkpoint is not None
+        ):  # later experiments may have more agents    # TODO: configuration option for determining whether new agents can copy the checkpoints of earlier agents, and if so then specifically which agent's checkpoint to use
             checkpoint = prev_agent_checkpoint
         else:
             checkpoint_filename = agent_id
             if use_separate_models_for_each_experiment:
                 checkpoint_filename += "-" + experiment_name
-            checkpoints = glob.glob(os.path.join(dir_cp, checkpoint_filename + "-*"))    # NB! separate agent id from date explicitly in glob arguments using "-" since theoretically the agent id could be a two digit number and we do not want to match agent_10 while looking for agent_1
+            checkpoints = glob.glob(
+                os.path.join(dir_cp, checkpoint_filename + "-*")
+            )  # NB! separate agent id from date explicitly in glob arguments using "-" since theoretically the agent id could be a two digit number and we do not want to match agent_10 while looking for agent_1
             if len(checkpoints) > 0:
                 checkpoint = max(checkpoints, key=os.path.getctime)
                 prev_agent_checkpoint = checkpoint
-            elif prev_agent_checkpoint is not None:   # later experiments may have more agents    # TODO: configuration option for determining whether new agents can copy the checkpoints of earlier agents, and if so then specifically which agent's checkpoint to use
+            elif (
+                prev_agent_checkpoint is not None
+            ):  # later experiments may have more agents    # TODO: configuration option for determining whether new agents can copy the checkpoints of earlier agents, and if so then specifically which agent's checkpoint to use
                 checkpoint = prev_agent_checkpoint
 
         # Add agent, with potential checkpoint
@@ -125,20 +139,36 @@ def run_experiment(cfg: DictConfig, experiment_name: str = "", score_dimensions:
         + (score_dimensions if isinstance(env, GridworldZooBaseEnv) else ["Score"])
     )
 
-    last_episode_was_saved = True # if not training episodes are specified then do not save models
+    last_episode_was_saved = (
+        True  # if not training episodes are specified then do not save models
+    )
     # num_episodes = cfg.hparams.num_episodes + cfg.hparams.test_episodes
     # num_episodes = (cfg.hparams.num_episodes if not is_last_pipeline_cycle else 0) + (cfg.hparams.test_episodes if is_last_pipeline_cycle else 0)
     # for i_episode in range(num_episodes):
-    r = range(cfg.hparams.num_episodes) if not is_last_pipeline_cycle else range(cfg.hparams.num_episodes, cfg.hparams.num_episodes + cfg.hparams.test_episodes)    # TODO: concatenate test plot in plotting.py
+    r = (
+        range(cfg.hparams.num_episodes)
+        if not is_last_pipeline_cycle
+        else range(
+            cfg.hparams.num_episodes,
+            cfg.hparams.num_episodes + cfg.hparams.test_episodes,
+        )
+    )  # TODO: concatenate test plot in plotting.py
 
-    with ProgressBar(max_value=len(r)) as episode_bar:  # this is a slow task so lets use a progress bar
+    with ProgressBar(
+        max_value=len(r)
+    ) as episode_bar:  # this is a slow task so lets use a progress bar
         for i_episode in r:
-
             # test_mode = (i_episode >= cfg.hparams.num_episodes)
             test_mode = is_last_pipeline_cycle
-            trial_no = int(i_episode / cfg.hparams.trial_length) if cfg.hparams.trial_length > 0 else 0   # TODO: ensure to use new trial_no when testin
+            trial_no = (
+                int(i_episode / cfg.hparams.trial_length)
+                if cfg.hparams.trial_length > 0
+                else 0
+            )  # TODO: ensure to use new trial_no when testin
 
-            print(f"\ni_pipeline_cycle: {i_pipeline_cycle} experiment: {experiment_name} episode: {i_episode} trial_no: {trial_no} test_mode: {test_mode}")
+            print(
+                f"\ni_pipeline_cycle: {i_pipeline_cycle} experiment: {experiment_name} episode: {i_episode} trial_no: {trial_no} test_mode: {test_mode}"
+            )
 
             # TODO: refactor these checks into separate function        # Save models
             # https://pytorch.org/tutorials/recipes/recipes/
@@ -148,14 +178,24 @@ def run_experiment(cfg: DictConfig, experiment_name: str = "", score_dimensions:
                     last_episode_was_saved = False
                     if i_episode % cfg.hparams.save_frequency == 0:
                         os.makedirs(dir_cp, exist_ok=True)
-                        trainer.save_models(i_episode, dir_cp, experiment_name, use_separate_models_for_each_experiment)
+                        trainer.save_models(
+                            i_episode,
+                            dir_cp,
+                            experiment_name,
+                            use_separate_models_for_each_experiment,
+                        )
                         last_episode_was_saved = True
-                else:   # when test mode starts, save last unsaved model immediately
+                else:  # when test mode starts, save last unsaved model immediately
                     if (
                         not last_episode_was_saved
                     ):  # happens when num_episodes is not divisible by save frequency
                         os.makedirs(dir_cp, exist_ok=True)
-                        trainer.save_models(i_episode, dir_cp, experiment_name, use_separate_models_for_each_experiment)
+                        trainer.save_models(
+                            i_episode,
+                            dir_cp,
+                            experiment_name,
+                            use_separate_models_for_each_experiment,
+                        )
                         last_episode_was_saved = True
             elif not test_mode:
                 last_episode_was_saved = False
@@ -179,10 +219,11 @@ def run_experiment(cfg: DictConfig, experiment_name: str = "", score_dimensions:
                     dones[agent.id] = False
 
             # Iterations within the episode
-            with ProgressBar(max_value=cfg.hparams.env_params.num_iters) as step_bar:  # this is a slow task so lets use a progress bar
+            with ProgressBar(
+                max_value=cfg.hparams.env_params.num_iters
+            ) as step_bar:  # this is a slow task so lets use a progress bar
                 for step in range(cfg.hparams.env_params.num_iters):
-
-                    #if step > 0 and step % 100 == 0:
+                    # if step > 0 and step % 100 == 0:
                     #    print(f"step: {step}")
 
                     if isinstance(env, ParallelEnv):
@@ -192,13 +233,20 @@ def run_experiment(cfg: DictConfig, experiment_name: str = "", score_dimensions:
                             observation = observations[agent.id]
                             info = infos[agent.id]
                             actions[agent.id] = agent.get_action(
-                                observation, info, step, trial_no, i_episode, i_pipeline_cycle
+                                observation,
+                                info,
+                                step,
+                                trial_no,
+                                i_episode,
+                                i_pipeline_cycle,
                             )
 
                         # print(f"actions: {actions}")
 
                         # call: send actions and get observations
-                        observations, scores, terminateds, truncateds, infos = env.step(actions)
+                        observations, scores, terminateds, truncateds, infos = env.step(
+                            actions
+                        )
                         # call update since the list of terminateds will become smaller on
                         # second step after agents have died
                         dones.update(
@@ -230,13 +278,23 @@ def run_experiment(cfg: DictConfig, experiment_name: str = "", score_dimensions:
 
                             # Record what just happened
                             env_step_info = (
-                                [score.get(dimension, 0) for dimension in score_dimensions]
+                                [
+                                    score.get(dimension, 0)
+                                    for dimension in score_dimensions
+                                ]
                                 if isinstance(score, dict)
                                 else [score]
                             )
 
                             events.loc[len(events)] = (
-                                [cfg.experiment_name, i_pipeline_cycle, i_episode, trial_no, step, test_mode]
+                                [
+                                    cfg.experiment_name,
+                                    i_pipeline_cycle,
+                                    i_episode,
+                                    trial_no,
+                                    step,
+                                    test_mode,
+                                ]
                                 + agent_step_info
                                 + env_step_info
                             )
@@ -257,7 +315,14 @@ def run_experiment(cfg: DictConfig, experiment_name: str = "", score_dimensions:
                             else:
                                 observation = env.observe(agent.id)
                                 info = env.observe_info(agent.id)
-                                action = agent.get_action(observation, info, step, trial_no, i_episode, i_pipeline_cycle)
+                                action = agent.get_action(
+                                    observation,
+                                    info,
+                                    step,
+                                    trial_no,
+                                    i_episode,
+                                    i_pipeline_cycle,
+                                )
 
                             # Env step
                             # NB! both AIntelope Zoo and Gridworlds Zoo wrapper in AIntelope
@@ -291,20 +356,32 @@ def run_experiment(cfg: DictConfig, experiment_name: str = "", score_dimensions:
                                     env,
                                     observation,
                                     info,
-                                    sum(score.values()) if isinstance(score, dict) else score,
+                                    sum(score.values())
+                                    if isinstance(score, dict)
+                                    else score,
                                     done,  # TODO: should it be "terminated" in place of "done" here?
                                     test_mode,
                                 )  # note that score is used ONLY by baseline
 
                                 # Record what just happened
                                 env_step_info = (
-                                    [score.get(dimension, 0) for dimension in score_dimensions]
+                                    [
+                                        score.get(dimension, 0)
+                                        for dimension in score_dimensions
+                                    ]
                                     if isinstance(score, dict)
                                     else [score]
                                 )
 
                                 events.loc[len(events)] = (
-                                    [cfg.experiment_name, i_pipeline_cycle, i_episode, trial_no, step, test_mode]
+                                    [
+                                        cfg.experiment_name,
+                                        i_pipeline_cycle,
+                                        i_episode,
+                                        trial_no,
+                                        step,
+                                        test_mode,
+                                    ]
                                     + agent_step_info
                                     + env_step_info
                                 )
@@ -320,7 +397,9 @@ def run_experiment(cfg: DictConfig, experiment_name: str = "", score_dimensions:
                                     # else it will be never called?
 
                     else:
-                        raise NotImplementedError(f"Unknown environment type {type(env)}")
+                        raise NotImplementedError(
+                            f"Unknown environment type {type(env)}"
+                        )
 
                     # Perform one step of the optimization (on the policy network)
                     if not test_mode:
@@ -334,20 +413,21 @@ def run_experiment(cfg: DictConfig, experiment_name: str = "", score_dimensions:
                     if (step + 1) % 100 == 0:
                         step_bar.update(step + 1)
 
-                #/ for step in range(cfg.hparams.env_params.num_iters):
-            #/ with ProgressBar(max_value=cfg.hparams.env_params.num_iters) as step_bar:
+                # / for step in range(cfg.hparams.env_params.num_iters):
+            # / with ProgressBar(max_value=cfg.hparams.env_params.num_iters) as step_bar:
 
             episode_bar.update(i_episode + 1 - r.start)
 
-        #/ for i_episode in range(cfg.hparams.num_episodes + cfg.hparams.test_episodes):
-    #/ with ProgressBar(max_value=len(r)) as bar:
-
+        # / for i_episode in range(cfg.hparams.num_episodes + cfg.hparams.test_episodes):
+    # / with ProgressBar(max_value=len(r)) as bar:
 
     if (
         not last_episode_was_saved
     ):  # happens when num_episodes is not divisible by save frequency
         os.makedirs(dir_cp, exist_ok=True)
-        trainer.save_models(i_episode, dir_cp, experiment_name, use_separate_models_for_each_experiment)
+        trainer.save_models(
+            i_episode, dir_cp, experiment_name, use_separate_models_for_each_experiment
+        )
 
     # normalise slashes in paths. This is not mandatory, but will be cleaner to debug
     experiment_dir = os.path.normpath(cfg.experiment_dir)

@@ -53,7 +53,9 @@ INFO_AGENT_INTEROCEPTION_ORDER = "info_agent_interoception_order"
 INFO_AGENT_INTEROCEPTION_VECTOR = "info_agent_interoception_vector"
 INTEROCEPTION_FOOD = "food_satiation"
 INTEROCEPTION_DRINK = "drink_satiation"
-ACTION_RELATIVE_COORDINATE_MAP = "action_relative_coordinate_map"   # TODO: move to Gridworld environment
+ACTION_RELATIVE_COORDINATE_MAP = (
+    "action_relative_coordinate_map"  # TODO: move to Gridworld environment
+)
 ALL_AGENTS_LAYER = "all_agents"
 
 logger = logging.getLogger("aintelope.environments.savanna_safetygrid")
@@ -373,9 +375,7 @@ class GridworldZooBaseEnv:
                 agent_chr
             ]
 
-        coordinates_dict = dict(info[
-                INFO_AGENT_OBSERVATION_COORDINATES
-            ])
+        coordinates_dict = dict(info[INFO_AGENT_OBSERVATION_COORDINATES])
         coordinates_dict[ALL_AGENTS_LAYER] = all_agents_coordinates
 
         return {
@@ -395,13 +395,13 @@ class GridworldZooBaseEnv:
             INFO_REWARD_DICT: info[INFO_REWARD_DICT],
             INFO_CUMULATIVE_REWARD_DICT: info[INFO_CUMULATIVE_REWARD_DICT],
             # TODO: in case of relative direction, this mapping will change depending on agent and depending on its direction
-            ACTION_RELATIVE_COORDINATE_MAP: {   # TODO: read these constants from the environment?
+            ACTION_RELATIVE_COORDINATE_MAP: {  # TODO: read these constants from the environment?
                 Actions.NOOP: (0, 0),
                 Actions.LEFT: (-1, 0),
                 Actions.RIGHT: (1, 0),
                 Actions.UP: (0, -1),
                 Actions.DOWN: (0, 1),
-            }
+            },
         }
 
     def format_infos(self, infos: dict):

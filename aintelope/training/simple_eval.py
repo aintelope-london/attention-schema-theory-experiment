@@ -145,7 +145,7 @@ def run_episode(full_params: Dict) -> None:
 
     # cannot use list since some of the agents may be terminated in the middle of
     # the episode
-    if isinstance(env, GridworldZooBaseEnv):    
+    if isinstance(env, GridworldZooBaseEnv):
         # episode_rewards will be dictionary of dictionaries in case of Gridworld environments
         episode_rewards = {agent.id: Counter() for agent in agents}
     else:
@@ -210,7 +210,7 @@ def run_episode(full_params: Dict) -> None:
                             observation,
                             info,
                             step,
-                            trial=0, 
+                            trial=0,
                             episode=0,
                             pipeline_cycle=0,
                         )
@@ -322,7 +322,7 @@ def run_episode(full_params: Dict) -> None:
                             observation,
                             info,
                             step,
-                            trial=0, 
+                            trial=0,
                             episode=0,
                             pipeline_cycle=0,
                         )

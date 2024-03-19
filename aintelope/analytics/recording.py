@@ -43,7 +43,9 @@ def record_events(record_path, events):
 
     logger.info(f"Saving training records to disk at {record_path}")
     record_path.parent.mkdir(exist_ok=True, parents=True)
-    events.to_csv(record_path, index=False, mode='a', header=not os.path.exists(record_path))
+    events.to_csv(
+        record_path, index=False, mode="a", header=not os.path.exists(record_path)
+    )
 
 
 def read_events(record_path, events_filename):
