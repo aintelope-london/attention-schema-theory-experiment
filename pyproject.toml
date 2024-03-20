@@ -23,6 +23,16 @@ packages = ["aintelope", "tests"]
 
 [tool.black]
 line-length = 88
+force-exclude = '''
+/(
+ai_safety_gridworlds
+| gymnasium
+| outputs
+| pettingzoo
+| pycolab
+| \.vshistory
+)/
+'''
 
 [tool.flake8]
 max-line-length = 88
