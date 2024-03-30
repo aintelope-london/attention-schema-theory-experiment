@@ -9,13 +9,12 @@ from omegaconf import DictConfig, OmegaConf
 from flatten_dict import flatten, unflatten
 from flatten_dict.reducers import make_reducer
 
-# import mutex. This one is cross-platform
+# this one is cross-platform
 from filelock import FileLock
 
 from aintelope.analytics import plotting, recording
 from aintelope.config.config_utils import register_resolvers, get_score_dimensions
-
-from progressbar import ProgressBar
+from aintelope.utils import wait_for_enter, try_df_to_csv_write, RobustProgressBar
 
 
 # need to specify config_path since we are in a subfolder and hydra does not automatically pay attention to current working directory. By default, hydra uses the directory of current file instead.
@@ -29,10 +28,12 @@ def recalculate_gridsearch_sfella_scores(cfg: DictConfig) -> None:
     # TODO: automatically select correct gridsearch config file based on main cfg
     gridsearch_config_file = os.environ.get("GRIDSEARCH_CONFIG")
     # if gridsearch_config is None:
-    #    gridsearch_config = "aintelope/config/config_gridsearch.yaml"
-    config_gridsearch = OmegaConf.load(gridsearch_config_file)
+    #    gridsearch_config = "initial_config_gridsearch.yaml"
+    initial_config_gridsearch = OmegaConf.load(
+        os.path.join("aintelope/config", gridsearch_config_file)
+    )
 
-    OmegaConf.update(cfg, "hparams", config_gridsearch.hparams, force_add=True)
+    OmegaConf.update(cfg, "hparams", initial_config_gridsearch.hparams, force_add=True)
 
     test_summaries = []
     if cfg.hparams.aggregated_results_file:
@@ -47,28 +48,17 @@ def recalculate_gridsearch_sfella_scores(cfg: DictConfig) -> None:
 
             lines = data.split("\n")
             with ProgressBar(
-                max_value=len(lines)
+                max_value=len(lines), granularity=10
             ) as bar:  # this takes a few moments of time
                 for line_index, line in enumerate(lines):
                     line = line.strip()
                     if len(line) == 0:
                         continue
                     test_summary = json.loads(line)
-                    # make nested dictionaries into one level
-                    # flattened_test_summary = flatten(test_summary, reducer=make_reducer(delimiter='.'))
-                    # for key, value in flattened_test_summary.items():
-                    #    if isinstance(value, list):
-                    #        flattened_test_summary[key] = str(value)    # pandas cannot handle list types when they are used as groupby keys
-                    #    elif not isinstance(value, str) and np.isnan(value):   # in current setup the values can overflow only in -inf direction    # TODO: remove nan-s in the main program
-                    #        flattened_test_summary[key] = -np.inf
-
-                    # test_summaries.append(flattened_test_summary)
                     test_summaries.append(test_summary)
 
-                    if (line_index + 1) % 10 == 0:
-                        bar.update(line_index + 1)
+                    bar.update(line_index + 1)
                 # / for line_index, line in enumerate(lines):
-                bar.update(len(lines))
 
         else:  # / if os.path.exists(aggregated_results_file):
             raise Exception("Aggregated results file not found")
@@ -81,7 +71,7 @@ def recalculate_gridsearch_sfella_scores(cfg: DictConfig) -> None:
     # test_summaries = test_summaries[345:]   # for debugging
 
     recalculated_test_summaries = []
-    with ProgressBar(max_value=len(test_summaries)) as bar:
+    with RobustProgressBar(max_value=len(test_summaries)) as bar:
         for index, test_summary in enumerate(test_summaries):
             if "timestamp_pid_uuid" in test_summary:
                 timestamp_pid_uuid = test_summary["timestamp_pid_uuid"]
@@ -172,12 +162,13 @@ def recalculate_gridsearch_sfella_scores(cfg: DictConfig) -> None:
             bar.update(index + 1)
 
         # / for test_summary in test_summaries:
-        bar.update(len(test_summaries))
 
-    # / with ProgressBar(max_value=len(test_summaries)) as bar:
+    # / with RobustProgressBar(max_value=len(test_summaries)) as bar:
 
-    parts = os.path.splitext(aggregated_results_file)
-    aggregated_results_file2 = parts[0] + "_recalculated" + parts[1]
+    # parts = os.path.splitext(aggregated_results_file)
+    # aggregated_results_file2 = parts[0] + "_recalculated" + parts[1]
+    aggregated_results_file2 = aggregated_results_file
+    print(f"\nWriting to {aggregated_results_file2}")
     aggregated_results_file2_lock = FileLock(aggregated_results_file2 + ".lock")
     with aggregated_results_file2_lock:
         with open(aggregated_results_file2, mode="w", encoding="utf-8") as fh:
@@ -189,7 +180,7 @@ def recalculate_gridsearch_sfella_scores(cfg: DictConfig) -> None:
                 )  # \n : Prepare the file for appending new lines upon subsequent append. The last character in the JSONL file is allowed to be a line separator, and it will be treated the same as if there was no line separator present.
             fh.flush()
 
-    input("\nRecalculation done. Press [enter] to continue.")
+    wait_for_enter("\nRecalculation done. Press [enter] to continue.")
     qqq = True
 
 
