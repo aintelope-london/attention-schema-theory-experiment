@@ -70,6 +70,8 @@ def recalculate_gridsearch_sfella_scores(cfg: DictConfig) -> None:
 
     # test_summaries = test_summaries[345:]   # for debugging
 
+    log_dir_root = os.path.normpath(cfg["log_dir_root"])
+
     recalculated_test_summaries = []
     with RobustProgressBar(max_value=len(test_summaries)) as bar:
         for index, test_summary in enumerate(test_summaries):
@@ -81,7 +83,7 @@ def recalculate_gridsearch_sfella_scores(cfg: DictConfig) -> None:
             experiment_name = test_summary["experiment_name"]
 
             log_dir = os.path.join(
-                "outputs", timestamp_pid_uuid
+                log_dir_root, timestamp_pid_uuid
             )  # TODO: read outputs folder name from configuration
             experiment_dir = os.path.join(log_dir, experiment_name)
             events_fname = cfg.events_fname

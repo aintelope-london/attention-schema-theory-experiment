@@ -1,9 +1,14 @@
 import os
+import sys
 import copy
+import distutils
+import shutil
 import json
 import pandas as pd
 import numpy as np
 from collections import OrderedDict
+
+# from command_runner.elevate import elevate
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
@@ -42,11 +47,11 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
         True  # TODO: override function argument
     )
 
-    compute_average_evals_scores_per_parameter_combination = True  # if set to false then all cycles of evals with best gridsearch parameter combination are outputted in separate rows of the output CSV file
+    compute_average_evals_scores_per_parameter_combination = False  # if set to false then all cycles of evals with best gridsearch parameter combination are outputted in separate rows of the output CSV file
 
-    return_n_best_combinations = (
-        2 if compute_average_evals_scores_per_parameter_combination else 1
-    )
+    return_n_best_combinations = 1  # TODO: function argument
+    if not compute_average_evals_scores_per_parameter_combination:
+        return_n_best_combinations = 1
 
     # extract list parameters and compute cross product over their values
     # dict_config = OmegaConf.to_container(initial_config_gridsearch, resolve=True) # convert DictConfig to dict # NB! DO resolve references here since we DO want to handle references to lists as lists
@@ -71,7 +76,7 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
         "hparams.gridsearch_trial_no"
     ] = (
         initial_config_gridsearch.hparams.gridsearch_trial_no
-    )  # this is a resolver that generates a list
+    )  # this is an OmegaConf resolver that generates a list
 
     # preserve only the config parameters that were NOT searched over
     # TODO: is this needed?
@@ -207,24 +212,15 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
         )
     ]
 
-    gridsearch_cycle_count = 4  # max cycle count   # TODO: read from config
-    eval_cycle_count = 4  # gridsearch_cycle_count if gridsearch_cycle_count is not None else 25    # min cycle count       # TODO: read from config
+    gridsearch_cycle_count = 100  # max cycle count   # TODO: read from config
+    eval_cycle_count = 100  # gridsearch_cycle_count if gridsearch_cycle_count is not None else 25    # min cycle count       # TODO: read from config
 
     df = df[
         df["gridsearch_params.hparams.gridsearch_trial_no"] < eval_cycle_count
     ]  # ignore results past eval_cycle_count
-    # df = df[df["gridsearch_params.hparams.model_params.conv_size"] == 3]
-
-    evals_params_and_results_cols = (
-        evals_parameter_grouping_cols
-        + (
-            ["gridsearch_params.hparams.gridsearch_trial_no"]
-            if not compute_average_evals_scores_per_parameter_combination
-            else []
-        )
-        + score_cols
-    )
-    evals_df_params_and_results = df[evals_params_and_results_cols]
+    # df = df[
+    #    df["gridsearch_params.hparams.env_params.map_max"] == 7
+    # ]  # TODO: function argument
 
     if (
         gridsearch_cycle_count is not None
@@ -241,6 +237,29 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
     ]
     gridsearch_df_params_and_results_with_experiment_name = gridsearch_df[
         gridsearch_parameter_grouping_cols + ["experiment_name"]
+    ]
+    gridsearch_df_params_and_results_with_timestamp_pid_uuid = gridsearch_df[
+        gridsearch_parameter_grouping_cols + ["timestamp_pid_uuid"]
+    ]
+
+    evals_params_and_results_cols = (
+        evals_parameter_grouping_cols
+        + (
+            ["gridsearch_params.hparams.gridsearch_trial_no", "timestamp_pid_uuid"]
+            if not compute_average_evals_scores_per_parameter_combination
+            else []
+        )
+        + score_cols
+    )
+    evals_df_params_and_results = df[evals_params_and_results_cols]
+    evals_df_params_and_results_with_timestamp_pid_uuid = df[
+        evals_params_and_results_cols
+        + (
+            # add "timestamp_pid_uuid" column only if not already as part of evals_params_and_results_cols, else duplicate column would appear
+            ["timestamp_pid_uuid"]
+            if "timestamp_pid_uuid" not in evals_params_and_results_cols
+            else []
+        )
     ]
 
     score_cols_mean_renames = {col: "mean." + col for col in score_cols}
@@ -282,6 +301,9 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
         gridsearch_df_params_and_results_with_experiment_name = (
             gridsearch_df_params_and_results_with_experiment_name[gridsearch_mask]
         )
+        gridsearch_df_params_and_results_with_timestamp_pid_uuid = (
+            gridsearch_df_params_and_results_with_timestamp_pid_uuid[gridsearch_mask]
+        )
 
     # / if not use_separate_parameters_for_each_experiment:
 
@@ -305,6 +327,11 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
         )
         .agg("std", ddof=0)  # TODO: ddof
         .rename(columns=score_cols_std_renames, inplace=False),
+        gridsearch_df_params_and_results_with_timestamp_pid_uuid.groupby(
+            gridsearch_parameter_grouping_cols, sort=False
+        )["timestamp_pid_uuid"]
+        .apply(list)
+        .rename("timestamp_pid_uuids", inplace=False),
     ]
 
     if (
@@ -338,7 +365,7 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
                 gridsearch_averages_per_parameter_combination["count"]
                 >= gridsearch_cycle_count
             ]
-        )  # TODO!!! check the cycle count per experiment, not per parameter combination
+        )
 
     else:
         # check how many unique experiment names remained per gridsearch parameter combination after removing rows with too few eval_cycle_count
@@ -378,6 +405,11 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
             )
             .agg("std", ddof=0)  # TODO: ddof
             .rename(columns=score_cols_std_renames, inplace=False),
+            evals_df_params_and_results_with_timestamp_pid_uuid.groupby(
+                evals_parameter_grouping_cols, sort=False
+            )["timestamp_pid_uuid"]
+            .apply(list)
+            .rename("timestamp_pid_uuids", inplace=False),
         ]
 
         # TODO: refactor this into a separate helper function since this code does not seem to be quite straightforward, but is a general use case
@@ -408,6 +440,11 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
                 "size"
             )  # count rows per group
             .rename("count_per_experiment", inplace=False),
+            evals_df_params_and_results_with_timestamp_pid_uuid["timestamp_pid_uuid"]
+            .map(
+                lambda x: [x]
+            )  # convert uuid to single-entry list in order to maintain same format as in case of compute_average_evals_scores_per_parameter_combination == True
+            .rename("timestamp_pid_uuids", inplace=False),
         ]
         evals_averages_per_parameter_combination = pd.concat(
             evals_cycle_count_transforms,  # NB! Here we do not reindex, else it would not be possible to apply gridsearch_mask to gridsearch_df_params_and_results. Also we do not need to reindex here since this list contains only transforms and not aggregations.
@@ -431,9 +468,10 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
     evals_environment_grouping_dims = ["gridsearch_params.hparams.env_params.map_max"]
     evals_environment_grouping_dims.append("experiment_name")
     if not compute_average_evals_scores_per_parameter_combination:
-        evals_environment_grouping_dims.append(
-            "gridsearch_params.hparams.gridsearch_trial_no"
-        )
+        evals_environment_grouping_dims += [
+            "gridsearch_params.hparams.gridsearch_trial_no",
+            "timestamp_pid_uuid",
+        ]
 
     gridsearch_environment_grouping_dims = [
         "gridsearch_params.hparams.env_params.map_max"
@@ -491,6 +529,8 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
     if (
         use_separate_parameters_for_each_experiment
         and compute_average_evals_scores_per_parameter_combination
+        and return_n_best_combinations == 1
+        # and gridsearch_cycle_count == eval_cycle_count
     ):
         assert len(rows) == len(gridsearch_best_parameters_by_score)
     evals_best_parameters_by_score = pd.concat(rows, axis=1).transpose()
@@ -539,6 +579,8 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
     if (
         use_separate_parameters_for_each_experiment
         and compute_average_evals_scores_per_parameter_combination
+        and return_n_best_combinations == 1
+        and gridsearch_cycle_count == eval_cycle_count
     ):
         assert len(rows) == len(gridsearch_best_parameters_by_sfella_score)
     evals_best_parameters_by_sfella_score = pd.concat(rows, axis=1).transpose()
@@ -599,6 +641,8 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
     if (
         use_separate_parameters_for_each_experiment
         and compute_average_evals_scores_per_parameter_combination
+        and return_n_best_combinations == 1
+        and gridsearch_cycle_count == eval_cycle_count
     ):
         assert len(rows) == len(gridsearch_best_parameters_by_score_minus_std)
     evals_best_parameters_by_score_minus_std = pd.concat(rows, axis=1).transpose()
@@ -606,6 +650,32 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
     # assert list(test["score_mean_minus_std"]) == list(best_parameters_by_score_minus_std_row_indexes["score_mean_minus_std"])
 
     # / # select evals rows that have same parameter sets as best gridsearch parameter sets
+
+    # copy log files of selected grid search and evals results to a separate output folder
+    if True:  # TODO: function argument
+        log_dir_root = os.path.normpath(
+            cfg["log_dir_root"]
+        )  # os.path.normpath removes any trailing slashes
+        log_folder_copy_target = (
+            log_dir_root + "_" + cfg.hparams.params_set_title + "_selected"
+        )  # TODO: function argument for the suffix
+
+        os.makedirs(log_folder_copy_target, exist_ok=True)
+
+        # TODO: config option for including all gridsearch combinations (before selecting the best ones) into the selected logs folder
+
+        for pd_index, eval_row in evals_best_parameters_by_score.iterrows():
+            experiment_name = eval_row["experiment_name"]
+            for timestamp_pid_uuid in eval_row["timestamp_pid_uuids"]:
+                copy_log_folder(
+                    experiment_name,
+                    timestamp_pid_uuid,
+                    log_dir_root,
+                    log_folder_copy_target,
+                    cfg,
+                )
+
+    # keep only selected columns in the CSV output
 
     if compute_average_evals_scores_per_parameter_combination:
         total_score_dims = [
@@ -745,8 +815,20 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
 
     evals_best_parameters_by_score_minus_std = (
         evals_best_parameters_by_score_minus_std.sort_values(
-            by=evals_environment_grouping_dims + ["score_mean_minus_std"],
-            ascending=([True] * len(evals_environment_grouping_dims) + [False]),
+            by=evals_environment_grouping_dims
+            + (
+                ["score_mean_minus_std"]
+                if compute_average_evals_scores_per_parameter_combination
+                else []
+            ),
+            ascending=(
+                [True] * len(evals_environment_grouping_dims)
+                + (
+                    [False]
+                    if compute_average_evals_scores_per_parameter_combination
+                    else []
+                )
+            ),
         )
     )
 
@@ -837,6 +919,7 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
         header=True,
     )
 
+    # create a new specialised pipeline config files based on the best parameters per experiment
     pipeline_config_file = os.environ.get("PIPELINE_CONFIG")
     using_default_pipeline_config_file = False
     if pipeline_config_file is None:
@@ -848,8 +931,6 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
     )
 
     for combination_i in range(0, return_n_best_combinations):
-        # create a new specialised pipeline config file based on the best parameters per experiment
-
         # TODO: ensure to do not use special pipeline config when doing initial gridsearch
         if using_default_pipeline_config_file:
             parts = os.path.splitext(pipeline_config_file)
@@ -934,8 +1015,136 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
 # / def gridsearch_analytics():
 
 
-if __name__ == "__main__":
+def copy_log_folder(experiment_name, source_uuid, source_base, dest_base, cfg):
+    source_pipeline_log = os.path.abspath(os.path.join(source_base, source_uuid))
+    dest_pipeline_log = os.path.join(dest_base, source_uuid)
+
+    os.makedirs(dest_pipeline_log, exist_ok=True)
+
+    # copy experiment logs
+
+    source_experiment_log = os.path.join(source_pipeline_log, experiment_name)
+    dest_experiment_log = os.path.join(dest_pipeline_log, experiment_name)
+    if not os.path.exists(dest_experiment_log):
+        os.symlink(source_experiment_log, dest_experiment_log, target_is_directory=True)
+    else:
+        qqq = True  # for debugging
+
+    # copy hydra logs
+
+    source_hydra_log = os.path.join(source_pipeline_log, cfg.hydra_logs_root)
+    dest_hydra_log = os.path.join(dest_pipeline_log, cfg.hydra_logs_root)
+    if not os.path.exists(dest_hydra_log):
+        os.symlink(source_hydra_log, dest_hydra_log, target_is_directory=True)
+
+    # copy plots
+
+    source_plot = os.path.join(source_pipeline_log, "plot_" + experiment_name)
+    dest_plot = os.path.join(dest_pipeline_log, "plot_" + experiment_name)
+
+    if (
+        os.name == "nt"
+    ):  # symbolic links to files do not work well in Windows when zipping
+        if not os.path.exists(dest_plot + ".png"):
+            shutil.copyfile(source_plot + ".png", dest_plot + ".png")
+        if not os.path.exists(dest_plot + ".svg"):
+            shutil.copyfile(source_plot + ".svg", dest_plot + ".svg")
+    else:
+        if not os.path.exists(dest_plot + ".png"):
+            os.symlink(
+                source_plot + ".png", dest_plot + ".png", target_is_directory=False
+            )
+        if not os.path.exists(dest_plot + ".svg"):
+            os.symlink(
+                source_plot + ".svg", dest_plot + ".svg", target_is_directory=False
+            )
+
+    # copy code archives
+    if False:  # TODO: function parameter
+        source_code_archive = os.path.join(
+            source_pipeline_log, "aintelope_code_archive.zip"
+        )
+        dest_code_archive = os.path.join(
+            source_pipeline_log, "aintelope_code_archive.zip"
+        )
+
+        if not os.path.exists(dest_code_archive):
+            if (
+                os.name == "nt"
+            ):  # symbolic links to files do not work well in Windows when zipping
+                shutil.copyfile(source_code_archive, dest_code_archive)
+            else:
+                os.symlink(
+                    source_code_archive, dest_code_archive, target_is_directory=False
+                )
+
+        source_code_archive = os.path.join(
+            source_pipeline_log, "gridworlds_code_archive.zip"
+        )
+        dest_code_archive = os.path.join(
+            source_pipeline_log, "gridworlds_code_archive.zip"
+        )
+
+        if not os.path.exists(dest_code_archive):
+            if (
+                os.name == "nt"
+            ):  # symbolic links to files do not work well in Windows when zipping
+                shutil.copyfile(source_code_archive, dest_code_archive)
+            else:
+                os.symlink(
+                    source_code_archive, dest_code_archive, target_is_directory=False
+                )
+
+    # TODO: copy checkpoints
+
+
+# / def copy_log_folder(experiment_name, source_uuid, source_base, dest_base, cfg):
+
+
+def main():
     register_resolvers()
 
     use_same_parameters_for_all_pipeline_experiments = False
     gridsearch_analytics()
+
+
+if __name__ == "__main__":
+    # TODO: do the elevation only when linking to log folders is activated
+    debugging = sys.gettrace() is not None
+    if os.name == "nt":
+        if debugging:
+            from ctypes import windll
+
+            if not windll.shell32.IsUserAnAdmin():
+                print(
+                    "You need to start your debugger in elevated mode. Creating symbolic links to selected log folders will not be possible. If you cannot get Administrator permissions, the alternative is to let the Administrator to create user permission to create symbolic links: gpedit.msc -> Computer Configuration -> Windows Settings -> Security Settings -> Local Policies -> User Rights Assignment -> Create symbolic links."
+                )
+                wait_for_enter("\nPress [enter] to continue.")
+            main()
+        else:
+            from ctypes import windll
+
+            if not windll.shell32.IsUserAnAdmin():
+                print(
+                    "Not running as Administrator. Creating symbolic links to selected log folders will not be possible. If you cannot get Administrator permissions, the alternative is to let the Administrator to create user permission to create symbolic links: gpedit.msc -> Computer Configuration -> Windows Settings -> Security Settings -> Local Policies -> User Rights Assignment -> Create symbolic links."
+                )
+                wait_for_enter("\nPress [enter] to continue.")
+
+            main()
+
+            # comment-out: elevate() does not preserve environment variables. TODO: fix that
+
+            # elevate(main)  # Needed to create symbolic links to selected log folders. See https://docs.python.org/3/library/os.html#os.symlink
+
+            # TODO: reimplement elevate() in such a way that the parent process stays alive after elevate() exists so we can check whether the elevation succeeded.
+
+            # try:
+            #    elevate()  # Needed to create symbolic links to selected log folders. See https://docs.python.org/3/library/os.html#os.symlink
+            # except Exception as ex:
+            #    print(
+            #        "Elevation failed, creating symbolic links to selected log folders will not be possible. If you cannot get Administrator permissions, the alternative is to let the Administrator to create user permission to create symbolic links: gpedit.msc -> Computer Configuration -> Windows Settings -> Security Settings -> Local Policies -> User Rights Assignment -> Create symbolic links."
+            #    )
+            #    wait_for_enter("\nPress [enter] to continue.")
+            #    main()
+    else:  # Linux, Mac
+        main()
