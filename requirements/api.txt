@@ -13,4 +13,4 @@ psutil==5.9.4
 pygame==2.4
 semaphore-win-ctypes==0.1.2; platform_system == "Windows"
 torch==2.1.0
--e git+https://github.com/levitation-opensource/ai-safety-gridworlds@aintelope_new_benchmarks2#egg=ai-safety-gridworlds
+-e git+https://github.com/levitation-opensource/ai-safety-gridworlds@master#egg=ai-safety-gridworlds
