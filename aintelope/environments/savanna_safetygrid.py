@@ -38,9 +38,8 @@ from ai_safety_gridworlds.helpers.gridworld_zoo_parallel_env import (
     GridworldZooParallelEnv,
 )
 
-from aintelope.environments.env_utils.distance import distance_to_closest_item
 from aintelope.aintelope_typing import Reward  # TODO: use np.ndarray or mo_reward
-from aintelope.aintelope_typing import (  # PositionFloat,; Action,; AgentStates,
+from aintelope.aintelope_typing import (  
     AgentId,
     Info,
     Observation,
@@ -120,7 +119,7 @@ class GridworldZooBaseEnv:
         "override_infos": False,
         "test_death": False,
         "test_death_probability": 0.33,
-        "use_old_aintelope_rewards": False,
+        "scalarize_rewards": False,   # needed for Zoo sequential API unit tests
         "flatten_observations": False,  # this will not work with current code
     }
 
@@ -223,6 +222,7 @@ class GridworldZooBaseEnv:
             "remove_unused_tile_types_from_layers": "remove_unused_tile_types_from_layers",
             "test_death": "test_death",
             "test_death_probability": "test_death_probability",
+            "scalarize_rewards": "scalarize_rewards",
             "amount_agents": "amount_agents",
             "flatten_observations": "flatten_observations",
         }
@@ -235,7 +235,7 @@ class GridworldZooBaseEnv:
 
         self._observe_bitmap_layers = self.metadata["observe_bitmap_layers"]
         self._override_infos = self.metadata["override_infos"]
-        self._use_old_aintelope_rewards = self.metadata["use_old_aintelope_rewards"]
+        self._scalarize_rewards = self.metadata["scalarize_rewards"]
 
     def init_observation_spaces(self, parent_observation_spaces, infos):
         # for @zoo-api
@@ -469,39 +469,6 @@ class GridworldZooBaseEnv:
             observations2[agent] = self.transform_observation(agent, infos[agent])
         return observations2
 
-    def calc_min_grass_distance(self, agent, info):
-        if not self._observe_bitmap_layers:
-            agent_chr = self.agent_name_mapping[agent]
-            agent_location = np.array(info[INFO_OBSERVATION_COORDINATES][agent_chr][0])
-            grass_patches = np.array(info[INFO_OBSERVATION_COORDINATES][FOOD_CHR])
-            min_grass_distance = distance_to_closest_item(agent_location, grass_patches)
-        else:
-            # TODO: I think this grass distance logic is obsolete here?
-            agent_chr = self.agent_name_mapping[agent]
-            agent_location = np.array(
-                info[INFO_AGENT_OBSERVATION_COORDINATES][agent_chr][0]
-            )
-            if len(info[INFO_AGENT_OBSERVATION_COORDINATES][FOOD_CHR]) > 0:
-                grass_patches = np.array(
-                    info[INFO_AGENT_OBSERVATION_COORDINATES][FOOD_CHR]
-                )
-                min_grass_distance = distance_to_closest_item(
-                    agent_location, grass_patches
-                )
-            else:
-                min_grass_distance = (
-                    np.inf
-                )  # grass not visible to the agent at the moment
-        return min_grass_distance
-
-    def reward_agent(self, min_grass_distance):
-        # For now measure if agent can eat.
-        # Was 1 / (1 + min_grass_distance), moving to instincts
-        if min_grass_distance > 1:
-            return np.float64(0.0)
-        else:
-            return np.float64(1.0)
-
     def observation_space(self, agent):
         return self.transformed_observation_spaces[agent]
 
@@ -726,11 +693,9 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
         rewards2 = {}
         # transform observations and rewards
         for agent in list(infos.keys()):
-            if self._use_old_aintelope_rewards:  # old AIntelope reward logic
-                min_grass_distance = self.calc_min_grass_distance(agent, infos[agent])
-                rewards2[agent] = self.reward_agent(min_grass_distance)
-            else:
-                rewards2[agent] = infos[agent][INFO_REWARD_DICT]
+            rewards2[agent] = infos[agent][INFO_REWARD_DICT]
+            if self._scalarize_rewards:
+                rewards2[agent] = sum(rewards2[agent].values())  # this is currently used only for unit tests so no need for nonlinear utility transformations before summation
 
         for agent in list(
             self.observations2.keys()
@@ -787,7 +752,7 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         # that .rewards property returns dictionary with existing agents.
         self._last_rewards2 = {agent: None for agent in self.possible_agents}
         self._cumulative_rewards2 = {
-            agent: (0.0 if self._use_old_aintelope_rewards else {})
+            agent: (0.0 if self._scalarize_rewards else {})
             for agent in self.possible_agents
         }
         self.observations2 = {}
@@ -865,7 +830,7 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         # so that .rewards property returns dictionary with existing agents.
         # NB! not calculating actual rewards yet, rewards should be only updated after
         # step, not on each observation before step.
-        if self._use_old_aintelope_rewards:
+        if self._scalarize_rewards:
             self._last_rewards2 = {
                 agent: np.float64(0) for agent in self.possible_agents
             }
@@ -902,7 +867,10 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
             observation2 = None  # that's how Zoo api_test.py requires it
 
         # rewards should be only updated after step, not on each observation before step
-        reward2 = self._cumulative_rewards2[agent]
+        # reward2 = self._cumulative_rewards2[agent]
+        reward2 = info[INFO_REWARD_DICT]
+        if self._scalarize_rewards:
+            reward2 = sum(reward2.values())
 
         if self._override_infos:
             info = {}
@@ -916,52 +884,8 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         )
 
     def step(self, action: Action) -> None:
-        logger.debug("debug action", action)
-
-        agent = self.agent_selection
-
-        # this needs to be so according to Zoo unit test. See
-        # https://github.com/Farama-Foundation/PettingZoo/blob/master/pettingzoo/test/api_test.py
-        if self._use_old_aintelope_rewards:
-            self._cumulative_rewards2[agent] = 0.0
-        else:
-            self._cumulative_rewards2[agent] = {}
-
-        # need to set current step rewards to zero for other agents
-        # the agent should be visible in .rewards after it dies (until its "dead step"),
-        # but during next agent's step it should get zero reward
-        for agent in self.agents:
-            if self.terminations[agent] or self.truncations[agent]:
-                if self._use_old_aintelope_rewards:
-                    self._last_rewards2[agent] = 0.0
-                else:
-                    self._last_rewards2[agent] = {}
-
-        GridworldZooAecEnv.step(self, {"step": action})
-
-        if agent not in self.agents:  # was "dead step"
-            # dead agent needs to be removed from observations2 and _last_rewards2
-            del self.observations2[agent]
-            del self._last_rewards2[agent]
-            return
-
-        info = GridworldZooAecEnv.observe_info(self, agent)
-        info = self.format_info(agent, info)
-
-        if self._use_old_aintelope_rewards:
-            min_grass_distance = self.calc_min_grass_distance(agent, info)
-            reward2 = self.reward_agent(min_grass_distance)
-            self._last_rewards2[agent] = reward2
-
-            # NB! cumulative reward should be calculated for all agents
-            for agent2 in self.agents:
-                self._cumulative_rewards2[agent2] += self._last_rewards2[agent2]
-        else:
-            self._last_rewards2[agent] = info[INFO_REWARD_DICT]
-
-            # NB! cumulative reward should be calculated for all agents
-            for agent2 in self.agents:
-                self._cumulative_rewards2[agent2] = info[INFO_CUMULATIVE_REWARD_DICT]
+        self.step_single_agent(action)
+        # self.step_multiple_agents({ self.agent_selection: action })
 
     def step_single_agent(self, action: Action):
         """step(action) takes in an action for each agent and should return the
@@ -975,23 +899,17 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
 
         agent = self.agent_selection
 
-        # this needs to be so according to Zoo unit test. See
-        # https://github.com/Farama-Foundation/PettingZoo/blob/master/pettingzoo/test/api_test.py
-        if self._use_old_aintelope_rewards:
-            self._cumulative_rewards2[agent] = 0.0
-        else:
-            self._cumulative_rewards2[agent] = {}
-
         # need to set current step rewards to zero for other agents
-        for agent in self.agents:
-            # the agent should be visible in .rewards after it dies
-            # (until its "dead step"), but during next agent's step
-            # it should get zero reward
-            if self.terminations[agent] or self.truncations[agent]:
-                if self._use_old_aintelope_rewards:
-                    self._last_rewards2[agent] = 0.0
-                else:
-                    self._last_rewards2[agent] = {}
+        # the agent should be visible in .rewards after it dies
+        # (until its "dead step"), but during next agent's step
+        # it should get zero reward
+        for agent2 in self.agents:
+            # this needs to be so according to Zoo unit test. See
+            # https://github.com/Farama-Foundation/PettingZoo/blob/master/pettingzoo/test/api_test.py
+            if self._scalarize_rewards:
+                self._last_rewards2[agent2] = 0.0
+            else:
+                self._last_rewards2[agent2] = {}
 
         GridworldZooAecEnv.step(self, {"step": action})
 
@@ -1004,26 +922,23 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         # observe observations, transform observations and rewards
         info = GridworldZooAecEnv.observe_info(self, agent)
         info = self.format_info(agent, info)
-        # self.observe_from_location({agent: [1, 1]})    # for debugging
+
         self._last_infos[agent] = info
         observation2 = self.transform_observation(agent, info)
         self.observations2[agent] = observation2
 
-        if self._use_old_aintelope_rewards:
-            min_grass_distance = self.calc_min_grass_distance(agent, info)
-            reward2 = self.reward_agent(min_grass_distance)
-            self._last_rewards2[agent] = reward2
+        reward2 = info[INFO_REWARD_DICT]
+        if self._scalarize_rewards:
+            reward2 = sum(reward2.values())  # this is currently used only for unit tests so no need for nonlinear utility transformations before summation
+        self._last_rewards2[agent] = reward2
 
-            # NB! cumulative reward should be calculated for all agents
-            for agent2 in self.agents:
-                self._cumulative_rewards2[agent2] += self._last_rewards2[agent2]
-        else:
-            reward2 = info[INFO_REWARD_DICT]
-            self._last_rewards2[agent] = reward2
-
-            # NB! cumulative reward should be calculated for all agents
-            for agent2 in self.agents:
-                self._cumulative_rewards2[agent2] = info[INFO_CUMULATIVE_REWARD_DICT]
+        # NB! cumulative reward should be calculated for all agents
+        for agent2 in self.agents:
+            info = GridworldZooAecEnv.observe_info(self, agent2)
+            info = self.format_info(agent2, info)
+            self._cumulative_rewards2[agent2] = info[INFO_CUMULATIVE_REWARD_DICT]
+            if self._scalarize_rewards:
+                self._cumulative_rewards2[agent2] = sum(self._cumulative_rewards2[agent2].values())  # this is currently used only for unit tests so no need for nonlinear utility transformations before summation
 
         terminated = self.terminations[agent]
         truncated = self.truncations[agent]
@@ -1069,13 +984,16 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         rewards2 = {}
         infos = {}
 
+        # the agent should be visible in .rewards after it dies
+        # (until its "dead step"), but during next agent's step
+        # it should get zero reward
         for agent in actions.keys():
             # this needs to be so according to Zoo unit test. See
             # https://github.com/Farama-Foundation/PettingZoo/blob/master/pettingzoo/test/api_test.py
-            if self._use_old_aintelope_rewards:
-                self._cumulative_rewards2[agent] = 0.0
+            if self._scalarize_rewards:
+                self._last_rewards2[agent] = 0.0
             else:
-                self._cumulative_rewards2[agent] = {}
+                self._last_rewards2[agent] = {}
 
         # loop over all agents in ENV NOT IN ACTIONS DICT
         for index in range(
@@ -1099,44 +1017,34 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
                     # observe observations, transform observations and rewards
                     info = GridworldZooAecEnv.observe_info(self, agent)
                     info = self.format_info(agent, info)
-                    # self.observe_from_location({agent: [1, 1]})    # for debugging
+                    
                     infos[agent] = info
                     self._last_infos[agent] = info
                     self.observations2[agent] = self.transform_observation(agent, info)
 
-                    if self._use_old_aintelope_rewards:
-                        min_grass_distance = self.calc_min_grass_distance(agent, info)
-                        reward2 = self.reward_agent(min_grass_distance)
-                        rewards2[agent] = reward2
-                        self._last_rewards2[agent] = reward2
-
-                        # NB! if the action of current agent somehow affects the rewards
-                        # of other agents then the cumulative reward of the other agents
-                        # needs to be updated here as well.
-                        self._cumulative_rewards2[agent] += reward2
-                    else:
-                        self._last_rewards2[agent] = info[INFO_REWARD_DICT]
-                        self._cumulative_rewards2[agent] = info[
-                            INFO_CUMULATIVE_REWARD_DICT
-                        ]
+                    self._last_rewards2[agent] = info[INFO_REWARD_DICT]
+                    # NB! if the action of current agent somehow affects the rewards
+                    # of other agents then the cumulative reward of the other agents
+                    # needs to be updated here as well.
+                    self._cumulative_rewards2[agent] = info[
+                        INFO_CUMULATIVE_REWARD_DICT
+                    ]
                 else:
                     info = GridworldZooAecEnv.observe_info(self, agent)
+                    info = self.format_info(agent, info)
 
-                    if self._use_old_aintelope_rewards:
-                        min_grass_distance = self.calc_min_grass_distance(agent, info)
-                        reward2 = self.reward_agent(min_grass_distance)
-                        rewards2[agent] = reward2
-                        self._last_rewards2[agent] = reward2
-
-                        # NB! if the action of current agent somehow affects the rewards
-                        # of other agents then the cumulative reward of the other agents
-                        # needs to be updated here as well.
-                        self._cumulative_rewards2[agent] += reward2
-                    else:
-                        self._last_rewards2[agent] = info[INFO_REWARD_DICT]
-                        self._cumulative_rewards2[agent] = info[
-                            INFO_CUMULATIVE_REWARD_DICT
-                        ]
+                    self._last_rewards2[agent] = info[INFO_REWARD_DICT]
+                    # NB! if the action of current agent somehow affects the rewards
+                    # of other agents then the cumulative reward of the other agents
+                    # needs to be updated here as well.
+                    self._cumulative_rewards2[agent] = info[
+                        INFO_CUMULATIVE_REWARD_DICT
+                    ]
+                    
+                if self._scalarize_rewards:
+                    # this is currently used only for unit tests so no need for nonlinear utility transformations before summation
+                    self._last_rewards2[agent] = sum(self._last_rewards2[agent].values())
+                    self._cumulative_rewards2[agent] = sum(self._cumulative_rewards2[agent].values())  
 
         # / for index in range(0, self.num_agents)
 
@@ -1153,15 +1061,8 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
                     self._last_infos[agent] = info
                     self.observations2[agent] = self.transform_observation(agent, info)
 
-                    # min_grass_distance = self.calc_min_grass_distance(agent, info)
-                    # reward2 = self.reward_agent(min_grass_distance)
-                    # rewards2[agent] = reward2
-                    # self._last_rewards2[agent] = reward2
-
         terminateds = self.terminations
         truncateds = self.truncations
-
-        infos = self.format_infos(infos)
 
         if self._override_infos:
             infos = {agent: {} for agent in infos.keys()}
