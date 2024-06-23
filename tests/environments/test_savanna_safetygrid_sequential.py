@@ -5,8 +5,6 @@ import numpy.testing as npt
 import pytest
 
 from aintelope.environments import savanna_safetygrid as safetygrid
-from aintelope.environments.env_utils.distance import distance_to_closest_item
-from aintelope.environments.savanna import ACTION_MAP
 from aintelope.environments.savanna_safetygrid import SavannaGridworldSequentialEnv
 from gymnasium.spaces import Discrete, MultiDiscrete
 from pettingzoo.test import (
@@ -21,7 +19,7 @@ from pettingzoo.test.seed_test import seed_test
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_api_sequential(execution_number):
+def test_gridworlds_api_sequential_scalarized_rewards(execution_number):
     # TODO: refactor these values out to a test-params file
     # seed = int(time.time()) & 0xFFFFFFFF
     # np.random.seed(seed)
@@ -34,7 +32,7 @@ def test_gridworlds_api_sequential(execution_number):
         "amount_agents": 1,  # for now only one agent
         "amount_grass_patches": 2,
         "amount_water_holes": 2,
-        "use_old_aintelope_rewards": True,  # Zoo does not handle dictionary rewards well in sequential env test
+        "scalarize_rewards": True,  # Zoo does not handle dictionary rewards well in sequential env test
     }
     env = safetygrid.SavannaGridworldSequentialEnv(env_params=env_params)
     env.seed(execution_number)
@@ -44,7 +42,7 @@ def test_gridworlds_api_sequential(execution_number):
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_api_sequential_with_death(execution_number):
+def test_gridworlds_api_sequential_with_death_scalarized_rewards(execution_number):
     # TODO: refactor these values out to a test-params file
     # seed = int(time.time()) & 0xFFFFFFFF
     # np.random.seed(seed)
@@ -62,7 +60,7 @@ def test_gridworlds_api_sequential_with_death(execution_number):
         "amount_water_holes": 2,
         "test_death": False,
         "seed": execution_number,
-        "use_old_aintelope_rewards": True,  # Zoo does not handle dictionary rewards well in sequential env test
+        "scalarize_rewards": True,  # Zoo does not handle dictionary rewards well in sequential env test
     }
     env = safetygrid.SavannaGridworldSequentialEnv(env_params=env_params)
 
@@ -90,18 +88,6 @@ def test_gridworlds_seed(execution_number):
         # for some reason the test env in Git does not recognise the num_cycles neither
         # as named or positional argument
         seed_test(get_env_instance)
-
-
-def test_gridworlds_agent_states():
-    pass  # safetygrid.SavannaGridworldEnv has no agent_states
-
-
-def test_gridworlds_reward_agent():
-    pass  # safetygrid.SavannaGridworldEnv has no reward_agent()
-
-
-def test_gridworlds_move_agent():
-    pass  # safetygrid.SavannaGridworldEnv has no agent_states and move_agent()
 
 
 @pytest.mark.parametrize("execution_number", range(1))
@@ -190,28 +176,6 @@ def test_gridworlds_action_spaces():
         assert env.action_space(agent).n == 5  # includes no-op
 
 
-def test_gridworlds_action_space_valid_step():
-    pass  # safetygrid.SavannaGridworldEnv has no agent_states and move_agent()
-
-
-def test_max_cycles():
-    # currently the environment does not accept parameters like max_cycles
-    # max_cycles_test(zoo.SavannaZooParallelEnv)
-    pass
-
-
-def test_render():
-    # TODO: close method not implemented
-    # render_test(zoo.SavannaZooParallelEnv)
-    pass
-
-
-def test_performance_benchmark():
-    # will print only timing to stdout; not shown per default
-    # performance_benchmark(zoo.SavannaZooParallelEnv())
-    pass
-
-
 if __name__ == "__main__" and os.name == "nt":  # detect debugging
     pytest.main([__file__])  # run tests only in this file
-    # test_gridworlds_api_sequential_with_death()
+    # test_gridworlds_api_sequential_with_death_scalarized_rewards(0)

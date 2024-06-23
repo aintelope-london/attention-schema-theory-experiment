@@ -150,7 +150,6 @@ def test_training_pipeline_instinct_with_dead_agents(execution_number):
 
 
 if __name__ == "__main__" and os.name == "nt":  # detect debugging
-    register_resolvers()  # needs to be called only once
     pytest.main([__file__])  # run tests only in this file
     # test_training_pipeline_main()
     # test_training_pipeline_instinct()

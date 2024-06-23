@@ -7,10 +7,6 @@ from aintelope.environments.savanna_safetygrid import (
     SavannaGridworldParallelEnv,
     SavannaGridworldSequentialEnv,
 )
-from aintelope.environments.savanna_zoo import (
-    SavannaZooParallelEnv,
-    SavannaZooSequentialEnv,
-)
 
 PettingZooEnv = Union[AECEnv, ParallelEnv]
 Environment = Union[gym.Env, PettingZooEnv]
@@ -31,7 +27,5 @@ def get_env_class(env_id: str) -> Type[Environment]:
     return ENV_REGISTRY[env_id]
 
 
-register_env_class("savanna-zoo-sequential-v2", SavannaZooSequentialEnv)
-register_env_class("savanna-zoo-parallel-v2", SavannaZooParallelEnv)
 register_env_class("savanna-safetygrid-sequential-v1", SavannaGridworldSequentialEnv)
 register_env_class("savanna-safetygrid-parallel-v1", SavannaGridworldParallelEnv)

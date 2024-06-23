@@ -8,12 +8,6 @@ import random
 import numpy as np
 
 from aintelope.agents.q_agent import QAgent
-from aintelope.environments.env_utils.distance import distance_to_closest_item
-from aintelope.environments.savanna import (
-    get_agent_pos_from_state,
-    move_agent,
-    reward_agent,
-)
 
 logger = logging.getLogger("aintelope.agents.simple_agents")
 
@@ -27,7 +21,7 @@ class RandomWalkAgent(QAgent):
         return self.action_space.sample()
 
 
-class OneStepPerfectPredictionAgent(QAgent):
+class OneStepPerfectPredictionAgent(QAgent): 
     def get_action(self, epsilon: float, device: str) -> int:
         """Using the given network, decide what action to carry out using an
         epsilon-greedy policy.
@@ -45,21 +39,8 @@ class OneStepPerfectPredictionAgent(QAgent):
             # GYM_INTERACTION
             action = self.action_space.sample()
         else:
-            agent_pos = get_agent_pos_from_state(
-                self.state[0], info={}, agent_name=self.id
-            )
-            grass = self.env.grass_patches  # TODO: 3D observation support
-            min_grass_distance = distance_to_closest_item(agent_pos, grass)
-            # agent_pos, grass = observation[:2], observation[2:].reshape(2, -1)
-            bestreward = -INF
-            ibestaction = 0
-            for iaction in range(self.action_space(self.id).n):
-                p = move_agent(agent_pos, iaction)
-                reward = reward_agent(p, min_grass_distance)
-                if reward > bestreward:
-                    bestreward = reward
-                    ibestaction = iaction
-            action = ibestaction
+            # TODO
+            action = self.action_space.sample()
         return action
 
 
