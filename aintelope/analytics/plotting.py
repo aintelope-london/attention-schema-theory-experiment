@@ -235,7 +235,9 @@ def plot_performance(
     )
     plot_datas = [plot_data1, plot_data2, plot_data3]
 
-    plt.rcParams['figure.constrained_layout.use'] = True    # ensure that plot labels fit to the image and do not overlap
+    plt.rcParams[
+        "figure.constrained_layout.use"
+    ] = True  # ensure that plot labels fit to the image and do not overlap
 
     # fig = plt.figure()
     fig, subplots = plt.subplots(3)

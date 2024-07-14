@@ -114,7 +114,9 @@ def plot_events(agent, style: str = "thickness", color: str = "viridis") -> Figu
     events_df = agent.get_events()
     agent_df, food_df, water_df = agent.process_events(events_df)
 
-    plt.rcParams['figure.constrained_layout.use'] = True    # ensure that plot labels fit to the image and do not overlap
+    plt.rcParams[
+        "figure.constrained_layout.use"
+    ] = True  # ensure that plot labels fit to the image and do not overlap
 
     fig, ax = plt.subplots(figsize=(8, 8))
 
