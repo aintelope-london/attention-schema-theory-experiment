@@ -94,7 +94,7 @@ of loggers can be provided. See the
 [documentation](https://hydra.cc/docs/tutorials/basic/running_your_app/logging/)
 for more details.
 
-# Windows
+## Windows
 
 Aintelope code base is compatible with Windows. No extra steps needed. GPU computation works fine as well. WSL is not needed.
 
@@ -105,3 +105,15 @@ the actual score from the desired behaviour are measured separately.
 The reward comes from the agent.py itself, while the desired score comes from 
 the environment (and thus the test). Both of these values are then recorded and 
 compared during analysis.
+
+# License
+
+This project is licensed under the GNU General Public License v3.0 (GPLv3). You are free to use, modify, and distribute this code under the terms of this license.
+
+**Attribution Requirement**: If you use this benchmark suite, please cite the source as follows:
+
+Roland Pihlakas and Joel Pyykkö. From homeostasis to resource sharing: Biologically and economically compatible multi-objective multi-agent AI safety benchmarks. Arxiv, a working paper, September 2024.
+
+**Use of Entire Suite**: We encourage the inclusion of the entire benchmark suite in derivative works to maintain the integrity and comprehensiveness of AI safety assessments.
+
+For more details, see the [LICENSE.txt](LICENSE.txt) file.
