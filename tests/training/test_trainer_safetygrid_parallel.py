@@ -20,6 +20,7 @@ def test_training_pipeline_main():
         "hparams.env_type=zoo",
         "hparams.unit_test_mode=True",
         "hparams.num_episodes=5",
+        "hparams.test_episodes=1",
         "hparams.env_params.num_iters=50",
         "hparams.warm_start_steps=10",
     ]
@@ -42,6 +43,7 @@ def test_training_pipeline_main_with_dead_agents(execution_number):
         "hparams.env_params.test_death=True",
         "hparams.unit_test_mode=True",
         "hparams.num_episodes=5",
+        "hparams.test_episodes=1",
         "hparams.env_params.num_iters=50",
         "hparams.warm_start_steps=10",
     ]
@@ -65,6 +67,7 @@ def test_training_pipeline_baseline():
         "hparams.agent_params.target_instincts=[]",
         "hparams.unit_test_mode=True",
         "hparams.num_episodes=5",
+        "hparams.test_episodes=1",
         "hparams.env_params.num_iters=50",
         "hparams.warm_start_steps=10",
     ]
@@ -92,6 +95,7 @@ def test_training_pipeline_baseline_with_dead_agents(execution_number):
         "hparams.env_params.test_death=True",
         "hparams.unit_test_mode=True",
         "hparams.num_episodes=5",
+        "hparams.test_episodes=1",
         "hparams.env_params.num_iters=50",
         "hparams.warm_start_steps=10",
     ]
@@ -115,6 +119,7 @@ def test_training_pipeline_instinct():
         "hparams.agent_params.target_instincts=[smell]",
         "hparams.unit_test_mode=True",
         "hparams.num_episodes=5",
+        "hparams.test_episodes=1",
         "hparams.env_params.num_iters=50",
         "hparams.warm_start_steps=10",
     ]
@@ -142,6 +147,7 @@ def test_training_pipeline_instinct_with_dead_agents(execution_number):
         "hparams.env_params.test_death=True",
         "hparams.unit_test_mode=True",
         "hparams.num_episodes=5",
+        "hparams.test_episodes=1",
         "hparams.env_params.num_iters=50",
         "hparams.warm_start_steps=10",
     ]

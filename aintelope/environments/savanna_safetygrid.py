@@ -470,6 +470,12 @@ class GridworldZooBaseEnv:
             ACTION_RELATIVE_COORDINATE_MAP,
         ]
         result = {key: value for key, value in info.items() if key in allowed_keys}
+
+        if INFO_AGENT_INTEROCEPTION_VECTOR in result:
+            result[INFO_AGENT_INTEROCEPTION_VECTOR] = result[
+                INFO_AGENT_INTEROCEPTION_VECTOR
+            ].tolist()  # NB! need to convert it to list since Zoo unit tests are not able to compare numpy arrays inside info dict
+
         return result
 
     def filter_infos(self, infos: dict):
