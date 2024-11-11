@@ -78,6 +78,18 @@
                 //"PYTHONPATH": "your_path_here"
             }
         },
+        {
+            "name": "Python: Run single environment with example agent and default params",
+            "type": "python",
+            "request": "launch",
+            "program": "aintelope/nonpipeline.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--config-name=config_experiment_exampleagent"],
+            "env": {
+                //"PYTHONPATH": "your_path_here"
+            }
+        },
         //-----------------------------------------------------------------------------------
         // Configurations to run pipeline with X agent and default params
         //-----------------------------------------------------------------------------------
@@ -148,6 +160,19 @@
                 //"PYTHONPATH": "your_path_here"
             }
         },
+        {
+            "name": "Python: Run pipeline with example agent and default params",
+            "type": "python",
+            "request": "launch",
+            "program": "aintelope/pipeline.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--config-name=config_experiment_exampleagent"],
+            "env": {
+                "PIPELINE_CONFIG": "config_pipeline.yaml",
+                //"PYTHONPATH": "your_path_here"
+            }
+        },
         //-----------------------------------------------------------------------------------
         // Configurations to run pipeline with X agent and per environment optimised params
         //-----------------------------------------------------------------------------------
@@ -189,6 +214,19 @@
             "args": ["--config-name=config_experiment_score"],
             "env": {
                 "PIPELINE_CONFIG": "config_pipeline_score10.yaml",
+                //"PYTHONPATH": "your_path_here"
+            }
+        },
+        {
+            "name": "Python: Run pipeline with example agent and per environment optimised params",
+            "type": "python",
+            "request": "launch",
+            "program": "aintelope/pipeline.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--config-name=config_experiment_exampleagent"],
+            "env": {
+                "PIPELINE_CONFIG": "config_pipeline_exampleagent10.yaml",
                 //"PYTHONPATH": "your_path_here"
             }
         },
@@ -265,6 +303,20 @@
                 //"PYTHONPATH": "your_path_here"
             }
         },
+        {
+            "name": "Python: Run multiple trials pipeline with example agent and default param (use only for debugging)",
+            "type": "python",
+            "request": "launch",
+            "program": "aintelope/gridsearch.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--config-name=config_experiment_exampleagent"],
+            "env": {
+                "PIPELINE_CONFIG": "config_pipeline.yaml",
+                "GRIDSEARCH_CONFIG": "config_trials_exampleagent.yaml",
+                //"PYTHONPATH": "your_path_here"
+            }
+        },
         //-----------------------------------------------------------------------------------
         // Configurations to run multiple trials pipeline with X agent and per environment optimised params
         //-----------------------------------------------------------------------------------
@@ -312,6 +364,20 @@
                 //"PYTHONPATH": "your_path_here"
             }
         },
+        {
+            "name": "Python: Run multiple trials pipeline with example agent and per environment optimised params",
+            "type": "python",
+            "request": "launch",
+            "program": "aintelope/gridsearch.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--config-name=config_experiment_exampleagent"],
+            "env": {
+                "PIPELINE_CONFIG": "config_pipeline_exampleagent10.yaml",
+                "GRIDSEARCH_CONFIG": "config_trials_exampleagent.yaml",
+                //"PYTHONPATH": "your_path_here"
+            }
+        },
         //-----------------------------------------------------------------------------------
         // Configurations to run gridsearch pipeline with X agent
         //-----------------------------------------------------------------------------------
@@ -354,6 +420,20 @@
             "env": {
                 "PIPELINE_CONFIG": "config_pipeline.yaml",
                 "GRIDSEARCH_CONFIG": "config_gridsearch_score.yaml",
+                //"PYTHONPATH": "your_path_here"
+            }
+        },
+        {
+            "name": "Python: Run gridsearch pipeline with example agent",
+            "type": "python",
+            "request": "launch",
+            "program": "aintelope/gridsearch.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--config-name=config_experiment_exampleagent"],
+            "env": {
+                "PIPELINE_CONFIG": "config_pipeline.yaml",
+                "GRIDSEARCH_CONFIG": "config_gridsearch_exampleagent.yaml",
                 //"PYTHONPATH": "your_path_here"
             }
         },
