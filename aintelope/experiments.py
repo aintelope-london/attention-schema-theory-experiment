@@ -198,7 +198,17 @@ def run_experiment(
                     model_needs_saving = True
                     if i_episode % cfg.hparams.save_frequency == 0:
                         os.makedirs(dir_cp, exist_ok=True)
-                        save_models()
+                        if "ppo" in cfg.hparams.agent_class:
+                            for agent in agents:
+                                agent.save_model()
+                        else:
+                            trainer.save_models(
+                                i_episode,
+                                dir_cp,
+                                experiment_name,
+                                use_separate_models_for_each_experiment,
+                            )
+
                         model_needs_saving = False
                 else:
                     model_needs_saving = True
@@ -437,19 +447,6 @@ def run_experiment(
         model_needs_saving
     ):  # happens when num_episodes is not divisible by save frequency
         os.makedirs(dir_cp, exist_ok=True)
-        save_models()
-
-    # normalise slashes in paths. This is not mandatory, but will be cleaner to debug
-    experiment_dir = os.path.normpath(cfg.experiment_dir)
-    events_fname = cfg.events_fname
-
-    record_path = Path(os.path.join(experiment_dir, events_fname))
-    os.makedirs(experiment_dir, exist_ok=True)
-    rec.record_events(
-        record_path, events
-    )  # TODO: flush the events log every once a while and later append new rows
-
-    def save_models():
         if "ppo" in cfg.hparams.agent_class:
             for agent in agents:
                 agent.save_model()
@@ -460,6 +457,16 @@ def run_experiment(
                 experiment_name,
                 use_separate_models_for_each_experiment,
             )
+
+    # normalise slashes in paths. This is not mandatory, but will be cleaner to debug
+    experiment_dir = os.path.normpath(cfg.experiment_dir)
+    events_fname = cfg.events_fname
+
+    record_path = Path(os.path.join(experiment_dir, events_fname))
+    os.makedirs(experiment_dir, exist_ok=True)
+    rec.record_events(
+        record_path, events
+    )  # TODO: flush the events log every once a while and later append new rows
 
 
 def run_baseline_training(cfg: DictConfig):
