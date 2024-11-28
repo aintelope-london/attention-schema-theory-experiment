@@ -124,9 +124,9 @@ class GridworldZooBaseEnv:
         "override_infos": False,
         "test_death": False,
         "test_death_probability": 0.33,
-        "scalarize_rewards": False,  # needed for Zoo sequential API unit tests
+        "scalarize_rewards": False,  # needs to be set True for Zoo sequential API unit tests and for OpenAI baselines learning 
         "flatten_observations": False,  # this will not work with current code
-        "combine_interoception_and_vision": False,
+        "combine_interoception_and_vision": False,  # needs to be set to True for OpenAI baselines learning algorithms
     }
 
     def __init__(self, env_params: Optional[Dict] = None):
@@ -233,6 +233,7 @@ class GridworldZooBaseEnv:
             "scalarize_rewards": "scalarize_rewards",
             "amount_agents": "amount_agents",
             "flatten_observations": "flatten_observations",
+            # "scalarise": "scalarize_rewards",     # NB! not passing scalarise/scalarize_rewards to the environment. Instead, if needed, we do our own scalarization in this wrapper here.
         }
 
         self.super_initargs = {"env_name": "ai_safety_gridworlds.aintelope_savanna"}
@@ -691,7 +692,7 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
             if self._scalarize_rewards:
                 rewards2[agent] = sum(
                     rewards2[agent].values()
-                )  # this is currently used only for unit tests so no need for nonlinear utility transformations before summation
+                )  # this is currently used for unit tests and OpenAI baselines so no need for nonlinear utility transformations before summation
 
         for agent in list(
             self.observations2.keys()
@@ -927,7 +928,7 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         if self._scalarize_rewards:
             reward2 = sum(
                 reward2.values()
-            )  # this is currently used only for unit tests so no need for nonlinear utility transformations before summation
+            )  # this is currently used for unit tests and OpenAI baselines so no need for nonlinear utility transformations before summation
         self._last_rewards2[agent] = reward2
 
         # NB! cumulative reward should be calculated for all agents
@@ -938,7 +939,7 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
             if self._scalarize_rewards:
                 self._cumulative_rewards2[agent2] = sum(
                     self._cumulative_rewards2[agent2].values()
-                )  # this is currently used only for unit tests so no need for nonlinear utility transformations before summation
+                )  # this is currently used for unit tests and OpenAI baselines so no need for nonlinear utility transformations before summation
 
         terminated = self.terminations[agent]
         truncated = self.truncations[agent]
@@ -1038,7 +1039,7 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
                     self._cumulative_rewards2[agent] = info[INFO_CUMULATIVE_REWARD_DICT]
 
                 if self._scalarize_rewards:
-                    # this is currently used only for unit tests so no need for nonlinear utility transformations before summation
+                    # this is currently used for unit tests and OpenAI baselines so no need for nonlinear utility transformations before summation
                     self._last_rewards2[agent] = sum(
                         self._last_rewards2[agent].values()
                     )
