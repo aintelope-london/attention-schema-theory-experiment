@@ -35,6 +35,8 @@ class HistoryStep(NamedTuple):
 
 
 def vec_env_args(env, num_envs):
+    assert num_envs == 1
+
     def env_fn():
         # env_copy = cloudpickle.loads(cloudpickle.dumps(env))
         env_copy = env  # TODO: add an assertion check that verifies that this "cloning" function is called only once per environment
