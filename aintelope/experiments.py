@@ -37,7 +37,11 @@ def run_experiment(
         return None
 
     # Environment
-    env = get_env_class(cfg.hparams.env)(env_params=cfg.hparams.env_params)
+    env = get_env_class(cfg.hparams.env)(
+        env_params=cfg.hparams.env_params,
+        ignore_num_iters=True,  # NB! this file implements its own iterations bookkeeping in order to allow the agent to learn from the last step
+    )
+
     if isinstance(env, ParallelEnv):
         (
             observations,
@@ -485,7 +489,7 @@ def run_baseline_training(cfg: DictConfig):
 
     env = get_env_class(cfg.hparams.env)(
         env_params=cfg.hparams.env_params,
-        max_iterations=cfg.hparams.env_params.num_iters,
+        ignore_num_iters=False,  # NB! here we need the environment to enforce the num iterations limit since PPO doesn not do that on its own
     )
 
     # Add agents
@@ -498,7 +502,7 @@ def run_baseline_training(cfg: DictConfig):
                 agent_id=agent_id,
                 trainer=None,
                 env=env,
-                cnf=cfg,
+                cfg=cfg,
             )
         )
 
