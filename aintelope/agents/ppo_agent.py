@@ -34,6 +34,15 @@ class HistoryStep(NamedTuple):
     next_state: Tuple[npt.NDArray[ObservationFloat], npt.NDArray[ObservationFloat]]
 
 
+def vec_env_args(env, num_envs):
+    def env_fn():
+        # env_copy = cloudpickle.loads(cloudpickle.dumps(env))
+        env_copy = env  # TODO: add an assertion check that verifies that this "cloning" function is called only once per environment
+        return env_copy
+
+    return [env_fn] * num_envs, env.observation_space, env.action_space
+
+
 class PPOAgent:
     """PPOAgent class from stable baselines
     https://pettingzoo.farama.org/tutorials/sb3/waterworld/
@@ -55,8 +64,13 @@ class PPOAgent:
         self.hparams = None
         self.done = False
         self.last_action = None
+
+        ss.vector.vector_constructors.vec_env_args = vec_env_args  # The original function tries to do environment cloning, but absl flags currently do not support it. Since we need only one environment, there is no reason for cloning, so lets replace the cloning function with identity function.
+
         env = ss.pettingzoo_env_to_vec_env_v1(env)
-        env = ss.concat_vec_envs_v1(env, 8, num_cpus=1, base_class="stable_baselines3")
+        env = ss.concat_vec_envs_v1(
+            env, num_vec_envs=1, num_cpus=1, base_class="stable_baselines3"
+        )  # NB! num_vec_envs=1 is important here so that we can use identity function instead of cloning in vec_env_args
         self.model = PPO("MlpPolicy", env, verbose=1)
 
     def reset(self, state, info, env_class) -> None:
