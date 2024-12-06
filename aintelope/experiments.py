@@ -38,9 +38,7 @@ def run_experiment(
 ) -> None:
     logger = logging.getLogger("aintelope.experiment")
 
-    is_sb3 = False
-    if "ppo" in cfg.hparams.agent_class:
-        is_sb3 = True
+    is_sb3 = cfg.hparams.agent_class.startswith("sb3_")
 
     # Environment
     env = get_env_class(cfg.hparams.env)(

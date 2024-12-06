@@ -31,7 +31,7 @@ hparams:
   #env_type: zoo
   model: dqn   #this is unused at the moment?
   unit_test_mode: False      # is set during tests in order to speed up DQN computations
-  agent_class: dqn_agent 
+  agent_class: sb3_dqn_agent 
   warm_start_steps: 5       # not used at the moment, except for the unit tests
   save_frequency: 10 # how often to save a model
   use_separate_models_for_each_experiment: True
