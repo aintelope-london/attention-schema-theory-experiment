@@ -47,11 +47,15 @@ class ExampleAgent(Agent):
         self.env = env
         self.cfg = cfg
         self.done = False
+        self.last_action = None
 
     def reset(self, state, info, env_class) -> None:
         """Resets self and updates the state."""
-        # TODO
-        return
+        self.done = False
+        self.last_action = None
+        self.state = state
+        self.info = info
+        self.env_class = env_class
 
     def get_action(
         self,
