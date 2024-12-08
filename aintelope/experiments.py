@@ -15,7 +15,7 @@ from omegaconf import DictConfig
 from aintelope.utils import RobustProgressBar
 
 from aintelope.agents import get_agent_class
-from aintelope.analytics import recording as rec
+from aintelope.analytics import recording
 from aintelope.environments import get_env_class
 from aintelope.environments.savanna_safetygrid import GridworldZooBaseEnv
 from aintelope.training.dqn_training import Trainer
@@ -59,23 +59,24 @@ def run_experiment(
     else:
         raise NotImplementedError(f"Unknown environment type {type(env)}")
 
-    events = pd.DataFrame(
-        columns=[
-            "Run_id",
-            "Pipeline cycle",
-            "Episode",
-            "Trial",
-            "Step",
-            "IsTest",
-            "Agent_id",
-            "State",
-            "Action",
-            "Reward",
-            "Done",
-            "Next_state",
-        ]
-        + (score_dimensions if isinstance(env, GridworldZooBaseEnv) else ["Score"])
-    )
+    events_columns = [
+        "Run_id",
+        "Pipeline cycle",
+        "Episode",
+        "Trial",
+        "Step",
+        "IsTest",
+        "Agent_id",
+        "State",
+        "Action",
+        "Reward",
+        "Done",
+        "Next_state",
+    ] + (score_dimensions if isinstance(env, GridworldZooBaseEnv) else ["Score"])
+
+    experiment_dir = os.path.normpath(cfg.experiment_dir)
+    events_fname = cfg.events_fname
+    events = recording.EventLog(experiment_dir, events_fname, events_columns)
 
     # Common trainer for each agent's models
     if is_sb3:
@@ -226,6 +227,8 @@ def run_experiment(
             max_value=len(r), disable=unit_test_mode
         ) as episode_bar:  # this is a slow task so lets use a progress bar    # note that ProgressBar crashes under unit test mode, so it will be disabled if unit_test_mode is on   # TODO: create a custom extended ProgressBar class that automatically turns itself off during unit test mode
             for i_episode in r:
+                events.flush()
+
                 trial_no = (
                     int(
                         i_episode / cfg.hparams.trial_length
@@ -359,7 +362,7 @@ def run_experiment(
                                     else [score]
                                 )
 
-                                events.loc[len(events)] = (
+                                events.log_event(
                                     [
                                         cfg.experiment_name,
                                         i_pipeline_cycle,
@@ -449,7 +452,7 @@ def run_experiment(
                                         else [score]
                                     )
 
-                                    events.loc[len(events)] = (
+                                    events.log_event(
                                         [
                                             cfg.experiment_name,
                                             i_pipeline_cycle,
@@ -512,16 +515,18 @@ def run_experiment(
     # / if is_sb3 and not test_mode:
 
     # normalise slashes in paths. This is not mandatory, but will be cleaner to debug
-    experiment_dir = os.path.normpath(cfg.experiment_dir)
-    events_fname = cfg.events_fname
+    # experiment_dir = os.path.normpath(cfg.experiment_dir)
+    # events_fname = cfg.events_fname
+    #
+    # record_path = Path(os.path.join(experiment_dir, events_fname))
+    # os.makedirs(experiment_dir, exist_ok=True)
+    # rec.record_events(
+    #    record_path, events
+    # )  # TODO: flush the events log every once a while and later append new rows
 
-    record_path = Path(os.path.join(experiment_dir, events_fname))
-    os.makedirs(experiment_dir, exist_ok=True)
-    rec.record_events(
-        record_path, events
-    )  # TODO: flush the events log every once a while and later append new rows
+    events.close()
 
-    return num_actual_train_episodes  # TODO!!! add num_actual_train_episodes logic to pipeline and gridsearch as well
+    return num_actual_train_episodes
 
 
 def run_baseline_training(

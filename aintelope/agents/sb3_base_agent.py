@@ -149,6 +149,8 @@ class SB3BaseAgent(Agent):
     def env_pre_reset_callback(self, seed, options, *args, **kwargs):
         assert seed is None
 
+        self.events.flush()
+
         i_episode = (
             self.next_episode_no
         )  # cannot use env.get_next_episode_no() here since its counter is reset for each new trial
@@ -234,8 +236,7 @@ class SB3BaseAgent(Agent):
                 else [score2]
             )
 
-            # NB! each agent has their own event
-            self.events.loc[len(self.events)] = (
+            self.events.log_event(
                 [
                     self.cfg.experiment_name,
                     i_pipeline_cycle,
@@ -313,7 +314,7 @@ class SB3BaseAgent(Agent):
         )  # get_step_no() returned step indexes start with 1
         test_mode = False
 
-        self.events.loc[len(self.events)] = (
+        self.events.log_event(
             [
                 self.cfg.experiment_name,
                 i_pipeline_cycle,
