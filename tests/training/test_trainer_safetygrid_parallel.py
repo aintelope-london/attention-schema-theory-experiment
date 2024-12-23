@@ -1,3 +1,9 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Repository: https://github.com/aintelope/biological-compatibility-benchmarks
+
 import os
 import subprocess
 import sys
@@ -20,6 +26,7 @@ def test_training_pipeline_main():
         "hparams.env_type=zoo",
         "hparams.unit_test_mode=True",
         "hparams.num_episodes=5",
+        "hparams.test_episodes=1",
         "hparams.env_params.num_iters=50",
         "hparams.warm_start_steps=10",
     ]
@@ -42,6 +49,7 @@ def test_training_pipeline_main_with_dead_agents(execution_number):
         "hparams.env_params.test_death=True",
         "hparams.unit_test_mode=True",
         "hparams.num_episodes=5",
+        "hparams.test_episodes=1",
         "hparams.env_params.num_iters=50",
         "hparams.warm_start_steps=10",
     ]
@@ -61,10 +69,11 @@ def test_training_pipeline_baseline():
             "aintelope.environments.savanna_safetygrid:SavannaGridworldParallelEnv"
         ),
         "hparams.env_type=zoo",
-        "hparams.agent_id=q_agent",
+        "hparams.agent_class=q_agent",
         "hparams.agent_params.target_instincts=[]",
         "hparams.unit_test_mode=True",
         "hparams.num_episodes=5",
+        "hparams.test_episodes=1",
         "hparams.env_params.num_iters=50",
         "hparams.warm_start_steps=10",
     ]
@@ -86,12 +95,13 @@ def test_training_pipeline_baseline_with_dead_agents(execution_number):
             "aintelope.environments.savanna_safetygrid:SavannaGridworldParallelEnv"
         ),
         "hparams.env_type=zoo",
-        "hparams.agent_id=q_agent",
+        "hparams.agent_class=q_agent",
         "hparams.agent_params.target_instincts=[]",
         "hparams.env_params.seed=" + str(execution_number),
         "hparams.env_params.test_death=True",
         "hparams.unit_test_mode=True",
         "hparams.num_episodes=5",
+        "hparams.test_episodes=1",
         "hparams.env_params.num_iters=50",
         "hparams.warm_start_steps=10",
     ]
@@ -111,10 +121,11 @@ def test_training_pipeline_instinct():
             "aintelope.environments.savanna_safetygrid:SavannaGridworldParallelEnv"
         ),
         "hparams.env_type=zoo",
-        "hparams.agent_id=instinct_agent",
+        "hparams.agent_class=instinct_agent",
         "hparams.agent_params.target_instincts=[smell]",
         "hparams.unit_test_mode=True",
         "hparams.num_episodes=5",
+        "hparams.test_episodes=1",
         "hparams.env_params.num_iters=50",
         "hparams.warm_start_steps=10",
     ]
@@ -136,12 +147,13 @@ def test_training_pipeline_instinct_with_dead_agents(execution_number):
             "aintelope.environments.savanna_safetygrid:SavannaGridworldParallelEnv"
         ),
         "hparams.env_type=zoo",
-        "hparams.agent_id=instinct_agent",
+        "hparams.agent_class=instinct_agent",
         "hparams.agent_params.target_instincts=[smell]",
         "hparams.env_params.seed=" + str(execution_number),
         "hparams.env_params.test_death=True",
         "hparams.unit_test_mode=True",
         "hparams.num_episodes=5",
+        "hparams.test_episodes=1",
         "hparams.env_params.num_iters=50",
         "hparams.warm_start_steps=10",
     ]
@@ -150,6 +162,6 @@ def test_training_pipeline_instinct_with_dead_agents(execution_number):
 
 
 if __name__ == "__main__" and os.name == "nt":  # detect debugging
-    register_resolvers()  # needs to be called only once
     pytest.main([__file__])  # run tests only in this file
+    # test_training_pipeline_main()
     # test_training_pipeline_instinct()

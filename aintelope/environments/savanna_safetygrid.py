@@ -1,3 +1,9 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Repository: https://github.com/aintelope/biological-compatibility-benchmarks
+
 import sys
 import logging
 from collections import OrderedDict, namedtuple
@@ -7,11 +13,17 @@ import numpy as np
 import numpy.typing as npt
 
 import gymnasium.spaces  # cannot import gymnasium.spaces.Tuple directly since it is already used by typing
-from ai_safety_gridworlds.environments.aintelope.aintelope_savanna import (  # TODO: import agent char map from env object instead?; AGENT_CHR3,
+from aintelope.environments.ai_safety_gridworlds.aintelope_savanna import (  # TODO: import agent char map from env object instead?; AGENT_CHR3,
     AGENT_CHR1,
     AGENT_CHR2,
     DRINK_CHR,
     FOOD_CHR,
+    DRINK_CHR,
+    GOLD_CHR,
+    SILVER_CHR,
+    DANGER_TILE_CHR,
+    PREDATOR_NPC_CHR,
+    WALL_CHR,
     GAME_ART,
 )
 
@@ -32,9 +44,8 @@ from ai_safety_gridworlds.helpers.gridworld_zoo_parallel_env import (
     GridworldZooParallelEnv,
 )
 
-from aintelope.environments.env_utils.distance import distance_to_closest_item
 from aintelope.aintelope_typing import Reward  # TODO: use np.ndarray or mo_reward
-from aintelope.aintelope_typing import (  # PositionFloat,; Action,; AgentStates,
+from aintelope.aintelope_typing import (
     AgentId,
     Info,
     Observation,
@@ -45,6 +56,12 @@ from pettingzoo import AECEnv, ParallelEnv
 
 INFO_AGENT_INTEROCEPTION_ORDER = "info_agent_interoception_order"
 INFO_AGENT_INTEROCEPTION_VECTOR = "info_agent_interoception_vector"
+INTEROCEPTION_FOOD = "food_satiation"
+INTEROCEPTION_DRINK = "drink_satiation"
+ACTION_RELATIVE_COORDINATE_MAP = (
+    "action_relative_coordinate_map"  # TODO: move to Gridworld environment
+)
+ALL_AGENTS_LAYER = "all_agents"
 
 logger = logging.getLogger("aintelope.environments.savanna_safetygrid")
 
@@ -102,18 +119,25 @@ class GridworldZooBaseEnv:
         # Alternate observation format to current vector of absolute coordinates.
         # Bitmap representation enables representing objects which might be outside of
         # agent's observation zone for time being.
-        "observe_bitmap_layers": True,
         # Needed for tests. Zoo is unable to compare infos
         # unless they have simple structure.
         "override_infos": False,
         "test_death": False,
         "test_death_probability": 0.33,
-        "use_old_aintelope_rewards": False,
+        "scalarize_rewards": False,  # needs to be set True for Zoo sequential API unit tests and for OpenAI baselines learning
+        "flatten_observations": False,  # this will not work with current code
+        "combine_interoception_and_vision": False,  # needs to be set to True for OpenAI baselines learning algorithms
     }
 
-    def __init__(self, env_params: Optional[Dict] = None):
+    def __init__(
+        self, env_params: Optional[Dict] = None, ignore_num_iters=False, **kwargs
+    ):
         if env_params is None:
             env_params = {}
+        env_params = dict(env_params)  # NB! make a copy before updating with kwargs
+        env_params.update(kwargs)
+
+        self.render_mode = None  # Some libraries require this field to be present. The actual value seems to be unimportant.
 
         # NB! Need to clone in order to not modify the default dict.
         # Similar problem to mutable default arguments.
@@ -127,7 +151,7 @@ class GridworldZooBaseEnv:
         logger.info(f"initializing savanna env with params: {self.metadata}")
 
         # TODO: get rid of this override and just ignore truncation flag from the environment?
-        if self.metadata["num_iters"] > 50:  # some unit tests use num_iters <= 50
+        if ignore_num_iters:
             self.metadata[
                 "num_iters"
             ] = (
@@ -157,8 +181,12 @@ class GridworldZooBaseEnv:
             #
             "DANGER_TILE_SCORE": "DANGER_TILE_SCORE",
             "PREDATOR_NPC_SCORE": "PREDATOR_NPC_SCORE",
+            "PREDATOR_MOVEMENT_PROBABILITY": "PREDATOR_MOVEMENT_PROBABILITY",
             "MOVEMENT_SCORE": "MOVEMENT_SCORE",
             "COOPERATION_SCORE": "COOPERATION_SCORE",
+            #
+            "GOLD_VISITS_LOG_BASE": "GOLD_VISITS_LOG_BASE",
+            "SILVER_VISITS_LOG_BASE": "SILVER_VISITS_LOG_BASE",
             #
             "FOOD_SCORE": "FOOD_SCORE",
             "FOOD_DEFICIENCY_SCORE": "FOOD_DEFICIENCY_SCORE",
@@ -168,6 +196,8 @@ class GridworldZooBaseEnv:
             "FOOD_EXTRACTION_RATE": "FOOD_EXTRACTION_RATE",
             "FOOD_DEFICIENCY_RATE": "FOOD_DEFICIENCY_RATE",
             "FOOD_OVERSATIATION_LIMIT": "FOOD_OVERSATIATION_LIMIT",
+            "FOOD_OVERSATIATION_THRESHOLD": "FOOD_OVERSATIATION_THRESHOLD",
+            "FOOD_DEFICIENCY_THRESHOLD": "FOOD_DEFICIENCY_THRESHOLD",
             #
             "FOOD_GROWTH_LIMIT": "FOOD_GROWTH_LIMIT",
             "FOOD_REGROWTH_EXPONENT": "FOOD_REGROWTH_EXPONENT",
@@ -180,6 +210,8 @@ class GridworldZooBaseEnv:
             "DRINK_EXTRACTION_RATE": "DRINK_EXTRACTION_RATE",
             "DRINK_DEFICIENCY_RATE": "DRINK_DEFICIENCY_RATE",
             "DRINK_OVERSATIATION_LIMIT": "DRINK_OVERSATIATION_LIMIT",
+            "DRINK_OVERSATIATION_THRESHOLD": "DRINK_OVERSATIATION_THRESHOLD",
+            "DRINK_DEFICIENCY_THRESHOLD": "DRINK_DEFICIENCY_THRESHOLD",
             #
             "DRINK_GROWTH_LIMIT": "DRINK_GROWTH_LIMIT",
             "DRINK_REGROWTH_EXPONENT": "DRINK_REGROWTH_EXPONENT",
@@ -202,26 +234,45 @@ class GridworldZooBaseEnv:
             "remove_unused_tile_types_from_layers": "remove_unused_tile_types_from_layers",
             "test_death": "test_death",
             "test_death_probability": "test_death_probability",
+            "scalarize_rewards": "scalarize_rewards",
             "amount_agents": "amount_agents",
+            "flatten_observations": "flatten_observations",
+            # "scalarise": "scalarize_rewards",     # NB! not passing scalarise/scalarize_rewards to the environment. Instead, if needed, we do our own scalarization in this wrapper here.
         }
 
-        self.super_initargs = {
-            "env_name": self.metadata.get(
-                "env_experiment", "aintelope.aintelope_savanna"
-            )
-        }
+        self.super_initargs = {"env_name": "ai_safety_gridworlds.aintelope_savanna"}
 
         for super_initargs_key, metadata_key in metadata_to_super_initargs_dict.items():
             if self.metadata.get(metadata_key, None) is not None:
                 self.super_initargs[super_initargs_key] = self.metadata[metadata_key]
 
-        self._observe_bitmap_layers = self.metadata["observe_bitmap_layers"]
         self._override_infos = self.metadata["override_infos"]
-        self._use_old_aintelope_rewards = self.metadata["use_old_aintelope_rewards"]
+        self._scalarize_rewards = self.metadata["scalarize_rewards"]
+        self._combine_interoception_and_vision = self.metadata[
+            "combine_interoception_and_vision"
+        ]
+        self._pre_reset_callback2 = None
+        self._post_reset_callback2 = None
+        self._pre_step_callback2 = None
+        self._post_step_callback2 = None
 
     def init_observation_spaces(self, parent_observation_spaces, infos):
         # for @zoo-api
-        if self._observe_bitmap_layers:
+        if self._combine_interoception_and_vision:
+            self.transformed_observation_spaces = {
+                agent: Box(
+                    low=0,  # this is a boolean bitmap
+                    high=1,  # this is a boolean bitmap
+                    shape=(
+                        len(infos[agent][INFO_AGENT_OBSERVATION_LAYERS_ORDER])
+                        + 2,  # this already includes all_agents layer + 2 for interoception
+                        parent_observation_spaces[agent].shape[1],
+                        parent_observation_spaces[agent].shape[2],
+                    ),
+                )
+                for agent in self.possible_agents
+            }
+        else:
             self.transformed_observation_spaces = {
                 agent: gymnasium.spaces.Tuple(
                     [
@@ -243,31 +294,6 @@ class GridworldZooBaseEnv:
                 )
                 for agent in self.possible_agents
             }
-        else:
-            self.transformed_observation_spaces = {
-                agent: gymnasium.spaces.Tuple(
-                    [
-                        Box(
-                            low=0,
-                            high=len(
-                                GAME_ART[0][0]
-                            ),  # TODO: consider height as well and read it from env object
-                            shape=(
-                                2
-                                * (
-                                    self.metadata["amount_agents"]
-                                    + self.metadata["amount_grass_patches"]
-                                    + self.metadata["amount_water_holes"]
-                                ),
-                            ),
-                        ),
-                        Box(
-                            low=-np.inf, high=np.inf, shape=(2,)
-                        ),  # dummy interoception vector
-                    ]
-                )
-                for agent in self.possible_agents
-            }
 
         qqq = True  # for debugging
 
@@ -275,24 +301,45 @@ class GridworldZooBaseEnv:
     def transform_observation(
         self, agent: str, info: dict
     ) -> npt.NDArray[ObservationFloat]:
-        if self._observe_bitmap_layers:
-            if agent is None:
-                return info[INFO_OBSERVATION_LAYERS_CUBE].astype(np.float32)
-            else:  # the info is already agent-specific, so no need to find agent subkey here
-                # agent_interoception_vector = [
-                #    info["metrics_dict"]["FoodSatiation_" + self.agent_name_mapping[agent]],
-                #    info["metrics_dict"]["DrinkSatiation_" + self.agent_name_mapping[agent]],
-                # ]
-                observation = info[INFO_AGENT_OBSERVATION_LAYERS_CUBE]
+        if agent is None:
+            return info[INFO_OBSERVATION_LAYERS_CUBE].astype(np.float32)
+        else:  # the info is already agent-specific, so no need to find agent subkey here
+            # agent_interoception_vector = [
+            #    info["metrics_dict"]["FoodSatiation_" + self.agent_name_mapping[agent]],
+            #    info["metrics_dict"]["DrinkSatiation_" + self.agent_name_mapping[agent]],
+            # ]
+            observation = info[INFO_AGENT_OBSERVATION_LAYERS_CUBE]
 
-                all_agents_layer = np.zeros(
-                    [observation.shape[1], observation.shape[2]], bool
+            all_agents_layer = np.zeros(
+                [observation.shape[1], observation.shape[2]], bool
+            )
+            for agent_name, agent_chr in self.agent_name_mapping.items():
+                all_agents_layer |= info[INFO_AGENT_OBSERVATION_LAYERS_DICT][agent_chr]
+
+            if self._combine_interoception_and_vision:
+                # TODO: Config for interoception scaling? Or use sigmoid transformation?
+                # NB! use +0.5 so that interoception value of 0 is centered between min and max of 0 and 1.
+                interoception_values = (
+                    info[INFO_AGENT_INTEROCEPTION_VECTOR].astype(np.float32) / 1000
+                    + 0.5
                 )
-                for agent_name, agent_chr in self.agent_name_mapping.items():
-                    all_agents_layer |= info[INFO_AGENT_OBSERVATION_LAYERS_DICT][
-                        agent_chr
-                    ]
 
+                # Add two more layers to the vision observation, representing interoception measures. For both interoception measures, entire layer will have same value.
+                interoception_layers = np.expand_dims(
+                    np.ones([observation.shape[1], observation.shape[2]], np.float32),
+                    axis=0,
+                ) * np.expand_dims(interoception_values, axis=[1, 2])
+
+                observation = np.vstack(
+                    [
+                        observation,
+                        np.expand_dims(all_agents_layer, axis=0),
+                        interoception_layers,
+                    ]
+                )  # feature vector is the first dimension
+
+                return observation
+            else:
                 observation = np.vstack(
                     [observation, np.expand_dims(all_agents_layer, axis=0)]
                 )  # feature vector is the first dimension
@@ -302,39 +349,6 @@ class GridworldZooBaseEnv:
                     # np.array(agent_interoception_vector).astype(np.float32)
                     info[INFO_AGENT_INTEROCEPTION_VECTOR].astype(np.float32),
                 )
-
-        else:
-            """
-            NB! So far the savanna code has been using absolute coordinates, not
-            relative coordinates. In case of relative coordinates, sometimes an object
-            might be outside of agent's observation distance. If you want to return
-            object location as agent-centric boolean bitmap, then it is easy to set
-            all cells to False. But with coordinates you need either special values or
-            an additional boolean dimension which indicates whether the coordinate is
-            available or not.
-            """
-
-            # TODO: import agent char map from env instead
-            agent_observations = []
-            for agent_name, agent_chr in self.agent_name_mapping.items():
-                agent_observations += list(
-                    info[INFO_OBSERVATION_COORDINATES][agent_chr][0]
-                )  # convert tuple to list
-            for x in info[INFO_OBSERVATION_COORDINATES].get(FOOD_CHR, []):
-                agent_observations += list(x)  # convert tuple to list
-            for x in info[INFO_OBSERVATION_COORDINATES].get(DRINK_CHR, []):
-                agent_observations += list(x)  # convert tuple to list
-
-            agent_observations = np.array(
-                agent_observations, np.float32
-            )  # NB! Q-agent expects float32 observation type
-
-            assert (
-                agent_observations.shape == self.observation_space(agent).shape
-            ), "observation / observation space shape mismatch"
-
-            dummy_interoception_vector = np.zeros([2], np.float32)
-            return (agent_observations, dummy_interoception_vector)
 
     def format_info(self, agent: str, info: dict):
         # keep only necessary fields of infos
@@ -350,24 +364,39 @@ class GridworldZooBaseEnv:
             ]
         )
 
+        all_agents_coordinates = []
+        for agent_name, agent_chr in self.agent_name_mapping.items():
+            all_agents_coordinates += info[INFO_AGENT_OBSERVATION_COORDINATES][
+                agent_chr
+            ]
+
+        coordinates_dict = dict(info[INFO_AGENT_OBSERVATION_COORDINATES])
+        coordinates_dict[ALL_AGENTS_LAYER] = all_agents_coordinates
+
         return {
-            INFO_AGENT_OBSERVATION_COORDINATES: info[
-                INFO_AGENT_OBSERVATION_COORDINATES
-            ],
+            INFO_AGENT_OBSERVATION_COORDINATES: coordinates_dict,
             INFO_AGENT_OBSERVATION_LAYERS_ORDER: info[
                 INFO_AGENT_OBSERVATION_LAYERS_ORDER
             ]
-            + ["all_agents"],
+            + [ALL_AGENTS_LAYER],
             INFO_AGENT_OBSERVATION_LAYERS_CUBE: info[
                 INFO_AGENT_OBSERVATION_LAYERS_CUBE
             ],
             INFO_AGENT_OBSERVATION_LAYERS_DICT: info[
                 INFO_AGENT_OBSERVATION_LAYERS_DICT
             ],
-            INFO_AGENT_INTEROCEPTION_ORDER: ["food_satiation", "drink_satiation"],
+            INFO_AGENT_INTEROCEPTION_ORDER: [INTEROCEPTION_FOOD, INTEROCEPTION_DRINK],
             INFO_AGENT_INTEROCEPTION_VECTOR: agent_interoception_vector,
             INFO_REWARD_DICT: info[INFO_REWARD_DICT],
             INFO_CUMULATIVE_REWARD_DICT: info[INFO_CUMULATIVE_REWARD_DICT],
+            # TODO: in case of relative direction, this mapping will change depending on agent and depending on its direction
+            ACTION_RELATIVE_COORDINATE_MAP: {  # TODO: read these constants from the environment?
+                Actions.NOOP: (0, 0),
+                Actions.LEFT: (-1, 0),
+                Actions.RIGHT: (1, 0),
+                Actions.UP: (0, -1),
+                Actions.DOWN: (0, 1),
+            },
         }
 
     def format_infos(self, infos: dict):
@@ -383,9 +412,18 @@ class GridworldZooBaseEnv:
         allowed_keys = [
             INFO_AGENT_OBSERVATION_COORDINATES,
             INFO_AGENT_OBSERVATION_LAYERS_ORDER,
+            INFO_AGENT_INTEROCEPTION_VECTOR,  # keeping interoception available in info since in observation it may be either located in its own vector or be part of the vision. That make access to this data cumbersome when writing hardcoded rules. Accessing via info argument is more convenient in such cases.
             INFO_AGENT_INTEROCEPTION_ORDER,
+            ACTION_RELATIVE_COORDINATE_MAP,
+            INFO_REWARD_DICT,  # keep reward dict for case the score is scalarised
         ]
         result = {key: value for key, value in info.items() if key in allowed_keys}
+
+        if INFO_AGENT_INTEROCEPTION_VECTOR in result:
+            result[INFO_AGENT_INTEROCEPTION_VECTOR] = result[
+                INFO_AGENT_INTEROCEPTION_VECTOR
+            ].tolist()  # NB! need to convert it to list since Zoo unit tests are not able to compare numpy arrays inside info dict
+
         return result
 
     def filter_infos(self, infos: dict):
@@ -394,30 +432,6 @@ class GridworldZooBaseEnv:
             agent: self.filter_info(agent, agent_info)
             for agent, agent_info in infos.items()
         }
-
-    @property
-    def grass_patches(self):
-        any_agent = self._last_infos[
-            "agent_0"
-        ]  # any agent is good here since we are using global coordinates here
-        coordinates = any_agent[INFO_OBSERVATION_COORDINATES].get(FOOD_CHR, [])
-        if len(coordinates) > 0:
-            grass_patches = np.array(coordinates)
-        else:
-            grass_patches = np.zeros([0, 2])
-        return grass_patches
-
-    @property
-    def water_holes(self):
-        any_agent = self._last_infos[
-            "agent_0"
-        ]  # any agent is good here since we are using global coordinates here
-        coordinates = any_agent[INFO_OBSERVATION_COORDINATES].get(DRINK_CHR, [])
-        if len(coordinates) > 0:
-            water_holes = np.array(coordinates)
-        else:
-            water_holes = np.zeros([0, 2])
-        return water_holes
 
     def observe_from_location(
         self, agents_coordinates: Dict, agents_directions: Dict = None
@@ -435,76 +449,17 @@ class GridworldZooBaseEnv:
             observations2[agent] = self.transform_observation(agent, infos[agent])
         return observations2
 
-    def calc_min_grass_distance(self, agent, info):
-        if not self._observe_bitmap_layers:
-            agent_chr = self.agent_name_mapping[agent]
-            agent_location = np.array(info[INFO_OBSERVATION_COORDINATES][agent_chr][0])
-            grass_patches = np.array(info[INFO_OBSERVATION_COORDINATES][FOOD_CHR])
-            min_grass_distance = distance_to_closest_item(agent_location, grass_patches)
-        else:
-            # TODO: I think this grass distance logic is obsolete here?
-            agent_chr = self.agent_name_mapping[agent]
-            agent_location = np.array(
-                info[INFO_AGENT_OBSERVATION_COORDINATES][agent_chr][0]
-            )
-            if len(info[INFO_AGENT_OBSERVATION_COORDINATES][FOOD_CHR]) > 0:
-                grass_patches = np.array(
-                    info[INFO_AGENT_OBSERVATION_COORDINATES][FOOD_CHR]
-                )
-                min_grass_distance = distance_to_closest_item(
-                    agent_location, grass_patches
-                )
-            else:
-                min_grass_distance = (
-                    np.inf
-                )  # grass not visible to the agent at the moment
-        return min_grass_distance
-
-    def reward_agent(self, min_grass_distance):
-        # For now measure if agent can eat.
-        # Was 1 / (1 + min_grass_distance), moving to instincts
-        if min_grass_distance > 1:
-            return np.float64(0.0)
-        else:
-            return np.float64(1.0)
-
     def observation_space(self, agent):
         return self.transformed_observation_spaces[agent]
 
-    # called by DQNLightning
-    def state_to_namedtuple(self, state: npt.NDArray[ObservationFloat]) -> NamedTuple:
-        """Method to convert a state array into a named tuple."""
-        agent_coords = {
-            "agent_coords": state[:2]
-        }  # TODO: make it dependant on number of agents
-        grass_patches_coords = {}
-        gp_offset = 2
-        water_holes_coords = {}
-        wh_offset = 2 + self.metadata["amount_grass_patches"] * 2
-        for i in range(self.metadata["amount_grass_patches"]):
-            grass_patches_coords[f"grass_patch_{i}"] = state[
-                gp_offset + i : gp_offset + i + 2
-            ]
-        for i in range(self.metadata["amount_water_holes"]):
-            water_holes_coords[f"water_hole_{i}"] = state[
-                wh_offset + i : wh_offset + i + 2
-            ]
-
-        keys = (
-            list(agent_coords) + list(grass_patches_coords) + list(water_holes_coords)
-        )
-        StateTuple = namedtuple("StateTuple", {k: np.ndarray for k in keys})
-        return StateTuple(**agent_coords, **grass_patches_coords, **water_holes_coords)
-
     """
     This API is intended primarily as input for the neural network.
-    if observe_bitmap_layers == True then observe() method returns same value as
-    observe_relative_bitmaps()
+    Currently observe() method returns same value as observe_relative_bitmaps() though it 
+    might depend on configuration in future implementations (this has been the case in the
+    past with some currently removed implementations).
     Relative observation bitmap is agent centric and considers the agent's observation
     radius. Environments with different sizes will have same-shaped relative
     observation bitmaps as long as the agent's observation radius is same.
-    if observe_bitmap_layers == False then the agent currently returns vector of
-    coordinates compatible with the old Savanna agent implementation.
     """
 
     def observe(self, agent=None) -> Union[Dict[AgentId, Observation], Observation]:
@@ -542,8 +497,9 @@ class GridworldZooBaseEnv:
     observation bitmap is agent centric and considers the agent's observation
     radius. Environments with different sizes will have same-shaped relative
     observation bitmaps as long as the agent's observation radius is same.
-    if observe_bitmap_layers == True then observe() method returns same value
-    as observe_relative_bitmaps()
+    Currently, observe() method returns same value as observe_relative_bitmaps() though it 
+    might depend on configuration in future implementations (this has been the case in the
+    past with some currently removed implementations).
     """
 
     def observe_relative_bitmaps(
@@ -609,10 +565,12 @@ class GridworldZooBaseEnv:
 
 
 class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
-    def __init__(self, env_params: Optional[Dict] = None):
+    def __init__(
+        self, env_params: Optional[Dict] = None, ignore_num_iters=False, **kwargs
+    ):
         if env_params is None:
             env_params = {}
-        GridworldZooBaseEnv.__init__(self, env_params)
+        GridworldZooBaseEnv.__init__(self, env_params, ignore_num_iters, **kwargs)
         GridworldZooParallelEnv.__init__(self, **self.super_initargs)
         parent_observation_spaces = GridworldZooParallelEnv.observation_spaces.fget(
             self
@@ -644,9 +602,24 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
     def reset(
         self, seed: Optional[int] = None, options=None, *args, **kwargs
     ) -> Tuple[Dict[AgentId, Observation], Dict[AgentId, Info]]:
+        if self._pre_reset_callback2 is not None:
+            (allow_reset, seed, options, args, kwargs) = self._pre_reset_callback2(
+                seed, options, *args, **kwargs
+            )
+            if not allow_reset:
+                return
+
         observations, infos = GridworldZooParallelEnv.reset(
             self, seed=seed, options=options, *args, **kwargs
         )
+
+        print(
+            "trial_no: "
+            + str(GridworldZooParallelEnv.get_trial_no(self))
+            + " episode_no: "
+            + str(GridworldZooParallelEnv.get_episode_no(self))
+        )
+
         infos = self.format_infos(infos)
         self._last_infos = infos
         # transform observations
@@ -656,7 +629,12 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
         if self._override_infos:
             infos = {agent: {} for agent in infos.keys()}
 
-        return self.observations2, self.filter_infos(infos)
+        result = (self.observations2, self.filter_infos(infos))
+
+        if self._post_reset_callback2 is not None:
+            self._post_reset_callback2(*result, seed, options, *args, **kwargs)
+
+        return result
 
     def step(self, actions: Dict[str, Action]) -> Step:
         """step(action) takes in an action for each agent and should return the
@@ -671,10 +649,17 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
             {<agent_name>: <agent_action or None if agent is done>}
         """
         logger.debug("debug actions", actions)
+
+        if self._pre_step_callback2 is not None:
+            actions = self._pre_step_callback2(actions)
+
         # If a user passes in actions with no agents,
         # then just return empty observations, etc.
         if not actions:
-            return {}, {}, {}, {}, {}
+            result = {}, {}, {}, {}, {}
+            if self._post_step_callback is not None:
+                self._post_step_callback(actions, *result)
+            return result
 
         (
             observations,
@@ -692,11 +677,11 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
         rewards2 = {}
         # transform observations and rewards
         for agent in list(infos.keys()):
-            if self._use_old_aintelope_rewards:  # old AIntelope reward logic
-                min_grass_distance = self.calc_min_grass_distance(agent, infos[agent])
-                rewards2[agent] = self.reward_agent(min_grass_distance)
-            else:
-                rewards2[agent] = infos[agent][INFO_REWARD_DICT]
+            rewards2[agent] = infos[agent][INFO_REWARD_DICT]
+            if self._scalarize_rewards:
+                rewards2[agent] = sum(
+                    rewards2[agent].values()
+                )  # this is currently used for unit tests and OpenAI baselines so no need for nonlinear utility transformations before summation
 
         for agent in list(
             self.observations2.keys()
@@ -719,7 +704,7 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
             truncateds,
             self.filter_infos(infos),
         )
-        return (
+        result = (
             self.observations2,
             rewards2,
             terminateds,
@@ -727,16 +712,23 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
             self.filter_infos(infos),
         )
 
+        if self._post_step_callback2 is not None:
+            self._post_step_callback2(actions, *result)
+
+        return result
+
 
 class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
-    def __init__(self, env_params: Optional[Dict] = None):
+    def __init__(
+        self, env_params: Optional[Dict] = None, ignore_num_iters=False, **kwargs
+    ):
         if env_params is None:
             env_params = {}
         self.observe_immediately_after_agent_action = env_params.get(
             "observe_immediately_after_agent_action", False
         )  # TODO: configure
 
-        GridworldZooBaseEnv.__init__(self, env_params)
+        GridworldZooBaseEnv.__init__(self, env_params, ignore_num_iters, **kwargs)
         GridworldZooAecEnv.__init__(self, **self.super_initargs)
         parent_observation_spaces = GridworldZooAecEnv.observation_spaces.fget(self)
 
@@ -753,7 +745,7 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         # that .rewards property returns dictionary with existing agents.
         self._last_rewards2 = {agent: None for agent in self.possible_agents}
         self._cumulative_rewards2 = {
-            agent: (0.0 if self._use_old_aintelope_rewards else {})
+            agent: (0.0 if self._scalarize_rewards else {})
             for agent in self.possible_agents
         }
         self.observations2 = {}
@@ -778,7 +770,7 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         self,
     ):
         """Needed for tests.
-        Zoo is unable to compare infos unless they have simple structure.
+        Note, Zoo is unable to compare infos unless they have simple structure.
         """
         infos = GridworldZooAecEnv.infos.fget(
             self
@@ -816,7 +808,21 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
     def reset(
         self, seed: Optional[int] = None, options=None, *args, **kwargs
     ) -> Tuple[Dict[AgentId, Observation], Dict[AgentId, Info]]:
+        if self._pre_reset_callback2 is not None:
+            (allow_reset, seed, options, args, kwargs) = self._pre_reset_callback2(
+                seed, options, *args, **kwargs
+            )
+            if not allow_reset:
+                return  # TODO!!! return value
+
         GridworldZooAecEnv.reset(self, seed=seed, options=options, *args, **kwargs)
+
+        print(
+            "trial_no: "
+            + str(GridworldZooParallelEnv.get_trial_no(self))
+            + " episode_no: "
+            + str(GridworldZooParallelEnv.get_episode_no(self))
+        )
 
         # observe observations, transform observations
         infos = {}
@@ -831,7 +837,7 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         # so that .rewards property returns dictionary with existing agents.
         # NB! not calculating actual rewards yet, rewards should be only updated after
         # step, not on each observation before step.
-        if self._use_old_aintelope_rewards:
+        if self._scalarize_rewards:
             self._last_rewards2 = {
                 agent: np.float64(0) for agent in self.possible_agents
             }
@@ -841,7 +847,12 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         if self._override_infos:
             infos = {agent: {} for agent in infos.keys()}
 
-        return self.observations2, self.filter_infos(infos)
+        result = (self.observations2, self.filter_infos(infos))
+
+        if self._post_reset_callback2 is not None:
+            self._post_reset_callback2(*result, seed, options, *args, **kwargs)
+
+        return result
 
     def last(self, observe=True):
         """Returns observation, cumulative reward, terminated, truncated, info for the
@@ -868,7 +879,10 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
             observation2 = None  # that's how Zoo api_test.py requires it
 
         # rewards should be only updated after step, not on each observation before step
-        reward2 = self._cumulative_rewards2[agent]
+        # reward2 = self._cumulative_rewards2[agent]
+        reward2 = info[INFO_REWARD_DICT]
+        if self._scalarize_rewards:
+            reward2 = sum(reward2.values())
 
         if self._override_infos:
             info = {}
@@ -882,52 +896,8 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         )
 
     def step(self, action: Action) -> None:
-        logger.debug("debug action", action)
-
-        agent = self.agent_selection
-
-        # this needs to be so according to Zoo unit test. See
-        # https://github.com/Farama-Foundation/PettingZoo/blob/master/pettingzoo/test/api_test.py
-        if self._use_old_aintelope_rewards:
-            self._cumulative_rewards2[agent] = 0.0
-        else:
-            self._cumulative_rewards2[agent] = {}
-
-        # need to set current step rewards to zero for other agents
-        # the agent should be visible in .rewards after it dies (until its "dead step"),
-        # but during next agent's step it should get zero reward
-        for agent in self.agents:
-            if self.terminations[agent] or self.truncations[agent]:
-                if self._use_old_aintelope_rewards:
-                    self._last_rewards2[agent] = 0.0
-                else:
-                    self._last_rewards2[agent] = {}
-
-        GridworldZooAecEnv.step(self, {"step": action})
-
-        if agent not in self.agents:  # was "dead step"
-            # dead agent needs to be removed from observations2 and _last_rewards2
-            del self.observations2[agent]
-            del self._last_rewards2[agent]
-            return
-
-        info = GridworldZooAecEnv.observe_info(self, agent)
-        info = self.format_info(agent, info)
-
-        if self._use_old_aintelope_rewards:
-            min_grass_distance = self.calc_min_grass_distance(agent, info)
-            reward2 = self.reward_agent(min_grass_distance)
-            self._last_rewards2[agent] = reward2
-
-            # NB! cumulative reward should be calculated for all agents
-            for agent2 in self.agents:
-                self._cumulative_rewards2[agent2] += self._last_rewards2[agent2]
-        else:
-            self._last_rewards2[agent] = info[INFO_REWARD_DICT]
-
-            # NB! cumulative reward should be calculated for all agents
-            for agent2 in self.agents:
-                self._cumulative_rewards2[agent2] = info[INFO_CUMULATIVE_REWARD_DICT]
+        self.step_single_agent(action)
+        # self.step_multiple_agents({ self.agent_selection: action })
 
     def step_single_agent(self, action: Action):
         """step(action) takes in an action for each agent and should return the
@@ -941,23 +911,20 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
 
         agent = self.agent_selection
 
-        # this needs to be so according to Zoo unit test. See
-        # https://github.com/Farama-Foundation/PettingZoo/blob/master/pettingzoo/test/api_test.py
-        if self._use_old_aintelope_rewards:
-            self._cumulative_rewards2[agent] = 0.0
-        else:
-            self._cumulative_rewards2[agent] = {}
+        if self._pre_step_callback2 is not None:
+            action = self._pre_step_callback2(agent, action)
 
         # need to set current step rewards to zero for other agents
-        for agent in self.agents:
-            # the agent should be visible in .rewards after it dies
-            # (until its "dead step"), but during next agent's step
-            # it should get zero reward
-            if self.terminations[agent] or self.truncations[agent]:
-                if self._use_old_aintelope_rewards:
-                    self._last_rewards2[agent] = 0.0
-                else:
-                    self._last_rewards2[agent] = {}
+        # the agent should be visible in .rewards after it dies
+        # (until its "dead step"), but during next agent's step
+        # it should get zero reward
+        for agent2 in self.agents:
+            # this needs to be so according to Zoo unit test. See
+            # https://github.com/Farama-Foundation/PettingZoo/blob/master/pettingzoo/test/api_test.py
+            if self._scalarize_rewards:
+                self._last_rewards2[agent2] = 0.0
+            else:
+                self._last_rewards2[agent2] = {}
 
         GridworldZooAecEnv.step(self, {"step": action})
 
@@ -970,26 +937,27 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         # observe observations, transform observations and rewards
         info = GridworldZooAecEnv.observe_info(self, agent)
         info = self.format_info(agent, info)
-        # self.observe_from_location({agent: [1, 1]})    # for debugging
+
         self._last_infos[agent] = info
         observation2 = self.transform_observation(agent, info)
         self.observations2[agent] = observation2
 
-        if self._use_old_aintelope_rewards:
-            min_grass_distance = self.calc_min_grass_distance(agent, info)
-            reward2 = self.reward_agent(min_grass_distance)
-            self._last_rewards2[agent] = reward2
+        reward2 = info[INFO_REWARD_DICT]
+        if self._scalarize_rewards:
+            reward2 = sum(
+                reward2.values()
+            )  # this is currently used for unit tests and OpenAI baselines so no need for nonlinear utility transformations before summation
+        self._last_rewards2[agent] = reward2
 
-            # NB! cumulative reward should be calculated for all agents
-            for agent2 in self.agents:
-                self._cumulative_rewards2[agent2] += self._last_rewards2[agent2]
-        else:
-            reward2 = info[INFO_REWARD_DICT]
-            self._last_rewards2[agent] = reward2
-
-            # NB! cumulative reward should be calculated for all agents
-            for agent2 in self.agents:
-                self._cumulative_rewards2[agent2] = info[INFO_CUMULATIVE_REWARD_DICT]
+        # NB! cumulative reward should be calculated for all agents
+        for agent2 in self.agents:
+            info = GridworldZooAecEnv.observe_info(self, agent2)
+            info = self.format_info(agent2, info)
+            self._cumulative_rewards2[agent2] = info[INFO_CUMULATIVE_REWARD_DICT]
+            if self._scalarize_rewards:
+                self._cumulative_rewards2[agent2] = sum(
+                    self._cumulative_rewards2[agent2].values()
+                )  # this is currently used for unit tests and OpenAI baselines so no need for nonlinear utility transformations before summation
 
         terminated = self.terminations[agent]
         truncated = self.truncations[agent]
@@ -1005,13 +973,18 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
             truncated,
             self.filter_info(agent, info),
         )
-        return (
+        result = (
             observation2,
             reward2,
             terminated,
             truncated,
             self.filter_info(agent, info),
         )
+
+        if self._post_step_callback2 is not None:
+            self._post_step_callback2(agent, action, *result)
+
+        return result
 
     def step_multiple_agents(self, actions: Dict[str, Action]) -> Step:
         """step(action) takes in an action for each agent and should return the
@@ -1035,13 +1008,16 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         rewards2 = {}
         infos = {}
 
+        # the agent should be visible in .rewards after it dies
+        # (until its "dead step"), but during next agent's step
+        # it should get zero reward
         for agent in actions.keys():
             # this needs to be so according to Zoo unit test. See
             # https://github.com/Farama-Foundation/PettingZoo/blob/master/pettingzoo/test/api_test.py
-            if self._use_old_aintelope_rewards:
-                self._cumulative_rewards2[agent] = 0.0
+            if self._scalarize_rewards:
+                self._last_rewards2[agent] = 0.0
             else:
-                self._cumulative_rewards2[agent] = {}
+                self._last_rewards2[agent] = {}
 
         # loop over all agents in ENV NOT IN ACTIONS DICT
         for index in range(
@@ -1065,44 +1041,34 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
                     # observe observations, transform observations and rewards
                     info = GridworldZooAecEnv.observe_info(self, agent)
                     info = self.format_info(agent, info)
-                    # self.observe_from_location({agent: [1, 1]})    # for debugging
+
                     infos[agent] = info
                     self._last_infos[agent] = info
                     self.observations2[agent] = self.transform_observation(agent, info)
 
-                    if self._use_old_aintelope_rewards:
-                        min_grass_distance = self.calc_min_grass_distance(agent, info)
-                        reward2 = self.reward_agent(min_grass_distance)
-                        rewards2[agent] = reward2
-                        self._last_rewards2[agent] = reward2
-
-                        # NB! if the action of current agent somehow affects the rewards
-                        # of other agents then the cumulative reward of the other agents
-                        # needs to be updated here as well.
-                        self._cumulative_rewards2[agent] += reward2
-                    else:
-                        self._last_rewards2[agent] = info[INFO_REWARD_DICT]
-                        self._cumulative_rewards2[agent] = info[
-                            INFO_CUMULATIVE_REWARD_DICT
-                        ]
+                    self._last_rewards2[agent] = info[INFO_REWARD_DICT]
+                    # NB! if the action of current agent somehow affects the rewards
+                    # of other agents then the cumulative reward of the other agents
+                    # needs to be updated here as well.
+                    self._cumulative_rewards2[agent] = info[INFO_CUMULATIVE_REWARD_DICT]
                 else:
                     info = GridworldZooAecEnv.observe_info(self, agent)
+                    info = self.format_info(agent, info)
 
-                    if self._use_old_aintelope_rewards:
-                        min_grass_distance = self.calc_min_grass_distance(agent, info)
-                        reward2 = self.reward_agent(min_grass_distance)
-                        rewards2[agent] = reward2
-                        self._last_rewards2[agent] = reward2
+                    self._last_rewards2[agent] = info[INFO_REWARD_DICT]
+                    # NB! if the action of current agent somehow affects the rewards
+                    # of other agents then the cumulative reward of the other agents
+                    # needs to be updated here as well.
+                    self._cumulative_rewards2[agent] = info[INFO_CUMULATIVE_REWARD_DICT]
 
-                        # NB! if the action of current agent somehow affects the rewards
-                        # of other agents then the cumulative reward of the other agents
-                        # needs to be updated here as well.
-                        self._cumulative_rewards2[agent] += reward2
-                    else:
-                        self._last_rewards2[agent] = info[INFO_REWARD_DICT]
-                        self._cumulative_rewards2[agent] = info[
-                            INFO_CUMULATIVE_REWARD_DICT
-                        ]
+                if self._scalarize_rewards:
+                    # this is currently used for unit tests and OpenAI baselines so no need for nonlinear utility transformations before summation
+                    self._last_rewards2[agent] = sum(
+                        self._last_rewards2[agent].values()
+                    )
+                    self._cumulative_rewards2[agent] = sum(
+                        self._cumulative_rewards2[agent].values()
+                    )
 
         # / for index in range(0, self.num_agents)
 
@@ -1119,15 +1085,8 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
                     self._last_infos[agent] = info
                     self.observations2[agent] = self.transform_observation(agent, info)
 
-                    # min_grass_distance = self.calc_min_grass_distance(agent, info)
-                    # reward2 = self.reward_agent(min_grass_distance)
-                    # rewards2[agent] = reward2
-                    # self._last_rewards2[agent] = reward2
-
         terminateds = self.terminations
         truncateds = self.truncations
-
-        infos = self.format_infos(infos)
 
         if self._override_infos:
             infos = {agent: {} for agent in infos.keys()}

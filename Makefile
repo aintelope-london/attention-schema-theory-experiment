@@ -20,11 +20,14 @@ run-pipeline: ## run pipeline
 venv: ## create virtual environment
 	@if [ ! -f "$(VENV)/bin/activate" ]; then python3 -m venv $(VENV) ; fi;
 
+venv-310: ## create virtual environment
+	@if [ ! -f "$(VENV)/bin/activate" ]; then python3.10 -m venv $(VENV) ; fi;
+
 clean-venv: ## remove virtual environment
 	if [ -d $(VENV) ]; then rm -r $(VENV) ; fi;
 
 install: ## Install packages
-	pip uninstall ai_safety_gridworlds
+	pip uninstall -y ai_safety_gridworlds 2>&1 | grep -v "not installed"
 	pip install -r requirements/api.txt
 
 install-dev: ## Install development packages
@@ -48,10 +51,10 @@ typecheck-local: ## Local typechecking
 # ---------- formatting ----------
 .PHONY: isort isort-check format format-check
 format: ## apply automatic code formatter to repository
-	black $(CODEBASE)
+	black --exclude="aintelope_savanna.py" $(CODEBASE)
 
 format-check: ## check formatting
-	black --check $(CODEBASE)
+	black --check --exclude="aintelope_savanna.py" $(CODEBASE)
 
 isort: ## Sort python imports
 	isort $(CODEBASE)

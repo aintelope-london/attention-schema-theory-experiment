@@ -1,4 +1,11 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Repository: https://github.com/aintelope/biological-compatibility-benchmarks
+
 import csv
+import gzip
 import logging
 import os
 import sys
@@ -11,39 +18,126 @@ import numpy as np
 import pandas as pd
 from matplotlib.figure import Figure
 
+# this one is cross-platform
+from filelock import FileLock
+
+from aintelope.utils import try_df_to_csv_write
+
 # Library for handling saving to file
 
 logger = logging.getLogger("aintelope.analytics.recording")
 
 """
 Uses config_experiment.yaml's fields:
-experiment_dir: outputs/${experiment_name}_${timestamp}/
+experiment_dir: ${log_dir_root}/${timestamp}/${experiment_name}
 events_dir: events.csv
 checkpoint_dir: checkpoints/
 
 HOWTO:
 One test_conf will form one folder in outputs, that contains 
-1..n same runs for significance
 1..n different runs for pipeline
-1 agent.
+n agents.
 You need to change the agent params in the main config_experiment
 and run the same again in order to have a comparison point.
 """
 
 
-def record_events(record_path, events):
-    """
-    Record events of the training to given path.
-    """
+class EventLog(object):
+    default_gzip_compresslevel = 6  # 6 is default level for gzip: https://linux.die.net/man/1/gzip and https://github.com/ebiggers/libdeflate
 
-    # speed up CSV generation by not saving arrays
-    # TODO: save arrays to separate pickle files
-    del events["State"]
-    del events["Next_state"]
+    def __init__(
+        self,
+        experiment_dir,
+        events_fname,
+        headers,
+        gzip_log=False,
+        gzip_compresslevel=None,
+    ):
+        record_path = Path(os.path.join(experiment_dir, events_fname))
+        logger.info(f"Saving training records to disk at {record_path}")
+        record_path.parent.mkdir(exist_ok=True, parents=True)
 
-    logger.info(f"Saving training records to disk at {record_path}")
-    record_path.parent.mkdir(exist_ok=True, parents=True)
-    events.to_csv(record_path, index=False)
+        # speed up CSV generation by not saving arrays
+        # TODO: save arrays to separate pickle files
+        self.state_col_index = headers.index("State")
+        self.next_state_col_index = headers.index("Next_state")
+        headers = [x for x in headers if x != "State" and x != "Next_state"]
+
+        if gzip_log:
+            if gzip_compresslevel is None:
+                gzip_compresslevel = self.default_gzip_compresslevel
+            write_header = not os.path.exists(record_path + ".gz")
+            self.file = gzip.open(
+                record_path + ".gz",
+                mode="at",
+                newline="",
+                encoding="utf-8",
+                compresslevel=gzip_compresslevel,
+            )  # csv writer creates its own newlines therefore need to set newline to empty string here     # TODO: buffering for gzip
+        else:
+            write_header = not os.path.exists(record_path)
+            self.file = open(
+                record_path,
+                mode="at",
+                buffering=1024 * 1024,
+                newline="",
+                encoding="utf-8",
+            )  # csv writer creates its own newlines therefore need to set newline to empty string here
+
+        self.writer = csv.writer(self.file, quoting=csv.QUOTE_MINIMAL, delimiter=",")
+
+        if (
+            write_header
+        ):  # TODO: if the file already exists then assert that the header is same
+            self.writer.writerow(headers)
+            # self.file.flush()
+
+    def log_event(self, event):
+        transformed_cols = []
+        for index, col in enumerate(event):
+            # speed up CSV generation by not saving arrays
+            # TODO: save arrays to separate pickle files
+            if index == self.state_col_index or index == self.next_state_col_index:
+                continue
+
+            # if type(col) == datetime.datetime:
+            #    col = datetime.datetime.strftime(col, '%Y.%m.%d-%H.%M.%S')
+            transformed_cols.append(col)
+
+        self.writer.writerow(transformed_cols)
+        # self.file.flush()
+
+    def flush(self):
+        self.file.flush()
+
+    def close(self):
+        self.file.flush()
+        self.file.close()
+
+
+# / class EventLog(object):
+
+
+# def record_events(record_path, events):
+#    """
+#    Record events of the training to given path.
+#    """
+
+#    # speed up CSV generation by not saving arrays
+#    # TODO: save arrays to separate pickle files
+#    del events["State"]
+#    del events["Next_state"]
+
+#    logger.info(f"Saving training records to disk at {record_path}")
+#    record_path.parent.mkdir(exist_ok=True, parents=True)
+
+#    try_df_to_csv_write(
+#        events,
+#        record_path,
+#        index=False,
+#        mode="a",
+#        header=not os.path.exists(record_path),
+#    )
 
 
 def read_events(record_path, events_filename):
@@ -53,7 +147,10 @@ def read_events(record_path, events_filename):
     events = []
 
     for path in Path(record_path).rglob(events_filename):
-        events.append(pd.read_csv(path))
+        with FileLock(
+            str(path) + ".lock"
+        ):  # lock for better robustness against other processes writing to it concurrently
+            events.append(pd.read_csv(path))
 
     return events
 
@@ -73,31 +170,16 @@ def read_checkpoints(checkpoint_dir):
 ### Old stuff, not in use, but should belong here:
 
 
-def process_events(
-    events_df: pd.DataFrame,
-) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Function to convert the agent events dataframe into individual dataframe for
-    agent position, grass and water locations. Instinct events are currently not
-    processed.
-    """
-    state_df = pd.DataFrame(events_df.state.to_list())
-    agent_df = pd.DataFrame(columns=["x", "y"], data=state_df.agent_coords.to_list())
-    grass_columns = [c for c in list(state_df) if c.startswith("grass")]
-    grass_df = state_df[grass_columns].applymap(lambda x: tuple(x))
-    grass_df = pd.DataFrame(columns=["x", "y"], data=set(grass_df.stack().to_list()))
-    water_columns = [c for c in list(state_df) if c.startswith("water")]
-    water_df = state_df[water_columns].applymap(lambda x: tuple(x))
-    water_df = pd.DataFrame(columns=["x", "y"], data=set(water_df.stack().to_list()))
-
-    return agent_df, grass_df, water_df
-
-
 def plot_events(agent, style: str = "thickness", color: str = "viridis") -> Figure:
     """
     Docstring missing, these are old functions I'm unsure are in use atm.
     """
     events_df = agent.get_events()
     agent_df, food_df, water_df = agent.process_events(events_df)
+
+    plt.rcParams[
+        "figure.constrained_layout.use"
+    ] = True  # ensure that plot labels fit to the image and do not overlap
 
     fig, ax = plt.subplots(figsize=(8, 8))
 

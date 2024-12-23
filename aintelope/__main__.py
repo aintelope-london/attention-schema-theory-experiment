@@ -1,59 +1,68 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Repository: https://github.com/aintelope/biological-compatibility-benchmarks
+
+import os
 import copy
 import logging
-import os
+import sys
+import torch
+import gc
+import time
+import json
+import itertools
+import subprocess
+import asyncio
 
 import hydra
-from omegaconf import DictConfig, OmegaConf
 
-from aintelope.analytics import plotting, recording
 from aintelope.config.config_utils import (
-    get_score_dimensions,
     register_resolvers,
+    select_gpu,
+    set_memory_limits,
+    set_priorities,
 )
-from aintelope.experiments import run_experiment
-
-logger = logging.getLogger("aintelope.__main__")
-
-
-@hydra.main(version_base=None, config_path="config", config_name="config_experiment")
-def aintelope_main(cfg: DictConfig) -> None:
-    pipeline_config = OmegaConf.load(
-        "aintelope/config/config_tests.yaml"
-    )  # was pipeline
-
-    for env_conf in pipeline_config:
-        experiment_cfg = copy.deepcopy(
-            cfg
-        )  # need to deepcopy in order to not accumulate keys that were present in previous experiment and are not present in next experiment
-        OmegaConf.update(experiment_cfg, "experiment_name", env_conf)
-        OmegaConf.update(
-            experiment_cfg, "hparams", pipeline_config[env_conf], force_add=True
-        )
-        logger.info("Running training with the following configuration")
-        logger.info(OmegaConf.to_yaml(experiment_cfg))
-
-        # Training
-        OmegaConf.update(experiment_cfg, "hparams.traintest_mode", "train")
-        run_experiment(experiment_cfg)
-        analytics(experiment_cfg)
-
-        # Testing
-        OmegaConf.update(experiment_cfg, "hparams.traintest_mode", "test")
-        run_experiment(experiment_cfg)
-        analytics(experiment_cfg)
+from aintelope.gridsearch import (
+    run_gridsearch_experiments,
+    run_gridsearch_experiment_subprocess,
+)
+from aintelope.pipeline import run_pipeline
 
 
-def analytics(cfg):
-    # normalise slashes in paths. This is not mandatory, but will be cleaner to debug
-    labels = get_score_dimensions(cfg)
-    experiment_dir = os.path.normpath(cfg.experiment_dir)
-    events_fname = cfg.events_fname
+# logger = logging.getLogger("aintelope.__main__")
 
-    savepath = os.path.join(experiment_dir, cfg.hparams.traintest_mode + "_plot.png")
-    events = recording.read_events(experiment_dir, events_fname)
-    plotting.plot_performance(events, labels, ["Episode", "Step"], savepath)
+
+def aintelope_main() -> None:
+    # return run_gridsearch_experiment(gridsearch_params=None)    # TODO: caching support
+    run_pipeline()
 
 
 if __name__ == "__main__":
     register_resolvers()
-    aintelope_main()
+
+    if (
+        sys.gettrace() is None
+    ):  # do not set low priority while debugging. Note that unit tests also set sys.gettrace() to not-None
+        set_priorities()
+
+    set_memory_limits()
+
+    # Need to choose GPU early before torch fully starts up. Else there may be CUDA errors later.
+    select_gpu()
+
+    gridsearch_params_json = os.environ.get(
+        "GRIDSEARCH_PARAMS"
+    )  # used by gridsearch subprocess
+    gridsearch_config_file = os.environ.get(
+        "GRIDSEARCH_CONFIG"
+    )  # used by main/parent gridsearch process
+    if gridsearch_params_json is not None:
+        run_gridsearch_experiment_subprocess(gridsearch_params_json)
+    elif gridsearch_config_file is not None:
+        asyncio.run(
+            run_gridsearch_experiments()
+        )  # TODO: use separate python file for starting gridsearch
+    else:
+        aintelope_main()

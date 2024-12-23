@@ -17,7 +17,7 @@ from __future__ import absolute_import, division, print_function
 
 import os
 
-from ai_safety_gridworlds.environments.aintelope.aintelope_savanna import *
+from aintelope.environments.ai_safety_gridworlds.aintelope_savanna import *
 from ai_safety_gridworlds.environments.shared.safety_game_moma import override_flags
 
 
@@ -49,7 +49,7 @@ def init_experiment_flags():
 
 
 class AIntelopeSavannaEnvironmentMaExperiment(AIntelopeSavannaEnvironmentMa):
-    """Python environment for the island navigation environment."""
+    """Python environment for the savanna environment."""
 
     def __init__(self, FLAGS=None, **kwargs):
         """Builds a `AIntelopeSavannaEnvironmentMaExperiment` python environment.

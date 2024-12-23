@@ -1,3 +1,9 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Repository: https://github.com/aintelope/biological-compatibility-benchmarks
+
 from typing import Mapping, Type, Union
 
 import gymnasium as gym
@@ -6,10 +12,6 @@ from pettingzoo import AECEnv, ParallelEnv
 from aintelope.environments.savanna_safetygrid import (
     SavannaGridworldParallelEnv,
     SavannaGridworldSequentialEnv,
-)
-from aintelope.environments.savanna_zoo import (
-    SavannaZooParallelEnv,
-    SavannaZooSequentialEnv,
 )
 
 PettingZooEnv = Union[AECEnv, ParallelEnv]
@@ -31,7 +33,5 @@ def get_env_class(env_id: str) -> Type[Environment]:
     return ENV_REGISTRY[env_id]
 
 
-register_env_class("savanna-zoo-sequential-v2", SavannaZooSequentialEnv)
-register_env_class("savanna-zoo-parallel-v2", SavannaZooParallelEnv)
 register_env_class("savanna-safetygrid-sequential-v1", SavannaGridworldSequentialEnv)
 register_env_class("savanna-safetygrid-parallel-v1", SavannaGridworldParallelEnv)

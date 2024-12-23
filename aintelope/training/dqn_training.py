@@ -1,8 +1,15 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Repository: https://github.com/aintelope/biological-compatibility-benchmarks
+
 import datetime
 import logging
 import os
 from collections import namedtuple
 from typing import Optional, Tuple
+from gymnasium.spaces import Discrete
 
 import numpy as np
 import numpy.typing as npt
@@ -21,7 +28,14 @@ Transition = namedtuple(
 
 
 def load_checkpoint(
-    path, obs_size, action_space_size, unit_test_mode, hidden_sizes, num_conv_layers
+    path,
+    obs_size,
+    action_space_size,
+    unit_test_mode,
+    hidden_sizes,
+    num_conv_layers,
+    conv_size,
+    combine_interoception_and_vision,
 ):
     """
     https://pytorch.org/tutorials/recipes/recipes/saving_and_loading_a_general_checkpoint.html
@@ -42,6 +56,8 @@ def load_checkpoint(
         unit_test_mode=unit_test_mode,
         hidden_sizes=hidden_sizes,
         num_conv_layers=num_conv_layers,
+        conv_size=conv_size,
+        combine_interoception_and_vision=combine_interoception_and_vision,
     )
 
     if not unit_test_mode:
@@ -73,9 +89,17 @@ class Trainer:
         self.action_spaces = {}
 
         self.hparams = params.hparams
+        self.combine_interoception_and_vision = (
+            params.hparams.env_params.combine_interoception_and_vision
+        )
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         print("Using GPU: " + str(self.device not in ["cpu"]))
+
+    def reset_agent(self, agent_id):
+        self.replay_memories[agent_id] = ReplayMemory(
+            self.hparams.model_params.replay_size
+        )
 
     def add_agent(
         self,
@@ -110,6 +134,8 @@ class Trainer:
                 unit_test_mode=unit_test_mode,
                 hidden_sizes=self.hparams.model_params.hidden_sizes,
                 num_conv_layers=self.hparams.model_params.num_conv_layers,
+                conv_size=self.hparams.model_params.conv_size,
+                combine_interoception_and_vision=self.combine_interoception_and_vision,
             ).to(self.device)
         else:
             self.policy_nets[agent_id] = load_checkpoint(
@@ -119,6 +145,8 @@ class Trainer:
                 unit_test_mode=unit_test_mode,
                 hidden_sizes=self.hparams.model_params.hidden_sizes,
                 num_conv_layers=self.hparams.model_params.num_conv_layers,
+                conv_size=self.hparams.model_params.conv_size,
+                combine_interoception_and_vision=self.combine_interoception_and_vision,
             ).to(self.device)
 
         self.target_nets[agent_id] = DQN(
@@ -127,15 +155,26 @@ class Trainer:
             unit_test_mode=unit_test_mode,
             hidden_sizes=self.hparams.model_params.hidden_sizes,
             num_conv_layers=self.hparams.model_params.num_conv_layers,
+            conv_size=self.hparams.model_params.conv_size,
+            combine_interoception_and_vision=self.combine_interoception_and_vision,
         ).to(self.device)
         self.target_nets[agent_id].load_state_dict(
             self.policy_nets[agent_id].state_dict()
         )
         self.optimizers[agent_id] = optim.AdamW(
             self.policy_nets[agent_id].parameters(),
-            lr=self.hparams.model_params.lr,
-            amsgrad=True,
+            lr=self.hparams.lr,
+            amsgrad=self.hparams.amsgrad,
         )
+
+    def tiebreaking_argmax(self, arr):
+        """Avoids the agent from repeatedly taking move-left action when the instinct tells the agent to move away from current cell in any direction. Then the instinct will not provide any q value difference in its q values for the different directions, they would be equal. Naive np.argmax would just return the index of first moving action, which happens to be always move-left action."""
+        max_values_bitmap = np.isclose(arr, arr.max())
+        max_values_indexes = np.flatnonzero(max_values_bitmap)
+        result = np.random.choice(
+            max_values_indexes
+        )  # TODO: seed for this random generator
+        return result
 
     @torch.no_grad()
     def get_action(
@@ -146,8 +185,10 @@ class Trainer:
         ] = None,
         info: dict = {},
         step: int = 0,
+        trial: int = 0,
         episode: int = 0,
-    ) -> Optional[int]:
+        pipeline_cycle: int = 0,
+    ) -> npt.NDArray:
         """
         Get action from an agent
 
@@ -157,34 +198,17 @@ class Trainer:
             step (int): used to calculate epsilon
 
         Returns:
-            None
+            Q values array
         """
-        # if step > 0:
-        #    epsilon = max(
-        #        self.hparams.model_params.eps_end,
-        #        self.hparams.model_params.eps_start
-        #        - step * 1 / self.hparams.model_params.eps_last_frame,
-        #    )
-        # else:
-        #    epsilon = 0.0
-        epsilon = self.hparams.model_params.eps_end + (
-            self.hparams.model_params.eps_start - self.hparams.model_params.eps_end
-        ) * max(0, 1 - step / self.hparams.model_params.eps_last_frame) * max(
-            0, 1 - episode / self.hparams.model_params.eps_last_episode
-        )
 
-        # print(f"Epsilon: {epsilon}")
+        logger.debug("debug observation", type(observation))
 
-        if np.random.random() < epsilon:
-            action = self.action_spaces[agent_id].sample()
-        else:
-            logger.debug("debug observation", type(observation))
-
+        if not self.combine_interoception_and_vision:
             observation = (
                 torch.tensor(
                     np.expand_dims(
                         observation[0], 0
-                    ),  # vision     # call .flatten() in case you want to force 1D network even on 3D vision
+                    )  # vision     # call .flatten() in case you want to force 1D network even on 3D vision
                 ),
                 torch.tensor(np.expand_dims(observation[1], 0)),  # interoception
             )
@@ -199,12 +223,23 @@ class Trainer:
                     observation[0].cuda(self.device),
                     observation[1].cuda(self.device),
                 )
+        else:
+            observation = torch.tensor(
+                np.expand_dims(
+                    observation, 0
+                )  # vision     # call .flatten() in case you want to force 1D network even on 3D vision
+            )
+            logger.debug(
+                "debug observation tensor",
+                type(observation),
+                observation.shape,
+            )
 
-            q_values = self.policy_nets[agent_id](observation)
-            _, action = torch.max(q_values, dim=1)
-            action = int(action.item())
+            if str(self.device) not in ["cpu"]:
+                observation = observation.cuda(self.device)
 
-        return action
+        q_values = self.policy_nets[agent_id](observation).cpu().numpy()
+        return q_values
 
     def update_memory(
         self,
@@ -229,32 +264,49 @@ class Trainer:
         Returns:
             None
         """
-        # add experience to torch device if bugged    # TODO: what does bugging mean here?
+
         if done:
             return
 
-        state = (
-            torch.tensor(state[0], dtype=torch.float32, device=self.device).unsqueeze(
-                0
-            ),
-            torch.tensor(state[1], dtype=torch.float32, device=self.device).unsqueeze(
-                0
-            ),
-        )
+        if not self.combine_interoception_and_vision:
+            state = (
+                torch.tensor(
+                    state[0], dtype=torch.float32, device=self.device
+                ).unsqueeze(0),
+                torch.tensor(
+                    state[1], dtype=torch.float32, device=self.device
+                ).unsqueeze(0),
+            )
+        else:
+            state = torch.tensor(
+                state, dtype=torch.float32, device=self.device
+            ).unsqueeze(0)
+
+        action_space = self.action_spaces[agent_id]
+        if isinstance(action_space, Discrete):
+            min_action = action_space.start
+        else:
+            min_action = action_space.min_action
+        action -= min_action  # offset the action index if min_action is not zero
 
         action = torch.tensor(action, device=self.device).unsqueeze(0).view(1, 1)
         reward = torch.tensor(
             reward, dtype=torch.float32, device=self.device
         ).unsqueeze(0)
 
-        next_state = (
-            torch.tensor(
-                next_state[0], dtype=torch.float32, device=self.device
-            ).unsqueeze(0),
-            torch.tensor(
-                next_state[1], dtype=torch.float32, device=self.device
-            ).unsqueeze(0),
-        )
+        if not self.combine_interoception_and_vision:
+            next_state = (
+                torch.tensor(
+                    next_state[0], dtype=torch.float32, device=self.device
+                ).unsqueeze(0),
+                torch.tensor(
+                    next_state[1], dtype=torch.float32, device=self.device
+                ).unsqueeze(0),
+            )
+        else:
+            next_state = torch.tensor(
+                next_state, dtype=torch.float32, device=self.device
+            ).unsqueeze(0)
 
         self.replay_memories[agent_id].push(state, action, reward, done, next_state)
 
@@ -270,15 +322,10 @@ class Trainer:
             None
         """
         for agent_id in self.policy_nets.keys():
-            if (
-                len(self.replay_memories[agent_id])
-                < self.hparams.model_params.batch_size
-            ):
-                return
+            if len(self.replay_memories[agent_id]) < self.hparams.batch_size:
+                continue  # TODO: there was return, I guess continue is more correct here?
 
-            transitions = self.replay_memories[agent_id].sample(
-                self.hparams.model_params.batch_size
-            )
+            transitions = self.replay_memories[agent_id].sample(self.hparams.batch_size)
             batch = Transition(*zip(*transitions))
 
             non_final_mask = torch.tensor(
@@ -286,14 +333,21 @@ class Trainer:
                 device=self.device,
                 dtype=torch.bool,
             )
-            non_final_next_states = (
-                torch.cat([s[0] for s in batch.next_state if s is not None]),
-                torch.cat([s[1] for s in batch.next_state if s is not None]),
-            )
-            state_batch = (
-                torch.cat([s[0] for s in batch.state]),
-                torch.cat([s[1] for s in batch.state]),
-            )
+            if not self.combine_interoception_and_vision:
+                non_final_next_states = (
+                    torch.cat([s[0] for s in batch.next_state if s is not None]),
+                    torch.cat([s[1] for s in batch.next_state if s is not None]),
+                )
+                state_batch = (
+                    torch.cat([s[0] for s in batch.state]),
+                    torch.cat([s[1] for s in batch.state]),
+                )
+            else:
+                non_final_next_states = torch.cat(
+                    [s for s in batch.next_state if s is not None]
+                )
+                state_batch = torch.cat(batch.state)
+
             action_batch = torch.cat(batch.action)
             reward_batch = torch.cat(batch.reward)
 
@@ -301,9 +355,7 @@ class Trainer:
             target_net = self.target_nets[agent_id]
             state_action_values = policy_net(state_batch).gather(1, action_batch.long())
 
-            next_state_values = torch.zeros(
-                self.hparams.model_params.batch_size, device=self.device
-            )
+            next_state_values = torch.zeros(self.hparams.batch_size, device=self.device)
             with torch.no_grad():
                 next_state_values[non_final_mask] = target_net(
                     non_final_next_states
@@ -335,7 +387,9 @@ class Trainer:
                 )
             target_net.load_state_dict(target_net_state_dict)
 
-    def save_models(self, episode, path):
+    def save_models(
+        self, episode, path, experiment_name, use_separate_models_for_each_experiment
+    ):
         """
         Save model artifacts to 'path'.
 
@@ -352,6 +406,19 @@ class Trainer:
             loss = 1.0
             if agent_id in self.losses:
                 loss = self.losses[agent_id]
+
+            checkpoint_filename = agent_id
+            if use_separate_models_for_each_experiment:
+                checkpoint_filename += "-" + experiment_name
+
+            filename = os.path.join(
+                path,
+                checkpoint_filename
+                + "-"
+                + datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S_%f"),
+            )
+
+            logger.info(f"Saving agent {agent_id} models to disk at {filename}")
             torch.save(
                 {
                     "epoch": episode,
@@ -359,10 +426,5 @@ class Trainer:
                     "optimizer_state_dict": optimizer.state_dict(),
                     "loss": loss,
                 },
-                os.path.join(
-                    path,
-                    agent_id
-                    + "-"
-                    + datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S_%f"),
-                ),
+                filename,
             )

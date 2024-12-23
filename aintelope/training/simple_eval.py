@@ -1,12 +1,18 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Repository: https://github.com/aintelope/biological-compatibility-benchmarks
+
 import logging
 from collections import Counter
 from typing import Dict
 
 from omegaconf import DictConfig, OmegaConf
 
-
 from aintelope.agents import get_agent_class
 from aintelope.environments import get_env_class
+from aintelope.environments.savanna_safetygrid import GridworldZooBaseEnv
 from aintelope.models.dqn import DQN
 from aintelope.training.dqn_training import Trainer
 from pettingzoo import AECEnv, ParallelEnv
@@ -45,10 +51,14 @@ def run_episode(full_params: Dict) -> None:
 
         # TODO: multi-agent compatibility
         # TODO: support for 3D-observation cube
-        obs_size = (
-            env.observation_space("agent_0")[0].shape,
-            env.observation_space("agent_0")[1].shape,
-        )
+        if not env_params.combine_interoception_and_vision:
+            obs_size = (
+                env.observation_space("agent_0")[0].shape,
+                env.observation_space("agent_0")[1].shape,
+            )
+        else:
+            obs_size = env.observation_space("agent_0").shape
+
         logger.info("obs size", obs_size)
 
         # TODO: multi-agent compatibility
@@ -83,15 +93,25 @@ def run_episode(full_params: Dict) -> None:
     # TODO: support for different action spaces in different agents?
     if isinstance(model_spec, list):
         models = [
-            MODEL_LOOKUP[net](obs_size, n_actions, unit_test_mode=unit_test_mode)
+            MODEL_LOOKUP[net](
+                obs_size,
+                n_actions,
+                unit_test_mode=unit_test_mode,
+                combine_interoception_and_vision=env_params.combine_interoception_and_vision,
+            )
             for net in model_spec
         ]
     else:
         models = [
-            MODEL_LOOKUP[model_spec](obs_size, n_actions, unit_test_mode=unit_test_mode)
+            MODEL_LOOKUP[model_spec](
+                obs_size,
+                n_actions,
+                unit_test_mode=unit_test_mode,
+                combine_interoception_and_vision=env_params.combine_interoception_and_vision,
+            )
         ]
 
-    agent_spec = hparams["agent_id"]  # TODO: why is this value a list?
+    agent_spec = hparams.agent_class
     if isinstance(agent_spec, list) and len(agent_spec) == 1:
         # NB! after this step the agent_spec is not a list anymore and the following
         # if condition will be False, so do not try to merge these "if" branches.
@@ -108,7 +128,6 @@ def run_episode(full_params: Dict) -> None:
                 get_agent_class(agent)(
                     agent_id=f"agent_{i}",
                     trainer=trainer,
-                    target_instincts=[],
                 )
                 for agent in agent_spec
             ]
@@ -119,7 +138,6 @@ def run_episode(full_params: Dict) -> None:
             get_agent_class(agent_spec)(
                 agent_id=f"agent_{i}",
                 trainer=trainer,
-                target_instincts=[],
             )
             for i in range(env_params["amount_agents"])
         ]
@@ -133,20 +151,33 @@ def run_episode(full_params: Dict) -> None:
             observation = env.observe(agent.id)
             info = env.observe_info(agent.id)
 
-        agent.reset(observation, info)
-        trainer.add_agent(
-            agent.id,
-            (observation[0].shape, observation[1].shape),
-            env.action_space,
-            unit_test_mode=unit_test_mode,
-        )
+        agent.reset(observation, info, type(env))
+
+        if not env_params.combine_interoception_and_vision:
+            trainer.add_agent(
+                agent.id,
+                (observation[0].shape, observation[1].shape),
+                env.action_space,
+                unit_test_mode=unit_test_mode,
+            )
+        else:
+            trainer.add_agent(
+                agent.id,
+                observation.shape,
+                env.action_space,
+                unit_test_mode=unit_test_mode,
+            )
 
     agents_dict = {agent.id: agent for agent in agents}
 
     # cannot use list since some of the agents may be terminated in the middle of
     # the episode
-    episode_rewards = Counter({agent.id: 0.0 for agent in agents})
-    episode_rewards_upgraded_to_dict_rewards = False
+    if isinstance(env, GridworldZooBaseEnv):
+        # episode_rewards will be dictionary of dictionaries in case of Gridworld environments
+        episode_rewards = {agent.id: Counter() for agent in agents}
+    else:
+        episode_rewards = Counter({agent.id: 0.0 for agent in agents})
+
     # cannot use list since some of the agents may be terminated in the middle of
     # the episode
     dones = {agent.id: False for agent in agents}
@@ -163,7 +194,12 @@ def run_episode(full_params: Dict) -> None:
                     observation = observations[agent.id]
                     info = infos[agent.id]
                     actions[agent.id] = agent.get_action(
-                        observation, info, step, episode=0
+                        observation=observation,
+                        info=info,
+                        step=step,
+                        trial=0,
+                        episode=0,
+                        pipeline_cycle=0,
                     )
 
                 logger.debug("debug actions", actions)
@@ -203,10 +239,12 @@ def run_episode(full_params: Dict) -> None:
                     else:
                         # action = action_space(agent.id).sample()
                         action = agent.get_action(
-                            observation,
-                            info,
-                            step,
+                            observation=observation,
+                            info=info,
+                            step=step,
+                            trial=0,
                             episode=0,
+                            pipeline_cycle=0,
                         )
 
                     logger.debug("debug action", action)
@@ -271,7 +309,12 @@ def run_episode(full_params: Dict) -> None:
                     observation = observations[agent.id]
                     info = infos[agent.id]
                     actions[agent.id] = agent.get_action(
-                        observation, info, step, episode=0
+                        observation=observation,
+                        info=info,
+                        step=step,
+                        trial=0,
+                        episode=0,
+                        pipeline_cycle=0,
                     )
 
                 logger.debug("debug actions", actions)
@@ -313,10 +356,12 @@ def run_episode(full_params: Dict) -> None:
                     else:
                         # action = action_space(agent.id).sample()
                         action = agent.get_action(
-                            observation,
-                            info,
-                            step,
+                            observation=observation,
+                            info=info,
+                            step=step,
+                            trial=0,
                             episode=0,
+                            pipeline_cycle=0,
                         )
 
                     logger.debug("debug action", action)
@@ -356,15 +401,7 @@ def run_episode(full_params: Dict) -> None:
             logger.warning("Simple_eval: non-zoo env, test not yet implemented!")
             pass
 
-        if len(rewards) == 0:
-            pass  # needed to avoid an error in the next blocks. Both below blocks may fail when len(rewards) == 0
-        elif isinstance(next(iter(rewards.values())), dict):
-            if (
-                not episode_rewards_upgraded_to_dict_rewards
-            ):  # each agent's reward is a dict, need to upgrade the episode_rewards counter  # TODO: detect this early, before the loops start
-                episode_rewards_upgraded_to_dict_rewards = True
-                episode_rewards = {agent.id: Counter() for agent in agents}
-
+        if isinstance(env, GridworldZooBaseEnv):
             # unfortunately counter does not support nested addition, so we need to do it with a loop here
             for agent, reward in rewards.items():
                 episode_rewards[agent].update(

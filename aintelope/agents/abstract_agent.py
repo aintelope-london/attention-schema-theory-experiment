@@ -1,3 +1,9 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Repository: https://github.com/aintelope/biological-compatibility-benchmarks
+
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Union
 import numpy.typing as npt
@@ -10,7 +16,7 @@ Environment = Union[AECEnv, ParallelEnv]
 
 class Agent(ABC):
     @abstractmethod
-    def reset(self, state, info) -> None:
+    def reset(self, state, info, env_class) -> None:
         ...
 
     @abstractmethod
@@ -20,8 +26,10 @@ class Agent(ABC):
             npt.NDArray[ObservationFloat], npt.NDArray[ObservationFloat]
         ] = None,
         info: dict = {},
-        step: int = 0,  # net: nn.Module, epsilon: float, device: str
+        step: int = 0,
+        trial: int = 0,
         episode: int = 0,
+        pipeline_cycle: int = 0,
     ) -> Optional[int]:
         ...
 
@@ -35,6 +43,6 @@ class Agent(ABC):
         info: dict = {},
         score: float = 0.0,
         done: bool = False,
-        save_path: Optional[str] = None,
+        test_mode: bool = False,
     ) -> list:
         ...

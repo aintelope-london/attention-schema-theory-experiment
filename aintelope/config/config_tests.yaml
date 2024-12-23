@@ -1,7 +1,12 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Repository: https://github.com/aintelope/biological-compatibility-benchmarks
 
 food_5x5:   
   env_params:
-    env_experiment: "aintelope.aintelope_savanna"
+    env_experiment: "ai_safety_gridworlds.aintelope_savanna"
     # num_iters: 100  # TODO: if you override this here then you need to override also eps_last_frame!
     amount_agents: 1 
     amount_grass_patches: 1

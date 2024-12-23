@@ -1,9 +1,17 @@
-gemini-engine==1.0.9
+diskcache==5.6.3
+filelock==3.13.1
+flatten-dict==0.4.2
 gymnasium==0.29.1
 hydra-core==1.3.0
 matplotlib==3.7.0
+numpy==1.26.4
 pandas==1.5.3
 PettingZoo==1.24.1
+posix-ipc==1.1.1; platform_system != "Windows"
+progressbar2==4.2.0
+psutil==5.9.4
 pygame==2.4
-pytorch-lightning==1.6.4
--e git+https://github.com/levitation-opensource/ai-safety-gridworlds@aintelope_new_benchmarks#egg=ai-safety-gridworlds
+seaborn==0.12.2
+semaphore-win-ctypes==0.1.2; platform_system == "Windows"
+torch==2.1.0
+-e git+https://github.com/levitation-opensource/ai-safety-gridworlds@master#egg=ai-safety-gridworlds
