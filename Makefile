@@ -20,11 +20,14 @@ run-pipeline: ## run pipeline
 venv: ## create virtual environment
 	@if [ ! -f "$(VENV)/bin/activate" ]; then python3 -m venv $(VENV) ; fi;
 
+venv-310: ## create virtual environment
+	@if [ ! -f "$(VENV)/bin/activate" ]; then python3.10 -m venv $(VENV) ; fi;
+
 clean-venv: ## remove virtual environment
 	if [ -d $(VENV) ]; then rm -r $(VENV) ; fi;
 
 install: ## Install packages
-	pip uninstall -y ai_safety_gridworlds
+	pip uninstall -y ai_safety_gridworlds 2>&1 | grep -v "not installed"
 	pip install -r requirements/api.txt
 
 install-dev: ## Install development packages

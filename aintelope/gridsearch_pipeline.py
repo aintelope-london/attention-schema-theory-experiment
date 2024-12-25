@@ -112,7 +112,12 @@ def run_pipeline(cfg: DictConfig) -> None:
     if gridsearch_params_in is None:
         print("Waiting for semaphore...")
     with Semaphore(
-        semaphore_name, max_count=num_workers, disable=gridsearch_params_in is not None
+        semaphore_name,
+        max_count=num_workers,
+        disable=(gridsearch_params_in is not None)
+        or (
+            os.name != "nt"
+        ),  # Linux does not unlock semaphore after a process gets killed, therefore disabling Semaphore under Linux until this gets resolved.
     ) as semaphore:
         if gridsearch_params_in is None:
             print("Semaphore acquired...")
@@ -138,6 +143,15 @@ def run_pipeline(cfg: DictConfig) -> None:
                         OmegaConf.update(
                             experiment_cfg, "experiment_name", env_conf_name
                         )
+
+                        experiment_cfg_dict = OmegaConf.to_container(
+                            experiment_cfg.hparams,
+                            resolve=True,
+                        )
+                        flattened_experiment_cfg = flatten(
+                            experiment_cfg_dict,
+                            reducer=make_reducer(delimiter="."),
+                        )  # convert to format {'a': 1, 'c.a': 2, 'c.b.x': 5, 'c.b.y': 10, 'd': [1, 2, 3]}
 
                         OmegaConf.update(
                             experiment_cfg,
@@ -173,15 +187,22 @@ def run_pipeline(cfg: DictConfig) -> None:
                             )  # convert to format {'a': 1, 'c.a': 2, 'c.b.x': 5, 'c.b.y': 10, 'd': [1, 2, 3]}
 
                             for null_entry_key in null_entry_keys:
-                                value = flattened_pipeline_config[
-                                    null_entry_key[len("hparams.") :]
-                                ]
+                                value = flattened_pipeline_config.get(
+                                    null_entry_key[len("hparams.") :], None
+                                )
+                                if (
+                                    value is None
+                                ):  # if the value is not available in pipeline config, then take it from experiment config
+                                    value = flattened_experiment_cfg[
+                                        null_entry_key[len("hparams.") :]
+                                    ]
                                 OmegaConf.update(
                                     gridsearch_params,
                                     null_entry_key,
                                     value,
                                     force_add=False,
                                 )
+                            # / for null_entry_key in null_entry_keys:
 
                             OmegaConf.update(
                                 experiment_cfg,
