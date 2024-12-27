@@ -18,7 +18,6 @@ from aintelope.training.dqn_training import Trainer
 
 from stable_baselines3 import TD3
 from stable_baselines3.common.noise import NormalActionNoise
-from stable_baselines3.td3.policies import CnnPolicy
 import supersuit as ss
 
 from typing import Union
@@ -52,10 +51,29 @@ class TD3Agent(SB3BaseAgent):
 
         n_actions = env.action_space(self.id).n
         action_noise = NormalActionNoise(
-            mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions)
+            mean=np.zeros(n_actions),
+            sigma=0.1 * np.ones(n_actions),  # TODO: config parameter for sigma
         )
 
-        self.model = TD3(CnnPolicy, env, action_noise=action_noise, verbose=1)
+        # policy_kwarg:
+        # if you want to use CnnPolicy or MultiInputPolicy with image-like observation (3D tensor) that are already normalized, you must pass normalize_images=False
+        # see the following links:
+        # https://stable-baselines3.readthedocs.io/en/master/guide/custom_env.html
+        # https://github.com/DLR-RM/stable-baselines3/issues/1863
+        # Also: make sure your image is in the channel-first format.
+        self.model = TD3(
+            "CnnPolicy",
+            env,
+            action_noise=action_noise,
+            verbose=1,
+            policy_kwargs={
+                "normalize_images": False,
+                "features_extractor_class": CustomCNN,  # need custom CNN in order to handle observation shape 9x9
+                "features_extractor_kwargs": {
+                    "features_dim": 256
+                },  # TODO: config parameter. Note this is not related to the number of features in the original observation (15), this parameter here is model's internal feature dimensionality
+            },
+        )
 
     # this method is currently called only in test mode
     def reset(self, state, info, env_class) -> None:

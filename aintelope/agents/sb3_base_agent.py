@@ -24,6 +24,10 @@ import stable_baselines3
 from stable_baselines3 import PPO
 import supersuit as ss
 
+import torch
+import torch.nn as nn
+from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
+
 from typing import Any, Union
 import gymnasium as gym
 from pettingzoo import AECEnv, ParallelEnv
@@ -48,6 +52,47 @@ def vec_env_args(env, num_envs):
 
 def is_json_serializable(item: Any) -> bool:
     return False
+
+
+class CustomCNN(BaseFeaturesExtractor):
+    def __init__(self, observation_space, features_dim=256):
+        super().__init__(observation_space, features_dim)
+
+        # TODO: make this architecture configurable
+
+        # Current observation_space is (15, 9, 9) - channels=15, height=9, width=9
+        # Let's build a small CNN with two conv layers:
+        #   Conv1: kernel_size=3, stride=1, padding=1 - keeps spatial dims from 9x9 -> 9x9
+        #   Conv2: kernel_size=3, stride=2, padding=1 - downsamples from 9x9 -> 5x5
+        #   Flatten into a linear layer
+        self.cnn = nn.Sequential(
+            nn.Conv2d(15, 32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(),
+            # TODO: test whether adding this third layer helps. It would make the output shape to 3x3.
+            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(),
+            nn.Flatten(),
+        )
+
+        # TODO, experiment with:
+        # * BatchNorm / LayerNorm: Try adding normalization layers if training stability is an issue.
+        # * Residual connections: In case of a deeper network, sometimes adding skip connections (resnets) helps performance, though it's more advanced.
+
+        # Figure out the output shape of self.cnn:
+        # 1) With the above, input: (batch_size, 15, 9, 9)
+        # 2) After Conv1: (batch_size, 32, 9, 9)
+        # 3) After Conv2: (batch_size, 64, 5, 5) => 64*5*5=1600
+        # We feed that into a linear layer to get features_dim=256
+        with torch.no_grad():
+            sample_input = torch.zeros(1, 15, 9, 9)
+            n_flatten = self.cnn(sample_input).shape[1]
+
+        self.linear = nn.Sequential(nn.Linear(n_flatten, features_dim), nn.ReLU())
+
+    def forward(self, observations: torch.Tensor) -> torch.Tensor:
+        return self.linear(self.cnn(observations))
 
 
 class SB3BaseAgent(Agent):

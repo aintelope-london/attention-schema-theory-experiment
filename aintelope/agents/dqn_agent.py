@@ -48,7 +48,24 @@ class DQNAgent(SB3BaseAgent):
             env, num_vec_envs=1, num_cpus=1, base_class="stable_baselines3"
         )  # NB! num_vec_envs=1 is important here so that we can use identity function instead of cloning in vec_env_args
 
-        self.model = DQN("CnnPolicy", env, verbose=1)
+        # policy_kwarg:
+        # if you want to use CnnPolicy or MultiInputPolicy with image-like observation (3D tensor) that are already normalized, you must pass normalize_images=False
+        # see the following links:
+        # https://stable-baselines3.readthedocs.io/en/master/guide/custom_env.html
+        # https://github.com/DLR-RM/stable-baselines3/issues/1863
+        # Also: make sure your image is in the channel-first format.
+        self.model = DQN(
+            "CnnPolicy",
+            env,
+            verbose=1,
+            policy_kwargs={
+                "normalize_images": False,
+                "features_extractor_class": CustomCNN,  # need custom CNN in order to handle observation shape 9x9
+                "features_extractor_kwargs": {
+                    "features_dim": 256
+                },  # TODO: config parameter. Note this is not related to the number of features in the original observation (15), this parameter here is model's internal feature dimensionality
+            },
+        )
 
     # this method is currently called only in test mode
     def reset(self, state, info, env_class) -> None:
