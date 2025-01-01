@@ -254,7 +254,9 @@ class SB3BaseAgent(Agent):
 
         # action_space = self.env.action_space(self.id)
 
-        action, _states = self.model.predict(observation, deterministic=False)
+        action, _states = self.model.predict(
+            observation, deterministic=True
+        )  # TODO: config setting for "deterministic" parameter
         action = np.asarray(
             action
         ).item()  # SB3 sends actions in wrapped into an one-item array for some reason. np.asarray is also able to handle lists.
