@@ -239,7 +239,7 @@ def sb3_gym_test_thread_entry_point(
     observation_space,
     action_space,
 ):
-    env = MultiAgentZooToGymWrapperGymSide(
+    env_wrapper = MultiAgentZooToGymWrapperGymSide(
         pipe, agent_id, checkpoint_filename, observation_space, action_space
     )
     try:
@@ -247,9 +247,9 @@ def sb3_gym_test_thread_entry_point(
         # warn=False : disable additional warnings since they are handled in the agent side by:
         # * disabling normalization
         # * using custom feature extractor
-        check_env(env, warn=False, skip_render_check=True)
+        check_env(env_wrapper, warn=False, skip_render_check=True)
 
-        env.save_or_return_model(model=None, filename_timestamp_sufix_str=None)
+        env_wrapper.save_or_return_model(model=None, filename_timestamp_sufix_str=None)
     except (
         Exception
     ) as ex:  # NB! need to catch exception so that the env wrapper can signal the training ended
@@ -279,10 +279,10 @@ def sb3_gym_test_thread_entry_point(
 #    env = safetygrid.SavannaGridworldSequentialEnv(env_params=env_params)
 #    env.seed(execution_number)
 
-#    env = MultiAgentZooToGymWrapperZooSide(
+#    env_wrapper = MultiAgentZooToGymWrapperZooSide(
 #        env, cfg=None
 #    )  # cfg is unused at sb3_gym_test_thread_entry_point() function
-#    _, exceptions = env.train(
+#    _, exceptions = env_wrapper.train(
 #        num_total_steps=None,  # unused at sb3_gym_test_thread_entry_point() function
 #        agent_thread_entry_point=sb3_gym_test_thread_entry_point,
 #        model_constructor=None,  # unused at sb3_gym_test_thread_entry_point() function
