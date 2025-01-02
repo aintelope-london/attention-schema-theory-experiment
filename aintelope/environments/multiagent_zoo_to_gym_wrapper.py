@@ -513,6 +513,7 @@ class MultiAgentZooToGymWrapperZooSide(gym.Env):
                     # we will below force-terminate all other training threads, so nothing needs to be done here (after which the agent will trigger an exception and exit the thread/process)
                     pass
 
+                # TODO: Make difference between episode end due to truncation and dead agents. In case of dead agents, DO NOT reset other agents.
                 elif any(resets) or any(exceptions) or any(models):
                     # TODO: this could be configurable: If at least one Gym thread decides to reset or finish training (with an exception or a model result), then send termination responses to all other threads and wait for them to call reset
 
