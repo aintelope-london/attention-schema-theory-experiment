@@ -93,7 +93,7 @@ class PPOAgent(SB3BaseAgent):
             # PPO supports weight sharing for multi-agent scenarios
             # TODO: Environment duplication support for parallel compute purposes. Abseil package needs to be replaced for that end.
 
-            ss.vector.vector_constructors.vec_env_args = vec_env_args  # The original function tries to do environment cloning, but absl flags currently do not support it. Since we need only one environment, there is no reason for cloning, so lets replace the cloning function with identity function.
+            ss.vector.vector_constructors.vec_env_args = vec_env_args  # Since we need only one environment, there is no reason for cloning, so lets replace the cloning function with identity function.
 
             env = ss.pettingzoo_env_to_vec_env_v1(env)
             env = ss.concat_vec_envs_v1(
@@ -102,49 +102,3 @@ class PPOAgent(SB3BaseAgent):
             self.model = self.model_constructor(env, cfg)
         else:
             pass  # multi-model training will be automatically set up by the base class when self.model is None. These models will be saved to self.models and there will be only one agent instance in the main process. Actual agents will run in threads/subprocesses because SB3 requires Gym interface.
-
-    # this method is currently called only in test mode
-    def reset(self, state, info, env_class) -> None:
-        """Resets self and updates the state."""
-        super().reset(state, info, env_class)
-
-    def get_action(self, *args, **kwargs) -> Optional[int]:
-        """Given an observation, ask your net what to do. State is needed to be
-        given here as other agents have changed the state!
-
-        Returns:
-            action (Optional[int]): index of action
-        """
-        action = super().get_action(*args, **kwargs)
-        return action
-
-    def update(self, *args, **kwargs) -> list:
-        """
-        Takes observations and updates trainer on perceived experiences.
-        Needed here to catch instincts.
-
-        Args:
-            env: Environment
-            observation: Tuple[ObservationArray, ObservationArray]
-            score: Only baseline uses score as a reward
-            done: boolean whether run is done
-            save_path: str
-        Returns:
-            agent_id (str): same as elsewhere ("agent_0" among them)
-            state (Tuple[npt.NDArray[ObservationFloat], npt.NDArray[ObservationFloat]]): input for the net
-            action (int): index of action
-            reward (float): reward signal
-            done (bool): if agent is done
-            next_state (npt.NDArray[ObservationFloat]): input for the net
-        """
-        event = super().update(*args, **kwargs)
-        return event
-
-    def train(self, steps):
-        super().train(steps)
-
-    def save_model(self):
-        super().save_model()
-
-    def load_model(self, checkpoint):
-        super().load_model(checkpoint)
