@@ -17,6 +17,7 @@ import subprocess
 import asyncio
 
 import hydra
+from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 from flatten_dict import flatten
 from flatten_dict.reducers import make_reducer

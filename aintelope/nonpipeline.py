@@ -14,12 +14,16 @@ import hydra
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 
-from aintelope.config.config_utils import register_resolvers, get_score_dimensions
+from aintelope.config.config_utils import (
+    register_resolvers,
+    get_score_dimensions,
+    set_console_title,
+)
 from aintelope.experiments import run_experiment
 
 from aintelope.analytics import plotting, recording
 
-from aintelope.utils import wait_for_enter, set_console_title
+from aintelope.utils import wait_for_enter
 
 logger = logging.getLogger("aintelope.__main__")
 
