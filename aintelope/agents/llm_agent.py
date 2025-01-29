@@ -167,7 +167,7 @@ class LLMAgent(Agent):
         ):  # for some reason np.isscalar() returns True for strings
             return value
         elif isinstance(value, list):
-            return [format_float(self, x) for x in value]
+            return [self.format_float(self, x) for x in value]
         elif np.isscalar(value):
             if abs(value) < 1e-10:  # TODO: tune/config
                 value = 0
