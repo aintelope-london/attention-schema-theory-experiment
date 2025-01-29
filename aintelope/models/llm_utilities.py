@@ -21,8 +21,14 @@ from openai import OpenAI
 from aintelope.utils import Timer, wait_for_enter
 
 
-client = OpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY"),  # This is the default and can be omitted
+client = (
+    OpenAI(
+        api_key=os.environ.get(
+            "OPENAI_API_KEY"
+        ),  # This is the default and can be omitted
+    )
+    if os.environ.get("OPENAI_API_KEY")
+    else None  # this file is always loaded by agents/__init__.py even when it is actually not used. But OpenAI class would throw if it gets unset API key.
 )
 
 
