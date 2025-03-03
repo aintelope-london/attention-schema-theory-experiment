@@ -1,18 +1,18 @@
-Total commits: 886
-Total ctimes: 4174
-Total files: 200
-Total loc: 16996
+Total commits: 998
+Total ctimes: 4962
+Total files: 239
+Total loc: 21752
 | Author                    |   loc |   coms |   fils |  distribution   |
 |:--------------------------|------:|-------:|-------:|:----------------|
-| Roland Pihlakas           | 14295 |    380 |     93 | 84.1/42.9/46.5  |
-| Joel Pyykkö               |  1151 |    128 |     17 | 6.8/14.4/ 8.5   |
-| derdre                    |   459 |     62 |     27 | 2.7/ 7.0/13.5   |
-| U-SKETCHER\Gunnar Zarncke |   392 |     12 |     12 | 2.3/ 1.4/ 6.0   |
-| a.kochanke                |   362 |    145 |     24 | 2.1/16.4/12.0   |
-| Nathan Helm-Burger        |   130 |     63 |     12 | 0.8/ 7.1/ 6.0   |
-| Gunnar Zarncke            |   127 |      1 |      1 | 0.7/ 0.1/ 0.5   |
-| Hauke Rehfeld             |    52 |     57 |      4 | 0.3/ 6.4/ 2.0   |
-| ak                        |    15 |      1 |      3 | 0.1/ 0.1/ 1.5   |
-| Orpheus Lummis            |     9 |      2 |      3 | 0.1/ 0.2/ 1.5   |
-| postuur                   |     4 |     33 |      4 | 0.0/ 3.7/ 2.0   |
+| Roland Pihlakas           | 18281 |    463 |    117 | 84.0/46.4/49.0  |
+| Joel Pyykkö               |  2032 |    154 |     32 | 9.3/15.4/13.4   |
+| derdre                    |   447 |     62 |     27 | 2.1/ 6.2/11.3   |
+| U-SKETCHER\Gunnar Zarncke |   392 |     12 |     12 | 1.8/ 1.2/ 5.0   |
+| a.kochanke                |   351 |    145 |     24 | 1.6/14.5/10.0   |
+| Gunnar Zarncke            |   127 |      1 |      1 | 0.6/ 0.1/ 0.4   |
+| Nathan Helm-Burger        |    82 |     63 |     12 | 0.4/ 6.3/ 5.0   |
+| ak                        |    15 |      1 |      3 | 0.1/ 0.1/ 1.3   |
+| Hauke Rehfeld             |    12 |     57 |      4 | 0.1/ 5.7/ 1.7   |
+| Orpheus Lummis            |     9 |      2 |      3 | 0.0/ 0.2/ 1.3   |
+| postuur                   |     4 |     36 |      4 | 0.0/ 3.6/ 1.7   |
 | NathanNeuro               |     0 |      2 |      0 | 0.0/ 0.2/ 0.0   |
