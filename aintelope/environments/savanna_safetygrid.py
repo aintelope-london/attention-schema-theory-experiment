@@ -624,8 +624,10 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
         print(
             "env_layout_seed: "
             + str(GridworldZooParallelEnv.get_env_layout_seed(self))
-            + " episode_no: "
-            + str(GridworldZooParallelEnv.get_episode_no(self))
+            + " episode_no per seed: "  # TODO: add global episode no counter which is not reset with seed
+            + str(
+                GridworldZooParallelEnv.get_episode_no(self)
+            )  # this counter is reset for each new env_layout_seed
         )
 
         infos = self.format_infos(infos)
@@ -828,8 +830,10 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         print(
             "env_layout_seed: "
             + str(GridworldZooParallelEnv.get_env_layout_seed(self))
-            + " episode_no: "
-            + str(GridworldZooParallelEnv.get_episode_no(self))
+            + " episode_no per seed: "  # TODO: add global episode no counter which is not reset with see
+            + str(
+                GridworldZooParallelEnv.get_episode_no(self)
+            )  # this counter is reset for each new env_layout_seed
         )
 
         # observe observations, transform observations
