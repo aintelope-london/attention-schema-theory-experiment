@@ -106,9 +106,6 @@ class SB3Instincts(object):
         test_mode: bool = False,
         observation=None,
     ) -> int:
-        if test_mode:
-            return 0, None
-
         # if deterministic:
         #     #  still use below random tiebreaking code, but use seed = ((pipeline_cycle * 10000 + episode) * 1000) + step
         #     # seed = ((pipeline_cycle * 10000 + episode) * 1000) + step
@@ -117,6 +114,12 @@ class SB3Instincts(object):
         # else:
         #     _random = np.random
         _random = np.random
+
+        if self.hparams.num_episodes == 0:  # there is no training
+            # detected pure instinct agent test without training - if that config is detected then test mode will use the instincts
+            return 1, _random  # instinct mode
+        elif test_mode:
+            return 0, None  # SB3 policy mode
 
         # TODO: warn if last_frame=0/1 or last_env_layout_seed=0/1 or last_episode=0/1 in any of the below values: for disabling the epsilon counting for corresponding variable one should use -1
         epsilon = (
@@ -173,22 +176,22 @@ class SB3Instincts(object):
             and epsilon > 0
             and _random.random() < epsilon
         ):
-            return 2, _random
+            return 2, _random  # random exploration mode
 
         elif (
             instinct_epsilon > 0 and _random.random() < instinct_epsilon
         ):  # TODO: find a better way to combine epsilon and instinct_epsilon
-            return 1, _random
+            return 1, _random  # instinct mode
 
         elif (
             apply_instinct_eps_before_random_eps
             and epsilon > 0
             and _random.random() < epsilon
         ):
-            return 2, _random
+            return 2, _random  # random exploration mode
 
         else:
-            return 0, None
+            return 0, None  # SB3 policy mode
 
     def get_action(
         self,

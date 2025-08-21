@@ -21,7 +21,7 @@ import datetime
 from aintelope.agents.sb3_base_agent import (
     SB3BaseAgent,
     CustomCNN,
-    PolicyWithConfig,
+    PolicyWithConfigFactory,
 )
 from aintelope.aintelope_typing import ObservationFloat, PettingZooEnv
 from aintelope.training.dqn_training import Trainer
@@ -103,17 +103,13 @@ class ExpertOverrideMixin:  # TODO: merge with code from PPO agent (the code is 
         obs_nps = obs.detach().cpu().numpy()
         obs_np = obs_nps[0, :]
 
-        (override_type, _random) = (
-            self.expert.should_override(
-                deterministic,
-                step,
-                episode,
-                pipeline_cycle,
-                test_mode,
-                obs_np,
-            )
-            if not test_mode
-            else 0
+        (override_type, _random) = self.expert.should_override(
+            deterministic,
+            step,
+            episode,
+            pipeline_cycle,
+            test_mode,
+            obs_np,
         )
         if override_type != 0:
             action = self.expert.get_action(
@@ -160,12 +156,13 @@ def dqn_model_constructor(env, env_classname, agent_id, cfg):
         or cfg.hparams.model_params.instinct_bias_epsilon_end > 0
     )
     if use_imitation_learning:
-        policy = (
-            PolicyWithConfig(env_classname, agent_id, cfg, CnnPolicyWithExpertOverride)
+        policy_override_class = (
+            CnnPolicyWithExpertOverride
             if cfg.hparams.model_params.num_conv_layers > 0
-            else PolicyWithConfig(
-                env_classname, agent_id, cfg, MlpPolicyWithExpertOverride
-            )
+            else MlpPolicyWithExpertOverride
+        )
+        policy = PolicyWithConfigFactory(
+            env_classname, agent_id, cfg, policy_override_class
         )
     else:
         policy = (
