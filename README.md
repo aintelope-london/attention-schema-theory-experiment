@@ -195,11 +195,11 @@ Aintelope code base is compatible with Windows. No extra steps needed. GPU compu
 
 # -----
 
-**Attribution & License**
+## Attribution & License
 
-This repository is a fork and derivative of "From homeostasis to resource sharing: Biologically and economically aligned multi-objective multi-agent gridworld-based AI safety benchmarks" (Roland Pihlakas et al.). Please cite the original work (DOI: `10.48550/arXiv.2410.00081`) — see `CITATION.cff` for citation metadata.  
+This repository is a fork and derivative of "Roland Pihlakas. From homeostasis to resource sharing: Biologically and economically aligned multi-objective multi-agent gridworld-based AI safety benchmarks". Please cite the original work (DOI: [`10.48550/arXiv.2410.00081`](https://doi.org/10.48550/arXiv.2410.00081)) — see [`CITATION.cff`](CITATION.cff) for citation metadata.  
 Original upstream repository: https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
-License: see `LICENSE.txt`.  
-Authors and contribution details: see `AUTHORS.md`.
+License: see [`LICENSE.txt`](LICENSE.txt).  
+Code contribution details: see [`AUTHORS.md`](AUTHORS.md).
 
