@@ -17,35 +17,6 @@
             }
         },
         //-----------------------------------------------------------------------------------
-        // Configurations to run single environment with X agent and default params
-        //-----------------------------------------------------------------------------------
-        {
-            "name": "Python: Run single environment with random agent and default params",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "aintelope/nonpipeline.py",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "showUncaughtExceptions": true,
-            "args": [ "--config-name=config_experiment_random" ],
-            "env": {
-                //"PYTHONPATH": "your_path_here"
-            }
-        },
-        {
-            "name": "Python: Run single environment with example agent and default params",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "aintelope/nonpipeline.py",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "showUncaughtExceptions": true,
-            "args": [ "--config-name=config_experiment_exampleagent" ],
-            "env": {
-                //"PYTHONPATH": "your_path_here"
-            }
-        },
-        //-----------------------------------------------------------------------------------
         // Configurations to run pipeline with X agent and default params
         //-----------------------------------------------------------------------------------
         {
