@@ -24,6 +24,7 @@ trainer_params:
   verbose: false
 
 hparams:
+  show_plot: True
   gridsearch_trial_no: 0        # is set by gridsearch config file
   params_set_title: "main config"
   do_not_enforce_checkpoint_file_existence_during_test: False
