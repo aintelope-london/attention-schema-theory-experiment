@@ -29,7 +29,7 @@ from diskcache import Cache
 from filelock import FileLock
 
 from aintelope.utils import RobustProgressBar, Semaphore, wait_for_enter
-
+from aintelope.gui.main_window import run_gui
 from matplotlib import pyplot as plt
 
 from aintelope.analytics import plotting, recording
@@ -66,13 +66,12 @@ def run_pipeline(cfg: DictConfig) -> None:
 
     archive_code(cfg)
 
-    pipeline_config_file = os.environ.get("PIPELINE_CONFIG")
-    if pipeline_config_file is None:
-        pipeline_config_file = "config_pipeline.yaml"
-    pipeline_config = OmegaConf.load(
-        os.path.join("aintelope", "config", pipeline_config_file)
-    )
-
+    if "--gui" in sys.argv:
+        pipeline_config = run_gui(baseline_cfg=cfg) 
+    else:
+        pipeline_config_file = os.environ.get("PIPELINE_CONFIG") or "config_pipeline.yaml"
+        pipeline_config = OmegaConf.load(os.path.join("aintelope", "config", pipeline_config_file))
+        
     config_name = HydraConfig.get().job.config_name
     set_console_title(
         config_name + " : " + pipeline_config_file + " : " + timestamp_pid_uuid
