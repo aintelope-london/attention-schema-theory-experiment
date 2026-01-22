@@ -6,107 +6,95 @@
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
 import os
-import subprocess
-import sys
-
 import pytest
+from omegaconf import OmegaConf
 
-from aintelope.config.config_utils import register_resolvers
 from aintelope.nonpipeline import aintelope_main
-from tests.conftest import constants
 
 
 def test_training_pipeline_main():
-    sys.argv = [
-        "",
-        "hparams.env=savanna-safetygrid-sequential-v1",
-        (
-            "hparams.env_entry_point="
-            "aintelope.environments.savanna_safetygrid:SavannaGridworldSequentialEnv"
-        ),
-        "hparams.env_type=zoo",
-        "hparams.unit_test_mode=True",
-        "hparams.num_episodes=5",
-        "hparams.test_episodes=1",
-        "hparams.env_params.num_iters=50",
-        "hparams.warm_start_steps=10",
-    ]
-    aintelope_main()
-    sys.argv = [""]
+    cfg = OmegaConf.load(os.path.join("aintelope", "config", "config_experiment.yaml"))
+
+    OmegaConf.update(cfg, "hparams.env", "savanna-safetygrid-sequential-v1")
+    OmegaConf.update(
+        cfg,
+        "hparams.env_entry_point",
+        "aintelope.environments.savanna_safetygrid:SavannaGridworldSequentialEnv",
+    )
+    OmegaConf.update(cfg, "hparams.env_type", "zoo")
+    OmegaConf.update(cfg, "hparams.unit_test_mode", True)
+    OmegaConf.update(cfg, "hparams.num_episodes", 5)
+    OmegaConf.update(cfg, "hparams.test_episodes", 1)
+    OmegaConf.update(cfg, "hparams.env_params.num_iters", 50)
+    OmegaConf.update(cfg, "hparams.warm_start_steps", 10)
+
+    aintelope_main(cfg)
 
 
 @pytest.mark.parametrize("execution_number", range(1))
 def test_training_pipeline_main_with_dead_agents(execution_number):
-    # run all code in single process always in order to pass seed argument
-    sys.argv = [
-        "",
-        "hparams.env=savanna-safetygrid-sequential-v1",
-        (
-            "hparams.env_entry_point="
-            "aintelope.environments.savanna_safetygrid:SavannaGridworldSequentialEnv"
-        ),
-        "hparams.env_type=zoo",
-        "hparams.env_params.seed=" + str(execution_number),
-        "hparams.env_params.test_death=True",
-        "hparams.unit_test_mode=True",
-        "hparams.num_episodes=5",
-        "hparams.test_episodes=1",
-        "hparams.env_params.num_iters=50",
-        "hparams.warm_start_steps=10",
-    ]
-    aintelope_main()
-    sys.argv = [""]
+    cfg = OmegaConf.load(os.path.join("aintelope", "config", "config_experiment.yaml"))
+
+    OmegaConf.update(cfg, "hparams.env", "savanna-safetygrid-sequential-v1")
+    OmegaConf.update(
+        cfg,
+        "hparams.env_entry_point",
+        "aintelope.environments.savanna_safetygrid:SavannaGridworldSequentialEnv",
+    )
+    OmegaConf.update(cfg, "hparams.env_type", "zoo")
+    OmegaConf.update(cfg, "hparams.env_params.seed", execution_number)
+    OmegaConf.update(cfg, "hparams.env_params.test_death", True)
+    OmegaConf.update(cfg, "hparams.unit_test_mode", True)
+    OmegaConf.update(cfg, "hparams.num_episodes", 5)
+    OmegaConf.update(cfg, "hparams.test_episodes", 1)
+    OmegaConf.update(cfg, "hparams.env_params.num_iters", 50)
+    OmegaConf.update(cfg, "hparams.warm_start_steps", 10)
+
+    aintelope_main(cfg)
 
 
 def test_training_pipeline_baseline():
-    # TODO: find a way to parse Makefile and get sys.argv that way
-    # sys.argv = [""] + shlex.split(const.BASELINE_ARGS, comments=False, posix=True)
-    # posix=True removes quotes around arguments
-    sys.argv = [
-        "",
-        "hparams.env=savanna-safetygrid-sequential-v1",
-        (
-            "hparams.env_entry_point="
-            "aintelope.environments.savanna_safetygrid:SavannaGridworldSequentialEnv"
-        ),
-        "hparams.env_type=zoo",
-        "hparams.agent_class=q_agent",
-        "hparams.unit_test_mode=True",
-        "hparams.num_episodes=5",
-        "hparams.test_episodes=1",
-        "hparams.env_params.num_iters=50",
-        "hparams.warm_start_steps=10",
-    ]
-    aintelope_main()
-    sys.argv = [""]
+    cfg = OmegaConf.load(os.path.join("aintelope", "config", "config_experiment.yaml"))
+
+    OmegaConf.update(cfg, "hparams.env", "savanna-safetygrid-sequential-v1")
+    OmegaConf.update(
+        cfg,
+        "hparams.env_entry_point",
+        "aintelope.environments.savanna_safetygrid:SavannaGridworldSequentialEnv",
+    )
+    OmegaConf.update(cfg, "hparams.env_type", "zoo")
+    OmegaConf.update(cfg, "hparams.agent_class", "q_agent")
+    OmegaConf.update(cfg, "hparams.unit_test_mode", True)
+    OmegaConf.update(cfg, "hparams.num_episodes", 5)
+    OmegaConf.update(cfg, "hparams.test_episodes", 1)
+    OmegaConf.update(cfg, "hparams.env_params.num_iters", 50)
+    OmegaConf.update(cfg, "hparams.warm_start_steps", 10)
+
+    aintelope_main(cfg)
 
 
 @pytest.mark.parametrize("execution_number", range(1))
 def test_training_pipeline_baseline_with_dead_agents(execution_number):
-    # run all code in single process always in order to pass seed argument
-    # TODO: find a way to parse Makefile and get sys.argv that way
-    # sys.argv = [""] + shlex.split(const.BASELINE_ARGS, comments=False, posix=True)
-    # posix=True removes quotes around arguments
-    sys.argv = [
-        "",
-        "hparams.env=savanna-safetygrid-sequential-v1",
-        (
-            "hparams.env_entry_point="
-            "aintelope.environments.savanna_safetygrid:SavannaGridworldSequentialEnv"
-        ),
-        "hparams.env_type=zoo",
-        "hparams.agent_class=q_agent",
-        "hparams.env_params.seed=" + str(execution_number),
-        "hparams.env_params.test_death=True",
-        "hparams.unit_test_mode=True",
-        "hparams.num_episodes=5",
-        "hparams.test_episodes=1",
-        "hparams.env_params.num_iters=50",
-        "hparams.warm_start_steps=10",
-    ]
-    aintelope_main()
-    sys.argv = [""]
+    cfg = OmegaConf.load(os.path.join("aintelope", "config", "config_experiment.yaml"))
+
+    OmegaConf.update(cfg, "hparams.env", "savanna-safetygrid-sequential-v1")
+    OmegaConf.update(
+        cfg,
+        "hparams.env_entry_point",
+        "aintelope.environments.savanna_safetygrid:SavannaGridworldSequentialEnv",
+    )
+    OmegaConf.update(cfg, "hparams.env_type", "zoo")
+    OmegaConf.update(cfg, "hparams.agent_class", "q_agent")
+    OmegaConf.update(cfg, "hparams.env_params.seed", execution_number)
+    OmegaConf.update(cfg, "hparams.env_params.test_death", True)
+    OmegaConf.update(cfg, "hparams.unit_test_mode", True)
+    OmegaConf.update(cfg, "hparams.num_episodes", 5)
+    OmegaConf.update(cfg, "hparams.test_episodes", 1)
+    OmegaConf.update(cfg, "hparams.env_params.num_iters", 50)
+    OmegaConf.update(cfg, "hparams.warm_start_steps", 10)
+
+    aintelope_main(cfg)
 
 
 if __name__ == "__main__" and os.name == "nt":  # detect debugging
-    pytest.main([__file__])  # run tests only in this file
+    pytest.main([__file__])

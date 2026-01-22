@@ -101,14 +101,15 @@ def muldiv(entry, multiplier, divisor):
 
 
 def register_resolvers() -> None:
-    OmegaConf.register_new_resolver("custom_now", custom_now)
-    OmegaConf.register_new_resolver("abs_path", get_project_path)
+    OmegaConf.register_new_resolver("custom_now", custom_now, replace=True)
+    OmegaConf.register_new_resolver("now", custom_now, replace=True)
+    OmegaConf.register_new_resolver("abs_path", get_project_path, replace=True)
     OmegaConf.register_new_resolver(
-        "append_pid_and_uuid", append_pid_and_uuid, use_cache=True
-    )  # NB! need to enable caching else the pid_and_uuid will change at random moments during execution, leading to errors
-    OmegaConf.register_new_resolver("minus_3", minus_3)
-    OmegaConf.register_new_resolver("muldiv", muldiv)
-    OmegaConf.register_new_resolver("range", create_range)
+        "append_pid_and_uuid", append_pid_and_uuid, use_cache=True, replace=True
+    )
+    OmegaConf.register_new_resolver("minus_3", minus_3, replace=True)
+    OmegaConf.register_new_resolver("muldiv", muldiv, replace=True)
+    OmegaConf.register_new_resolver("range", create_range, replace=True)
 
 
 def get_score_dimensions(cfg: DictConfig):

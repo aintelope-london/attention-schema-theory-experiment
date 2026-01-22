@@ -11,8 +11,6 @@ import sys
 import torch
 import gc
 
-import hydra
-from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 
 from aintelope.config.config_utils import (
@@ -29,15 +27,13 @@ from aintelope.utils import wait_for_enter
 logger = logging.getLogger("aintelope.__main__")
 
 
-@hydra.main(version_base=None, config_path="config", config_name="config_experiment")
 def aintelope_main(cfg: DictConfig) -> None:
     timestamp = str(cfg.timestamp)
     timestamp_pid_uuid = str(cfg.timestamp_pid_uuid)
     logger.info(f"timestamp: {timestamp}")
     logger.info(f"timestamp_pid_uuid: {timestamp_pid_uuid}")
 
-    config_name = HydraConfig.get().job.config_name
-    set_console_title(config_name + " : " + timestamp_pid_uuid)
+    set_console_title(cfg.hparams.params_set_title + " : " + timestamp_pid_uuid)
 
     logger.info("Running training with the following configuration")
     logger.info(OmegaConf.to_yaml(cfg))
@@ -104,4 +100,5 @@ def analytics(cfg, score_dimensions, title, experiment_name, do_not_show_plot=Fa
 
 if __name__ == "__main__":  # for multiprocessing support
     register_resolvers()
-    aintelope_main()
+    cfg = OmegaConf.load(os.path.join("aintelope", "config", "config_experiment.yaml"))
+    aintelope_main(cfg)

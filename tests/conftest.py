@@ -12,6 +12,10 @@ from typing import Dict, Tuple, Union
 import pytest
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
+from aintelope.config.config_utils import register_resolvers
+
+register_resolvers()
+
 
 def constants() -> DictConfig:
     constants_dict = {
