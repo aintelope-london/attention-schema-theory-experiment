@@ -11,7 +11,6 @@ experiment_name: experiment
 events_fname: events.csv
 lzma_events_log: True          
 checkpoint_dir: checkpoints/
-hydra_logs_root: hydra_logs
 log_dir_root: outputs
 log_dir: ${log_dir_root}/${timestamp_pid_uuid}/
 experiment_dir: ${log_dir}/${experiment_name}/
@@ -127,7 +126,3 @@ hparams:
     #
     test_death: False      # needed for trainer tests
     seed: 0      # needed for trainer tests
-
-hydra:
-  run:
-    dir: ${log_dir}/${hydra_logs_root}/

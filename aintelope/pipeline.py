@@ -17,8 +17,6 @@ import itertools
 import subprocess
 import asyncio
 
-import hydra
-from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 from flatten_dict import flatten
 from flatten_dict.reducers import make_reducer
@@ -57,7 +55,6 @@ def aintelope_main() -> None:
     run_pipeline()
 
 
-@hydra.main(version_base=None, config_path="config", config_name="config_experiment")
 def run_pipeline(cfg: DictConfig) -> None:
     timestamp = str(cfg.timestamp)
     timestamp_pid_uuid = str(cfg.timestamp_pid_uuid)
@@ -72,9 +69,12 @@ def run_pipeline(cfg: DictConfig) -> None:
         pipeline_config_file = os.environ.get("PIPELINE_CONFIG") or "config_pipeline.yaml"
         pipeline_config = OmegaConf.load(os.path.join("aintelope", "config", pipeline_config_file))
         
-    config_name = HydraConfig.get().job.config_name
     set_console_title(
-        config_name + " : " + pipeline_config_file + " : " + timestamp_pid_uuid
+        cfg.hparams.params_set_title
+        + " : "
+        + pipeline_config_file
+        + " : "
+        + timestamp_pid_uuid
     )
 
     test_summaries_to_return = []
@@ -315,7 +315,8 @@ def analytics(
 
 def aintelope_main() -> None:
     # return run_gridsearch_experiment(gridsearch_params=None)    # TODO: caching support
-    run_pipeline()
+    cfg = OmegaConf.load(os.path.join("aintelope", "config", "config_experiment.yaml"))
+    run_pipeline(cfg)
 
 
 if __name__ == "__main__":  # for multiprocessing support

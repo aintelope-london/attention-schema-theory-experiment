@@ -17,7 +17,6 @@ import itertools
 import subprocess
 import asyncio
 
-import hydra
 from omegaconf import DictConfig, OmegaConf
 from flatten_dict import flatten
 from flatten_dict.reducers import make_reducer
@@ -72,15 +71,19 @@ def run_gridsearch_experiment_cache_helper(
 
     # cfg.timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")    # TODO: re-parse date format from config file
 
-    gridsearch_params_global = gridsearch_params  # TODO: hydra main does not allow multiple arguments, probably there is a more typical way to do it
+    gridsearch_params_global = gridsearch_params
     test_summaries = run_pipeline()
     return test_summaries  # this result will be cached
 
 
-@hydra.main(version_base=None, config_path="config", config_name="config_experiment")
 def run_pipeline(cfg: DictConfig) -> None:
+<<<<<<< HEAD
     gridsearch_params_in = gridsearch_params_global  # TODO: hydra main does not allow multiple arguments, but probably there is a more typical way to do it
     show_plot = gridsearch_params_in is None
+=======
+    gridsearch_params_in = gridsearch_params_global
+    do_not_show_plot = gridsearch_params_in is not None
+>>>>>>> remove-hydra
 
     timestamp = str(cfg.timestamp)
     timestamp_pid_uuid = str(cfg.timestamp_pid_uuid)
