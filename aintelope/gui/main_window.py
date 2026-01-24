@@ -10,6 +10,7 @@ from omegaconf import DictConfig, OmegaConf
 from gui.ui_schema_manager import load_ui_schema, get_field_spec
 from gui.widgets import create_widget, get_range_display
 
+CONFIG_DIR = Path("aintelope") / "config"
 
 class ConfigGUI:
     def __init__(self, root: tk.Tk, default_cfg: DictConfig):
@@ -94,7 +95,7 @@ class ConfigGUI:
         for key, value in config.items():
             current_path = f"{path}.{key}" if path else key
             
-            if isinstance(value, dict):
+            if isinstance(value, (dict, DictConfig)):
                 # Section header
                 frame = ttk.Frame(parent)
                 frame.grid(row=row, column=0, columnspan=3, sticky=tk.W, pady=(10 if level == 0 else 5, 2))
@@ -170,13 +171,12 @@ class ConfigGUI:
         return f"config_{timestamp}.yaml"
     
     def _list_configs(self) -> list:
-        config_dir = Path("configs")
-        return sorted([f.name for f in config_dir.glob("config_*.yaml")])
+        return sorted([f.name for f in CONFIG_DIR.glob("config_*.yaml")])
     
     def _load_config(self):
         """Load config file, applying it over default."""
         config_name = self.config_var.get()
-        config_path = Path("configs") / config_name
+        config_path = CONFIG_DIR / config_name
         
         loaded = OmegaConf.load(config_path)
         merged = OmegaConf.merge(self.default_cfg, loaded)
@@ -191,7 +191,7 @@ class ConfigGUI:
         if not output_name.endswith('.yaml'):
             output_name += '.yaml'
         
-        output_path = Path("configs") / output_name
+        output_path = CONFIG_DIR / output_name
         OmegaConf.save(OmegaConf.create(self.current_config), output_path)
         
         self.status_var.set(f"Saved: {output_name}")
@@ -242,6 +242,7 @@ def run_gui(default_cfg: DictConfig) -> Optional[DictConfig]:
         None: User cancelled
     """
     root = tk.Tk()
+    root.tk.call('tk', 'scaling', 1.0)
     gui = ConfigGUI(root, default_cfg)
     root.mainloop()
     root.destroy()

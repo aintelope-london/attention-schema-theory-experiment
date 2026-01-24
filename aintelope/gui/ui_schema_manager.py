@@ -10,7 +10,6 @@ def load_ui_schema() -> DictConfig:
     schema_path = Path(__file__).parent / "ui_schema.yaml"
     return OmegaConf.load(schema_path)
 
-
 def get_field_spec(ui_schema: DictConfig, key_path: str) -> Optional[list]:
     """
     Get UI rendering spec for a parameter.
@@ -26,4 +25,10 @@ def get_field_spec(ui_schema: DictConfig, key_path: str) -> Optional[list]:
             return None
         current = current[key]
     
-    return OmegaConf.to_container(current, resolve=True)
+    result = OmegaConf.to_container(current, resolve=True)
+    
+    # Return None if not a leaf spec (i.e., if it's a dict/intermediate node)
+    if isinstance(result, dict):
+        return None
+    
+    return result

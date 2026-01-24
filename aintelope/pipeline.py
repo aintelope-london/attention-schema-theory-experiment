@@ -61,18 +61,18 @@ def run_pipeline(cfg: DictConfig) -> None:
     logger.info(f"timestamp: {timestamp}")
     logger.info(f"timestamp_pid_uuid: {timestamp_pid_uuid}")
 
-    archive_code(cfg)
-
+    
     if "--gui" in sys.argv:
-        pipeline_config = run_gui(baseline_cfg=cfg) 
+        pipeline_config = run_gui(cfg) 
+        if pipeline_config is None:
+            print("GUI cancelled.")
+            return []
     else:
-        pipeline_config_file = os.environ.get("PIPELINE_CONFIG") or "config_pipeline.yaml"
-        pipeline_config = OmegaConf.load(os.path.join("aintelope", "config", pipeline_config_file))
-        
+        pipeline_config_file = os.environ.get("PIPELINE_CONFIG") or "config_pipeline.yaml"    
+        pipeline_config = OmegaConf.load(os.path.join("aintelope", "config", pipeline_config_file))        
+
     set_console_title(
         cfg.hparams.params_set_title
-        + " : "
-        + pipeline_config_file
         + " : "
         + timestamp_pid_uuid
     )
@@ -222,6 +222,8 @@ def run_pipeline(cfg: DictConfig) -> None:
                         json_text + "\n"
                     )  # \n : Prepare the file for appending new lines upon subsequent append. The last character in the JSONL file is allowed to be a line separator, and it will be treated the same as if there was no line separator present.
                 fh.flush()
+    
+    archive_code(cfg)
 
     torch.cuda.empty_cache()
     gc.collect()
