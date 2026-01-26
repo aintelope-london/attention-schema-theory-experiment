@@ -61,21 +61,20 @@ def run_pipeline(cfg: DictConfig) -> None:
     logger.info(f"timestamp: {timestamp}")
     logger.info(f"timestamp_pid_uuid: {timestamp_pid_uuid}")
 
-    
     if "--gui" in sys.argv:
-        pipeline_config = run_gui(cfg) 
+        pipeline_config = run_gui(cfg)
         if pipeline_config is None:
             print("GUI cancelled.")
             return []
     else:
-        pipeline_config_file = os.environ.get("PIPELINE_CONFIG") or "config_pipeline.yaml"    
-        pipeline_config = OmegaConf.load(os.path.join("aintelope", "config", pipeline_config_file))        
+        pipeline_config_file = (
+            os.environ.get("PIPELINE_CONFIG") or "config_pipeline.yaml"
+        )
+        pipeline_config = OmegaConf.load(
+            os.path.join("aintelope", "config", pipeline_config_file)
+        )
 
-    set_console_title(
-        cfg.hparams.params_set_title
-        + " : "
-        + timestamp_pid_uuid
-    )
+    set_console_title(cfg.hparams.params_set_title + " : " + timestamp_pid_uuid)
 
     test_summaries_to_return = []
     test_summaries_to_jsonl = []
@@ -124,6 +123,11 @@ def run_pipeline(cfg: DictConfig) -> None:
                         experiment_cfg = copy.deepcopy(
                             cfg
                         )  # need to deepcopy in order to not accumulate keys that were present in previous experiment and are not present in next experiment
+
+                        experiment_cfg.hparams = OmegaConf.merge(
+                            experiment_cfg.hparams, pipeline_config[env_conf_name]
+                        )
+                        """
                         OmegaConf.update(
                             experiment_cfg, "experiment_name", env_conf_name
                         )
@@ -134,7 +138,7 @@ def run_pipeline(cfg: DictConfig) -> None:
                             pipeline_config[env_conf_name],
                             force_add=True,
                         )
-
+                        """
                         logger.info("Running training with the following configuration")
                         logger.info(
                             os.linesep
@@ -192,7 +196,7 @@ def run_pipeline(cfg: DictConfig) -> None:
                                 group_by_pipeline_cycle=cfg.hparams.num_pipeline_cycles
                                 >= 1,
                                 gridsearch_params=None,
-                                show_plot= experiment_cfg.hparams.show_plot, 
+                                show_plot=experiment_cfg.hparams.show_plot,
                             )
                             test_summaries_to_return.append(test_summary)
                             test_summaries_to_jsonl.append(test_summary)
@@ -222,14 +226,14 @@ def run_pipeline(cfg: DictConfig) -> None:
                         json_text + "\n"
                     )  # \n : Prepare the file for appending new lines upon subsequent append. The last character in the JSONL file is allowed to be a line separator, and it will be treated the same as if there was no line separator present.
                 fh.flush()
-    
+
     archive_code(cfg)
 
     torch.cuda.empty_cache()
     gc.collect()
 
     # keep plots visible until the user decides to close the program
-    if experiment_cfg.hparams.show_plot: 
+    if experiment_cfg.hparams.show_plot:
         # uses less CPU on Windows than input() function. Note that the graph window will be frozen, but will still show graphs
         wait_for_enter("\nPipeline done. Press [enter] to continue.")
 
