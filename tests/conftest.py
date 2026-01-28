@@ -16,7 +16,6 @@ from aintelope.config.config_utils import register_resolvers
 
 register_resolvers()
 
-
 def constants() -> DictConfig:
     constants_dict = {
         "PROJECT": "aintelope",
@@ -25,21 +24,18 @@ def constants() -> DictConfig:
     return OmegaConf.create(constants_dict)
 
 
-# @pytest.fixture
-# def root_dir() -> pathlib.Path:
-#    return pathlib.Path(__file__).parents[1]
-
-
 @pytest.fixture
-# def tparams_hparams(root_dir: pathlib.Path) -> Union[DictConfig, ListConfig]:
-def tparams_hparams() -> Union[DictConfig, ListConfig]:
-    # full_params = OmegaConf.load(os.path.join(root_dir, "aintelope", "config", "config_experiment.yaml"))
+
+def base_test_config() -> Union[DictConfig, ListConfig]:
+    """Base test configuration built on config_experiment.yaml.
+    
+    Loads full config to satisfy external env dependencies,
+    then overrides for fast test execution.
+    """
     full_params = OmegaConf.load(
         os.path.join("aintelope", "config", "config_experiment.yaml")
     )
 
-    # override some parameters during tests in order to speed up computations
-    # TODO: move these overrides to a separate config?
     full_params.hparams.unit_test_mode = True
     full_params.hparams.num_episodes = min(5, full_params.hparams.num_episodes)
     full_params.hparams.env_params.num_iters = min(
@@ -48,3 +44,17 @@ def tparams_hparams() -> Union[DictConfig, ListConfig]:
     full_params.hparams.warm_start_steps = min(10, full_params.hparams.warm_start_steps)
 
     return full_params
+
+@pytest.fixture
+def dqn_learning_config(base_test_config) -> Union[DictConfig, ListConfig]:
+    """Config for baseline ML learning tests (DQN).
+    
+    Extends base_test_config with settings suitable for
+    verifying that learning actually occurs.
+    """
+    config = base_test_config.copy()
+    
+    config.hparams.num_episodes = 50 
+    config.hparams.env_params.num_iters = 100
+    
+    return config

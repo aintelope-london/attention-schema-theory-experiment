@@ -56,8 +56,6 @@ def aintelope_main() -> None:
 
 
 def run_pipeline(cfg: DictConfig) -> None:
-    do_not_show_plot = False  # TODO: config parameter
-
     timestamp = str(cfg.timestamp)
     timestamp_pid_uuid = str(cfg.timestamp_pid_uuid)
     logger.info(f"timestamp: {timestamp}")
@@ -195,7 +193,7 @@ def run_pipeline(cfg: DictConfig) -> None:
                                 group_by_pipeline_cycle=cfg.hparams.num_pipeline_cycles
                                 >= 1,
                                 gridsearch_params=None,
-                                do_not_show_plot=do_not_show_plot,
+                                show_plot= experiment_cfg.hparams.show_plot, 
                             )
                             test_summaries_to_return.append(test_summary)
                             test_summaries_to_jsonl.append(test_summary)
@@ -230,7 +228,7 @@ def run_pipeline(cfg: DictConfig) -> None:
     gc.collect()
 
     # keep plots visible until the user decides to close the program
-    if not do_not_show_plot:
+    if experiment_cfg.hparams.show_plot: 
         # uses less CPU on Windows than input() function. Note that the graph window will be frozen, but will still show graphs
         wait_for_enter("\nPipeline done. Press [enter] to continue.")
 
@@ -244,7 +242,7 @@ def analytics(
     experiment_name,
     group_by_pipeline_cycle,
     gridsearch_params=DictConfig,
-    do_not_show_plot=False,
+    show_plot=False,
 ):
     # normalise slashes in paths. This is not mandatory, but will be cleaner to debug
     log_dir = os.path.normpath(cfg.log_dir)
@@ -310,7 +308,7 @@ def analytics(
         save_path=savepath,
         title=title,
         group_by_pipeline_cycle=group_by_pipeline_cycle,
-        do_not_show_plot=do_not_show_plot,
+        show_plot=show_plot,
     )
 
     return test_summary

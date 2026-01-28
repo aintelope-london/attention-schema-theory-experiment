@@ -220,7 +220,7 @@ def plot_performance(
     save_path: Optional[str],
     title: Optional[str] = "",
     group_by_pipeline_cycle: bool = False,
-    do_not_show_plot: bool = False,
+    show_plot: bool = False,
 ):
     """
     Plot performance between rewards and scores.
@@ -292,7 +292,7 @@ def plot_performance(
     if save_path:
         save_plot(fig, save_path)
 
-    if not do_not_show_plot:
+    if show_plot:
         # enable this code if you want the plot to open automatically
         plt.ion()
         maximise_plot()
