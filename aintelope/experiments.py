@@ -580,6 +580,5 @@ def run_baseline_training(
     return num_actual_train_episodes
 
 
-# @hydra.main(version_base=None, config_path="config", config_name="config_experiment")
 if __name__ == "__main__":
     run_experiment()  # TODO: cfg, score_dimensions

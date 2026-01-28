@@ -33,9 +33,7 @@ class SavannaGridworldDemoEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
         GridworldZooParallelEnv.__init__(self, **self.super_initargs)
 
 
-def main(
-    pipeline_env_conf_name,
-):  # cannot use hydra here since it would interfere with human ui rendering
+def main(pipeline_env_conf_name):
     try:
         register_resolvers()
 

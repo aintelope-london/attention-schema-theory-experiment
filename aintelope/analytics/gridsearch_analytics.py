@@ -17,7 +17,6 @@ from collections import OrderedDict
 
 # from command_runner.elevate import elevate
 
-import hydra
 from omegaconf import DictConfig, OmegaConf
 from flatten_dict import flatten, unflatten
 from flatten_dict.reducers import make_reducer
@@ -33,12 +32,6 @@ from aintelope.config.config_utils import register_resolvers
 from aintelope.utils import wait_for_enter, try_df_to_csv_write, RobustProgressBar
 
 
-# need to specify config_path since we are in a subfolder and hydra does not automatically pay attention to current working directory. By default, hydra uses the directory of current file instead.
-@hydra.main(
-    version_base=None,
-    config_path=os.path.join(os.getcwd(), "aintelope", "config"),
-    config_name="config_experiment",
-)
 def gridsearch_analytics(cfg: DictConfig) -> None:
     # TODO: command line arguments
     gridsearch_cycle_count = 10  # max cycle count   # TODO: read from config
@@ -1102,13 +1095,6 @@ def copy_log_folder(experiment_name, source_uuid, source_base, dest_base, cfg):
     else:
         qqq = True  # for debugging
 
-    # copy hydra logs
-
-    source_hydra_log = os.path.join(source_pipeline_log, cfg.hydra_logs_root)
-    dest_hydra_log = os.path.join(dest_pipeline_log, cfg.hydra_logs_root)
-    if not os.path.exists(dest_hydra_log):
-        os.symlink(source_hydra_log, dest_hydra_log, target_is_directory=True)
-
     # copy plots
 
     source_plot = os.path.join(source_pipeline_log, "plot_" + experiment_name)
@@ -1176,8 +1162,10 @@ def copy_log_folder(experiment_name, source_uuid, source_base, dest_base, cfg):
 def main():
     register_resolvers()
 
+    cfg = OmegaConf.load(os.path.join("aintelope", "config", "config_experiment.yaml"))
+
     use_same_parameters_for_all_pipeline_experiments = False
-    gridsearch_analytics()
+    gridsearch_analytics(cfg)
 
 
 if __name__ == "__main__":

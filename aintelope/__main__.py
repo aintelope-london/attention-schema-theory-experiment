@@ -17,8 +17,6 @@ import itertools
 import subprocess
 import asyncio
 
-import hydra
-
 from aintelope.config.config_utils import (
     register_resolvers,
     select_gpu,

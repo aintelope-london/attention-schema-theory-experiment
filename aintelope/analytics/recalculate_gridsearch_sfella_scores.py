@@ -11,7 +11,6 @@ import json
 import pandas as pd
 import numpy as np
 
-import hydra
 from omegaconf import DictConfig, OmegaConf
 from flatten_dict import flatten, unflatten
 from flatten_dict.reducers import make_reducer
@@ -24,12 +23,6 @@ from aintelope.config.config_utils import register_resolvers, get_score_dimensio
 from aintelope.utils import wait_for_enter, try_df_to_csv_write, RobustProgressBar
 
 
-# need to specify config_path since we are in a subfolder and hydra does not automatically pay attention to current working directory. By default, hydra uses the directory of current file instead.
-@hydra.main(
-    version_base=None,
-    config_path=os.path.join(os.getcwd(), "aintelope", "config"),
-    config_name="config_experiment",
-)
 def recalculate_gridsearch_sfella_scores(cfg: DictConfig) -> None:
     # TODO: refactor into a shared method
     # TODO: automatically select correct gridsearch config file based on main cfg
@@ -199,5 +192,7 @@ def recalculate_gridsearch_sfella_scores(cfg: DictConfig) -> None:
 if __name__ == "__main__":
     register_resolvers()
 
+    cfg = OmegaConf.load(os.path.join("aintelope", "config", "config_experiment.yaml"))
+
     use_same_parameters_for_all_pipeline_experiments = False
-    recalculate_gridsearch_sfella_scores()
+    recalculate_gridsearch_sfella_scores(cfg)

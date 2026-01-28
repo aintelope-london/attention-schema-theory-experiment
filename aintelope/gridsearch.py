@@ -18,10 +18,6 @@ import subprocess
 import asyncio
 from collections import OrderedDict
 
-import hydra
-from hydra.core.hydra_config import HydraConfig
-from hydra.core.global_hydra import GlobalHydra
-
 from aintelope.config.config_utils import (
     register_resolvers,
     select_gpu,
@@ -51,17 +47,11 @@ def aintelope_main() -> None:
     run_pipeline()
 
 
-# hydra does not seem to support async, therefore need a separate function here
-@hydra.main(version_base=None, config_path="config", config_name="config_experiment")
-def run_gridsearch_experiments(
-    cfg,
-) -> (
-    None
-):  # cfg is unused, but needed for enabling HydraConfig.get().job.config_name in the code
-    asyncio.run(run_gridsearch_experiments_async())
+def run_gridsearch_experiments(cfg) -> None:
+    asyncio.run(run_gridsearch_experiments_async(cfg))
 
 
-async def run_gridsearch_experiments_async() -> None:
+async def run_gridsearch_experiments_async(cfg) -> None:
     use_multiprocessing = sys.gettrace() is None  # not debugging
     # use_multiprocessing = False
     if (
@@ -69,15 +59,16 @@ async def run_gridsearch_experiments_async() -> None:
     ):  # no need for multiprocessing if only one experiment is run at a time
         use_multiprocessing = False
 
-    config_name = HydraConfig.get().job.config_name
     pipeline_config_file = os.environ.get("PIPELINE_CONFIG")
     gridsearch_config_file = os.environ.get("GRIDSEARCH_CONFIG")
 
     set_console_title(
-        config_name + " : " + pipeline_config_file + " : " + gridsearch_config_file
+        cfg.hparams.params_set_title
+        + " : "
+        + pipeline_config_file
+        + " : "
+        + gridsearch_config_file
     )
-
-    GlobalHydra.instance().clear()  # needed to prevent errors in the gridsearch_pipeline.py when it also has hydra decoration
 
     # if gridsearch_config is None:
     #    gridsearch_config = "initial_config_gridsearch.yaml"
@@ -379,4 +370,7 @@ if __name__ == "__main__":  # for multiprocessing support
     if gridsearch_params_json is not None:
         run_gridsearch_experiment_subprocess(gridsearch_params_json)
     else:
-        run_gridsearch_experiments()
+        cfg = OmegaConf.load(
+            os.path.join("aintelope", "config", "config_experiment.yaml")
+        )
+        run_gridsearch_experiments(cfg)
