@@ -80,7 +80,7 @@ def run_gridsearch_experiment_cache_helper(
 @hydra.main(version_base=None, config_path="config", config_name="config_experiment")
 def run_pipeline(cfg: DictConfig) -> None:
     gridsearch_params_in = gridsearch_params_global  # TODO: hydra main does not allow multiple arguments, but probably there is a more typical way to do it
-    do_not_show_plot = gridsearch_params_in is not None
+    show_plot = gridsearch_params_in is None
 
     timestamp = str(cfg.timestamp)
     timestamp_pid_uuid = str(cfg.timestamp_pid_uuid)
@@ -337,7 +337,7 @@ def run_pipeline(cfg: DictConfig) -> None:
                                 group_by_pipeline_cycle=cfg.hparams.num_pipeline_cycles
                                 >= 1,
                                 gridsearch_params=gridsearch_params,
-                                do_not_show_plot=do_not_show_plot,
+                                show_plot=show_plot,
                             )
                             test_summaries_to_return.append(test_summary)
                             test_summaries_to_jsonl.append(test_summary)
@@ -372,7 +372,7 @@ def run_pipeline(cfg: DictConfig) -> None:
     gc.collect()
 
     # keep plots visible until the user decides to close the program
-    if not do_not_show_plot:
+    if show_plot:
         # uses less CPU on Windows than input() function. Note that the graph window will be frozen, but will still show graphs
         wait_for_enter("\nPipeline done. Press [enter] to continue.")
 

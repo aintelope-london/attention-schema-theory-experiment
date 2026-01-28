@@ -63,21 +63,21 @@ def aintelope_main(cfg: DictConfig) -> None:
     )
 
     title = timestamp + " : " + cfg.experiment_name
-    do_not_show_plot = cfg.hparams.unit_test_mode
+    show_plot = not cfg.hparams.unit_test_mode
     analytics(
         cfg,
         score_dimensions,
         title=title,
         experiment_name=cfg.experiment_name,
-        do_not_show_plot=do_not_show_plot,
+        show_plot=show_plot,
     )
 
-    if not do_not_show_plot:
+    if show_plot:
         # keep plots visible until the user decides to close the program
         wait_for_enter("Press [enter] to continue.")
 
 
-def analytics(cfg, score_dimensions, title, experiment_name, do_not_show_plot=False):
+def analytics(cfg, score_dimensions, title, experiment_name, show_plot=True):
     # normalise slashes in paths. This is not mandatory, but will be cleaner to debug
     log_dir = os.path.normpath(cfg.log_dir)
     events_fname = cfg.events_fname
@@ -98,7 +98,7 @@ def analytics(cfg, score_dimensions, title, experiment_name, do_not_show_plot=Fa
         save_path=savepath,
         title=title,
         group_by_pipeline_cycle=False,
-        do_not_show_plot=do_not_show_plot,
+        show_plot=show_plot,
     )
 
 
