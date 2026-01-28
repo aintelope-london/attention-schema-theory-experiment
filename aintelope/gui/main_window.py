@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any, Optional
 from omegaconf import DictConfig, OmegaConf
 
-from gui.ui_schema_manager import load_ui_schema, get_field_spec
-from gui.widgets import create_widget, get_range_display
+from aintelope.gui.ui_schema_manager import load_ui_schema, get_field_spec
+from aintelope.gui.widgets import create_widget, get_range_display
 
 CONFIG_DIR = Path("aintelope") / "config"
 

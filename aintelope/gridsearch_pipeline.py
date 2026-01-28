@@ -77,7 +77,6 @@ def run_gridsearch_experiment_cache_helper(
 
 
 def run_pipeline(cfg: DictConfig) -> None:
-
     gridsearch_params_in = gridsearch_params_global  # TODO: hydra main does not allow multiple arguments, but probably there is a more typical way to do it
     show_plot = gridsearch_params_in is None
 
