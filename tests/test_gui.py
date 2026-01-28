@@ -12,8 +12,8 @@ import tkinter as tk
 
 import pytest
 
-from gui.ui_schema_manager import load_ui_schema, get_field_spec
-from gui.widgets import create_widget, get_range_display
+from aintelope.gui.ui_schema_manager import load_ui_schema, get_field_spec
+from aintelope.gui.widgets import create_widget, get_range_display
 
 
 # =============================================================================
@@ -110,7 +110,7 @@ class TestCreateWidget:
         """Bool spec returns Frame (custom checkbox container)."""
         parent = tk.Frame(tk_root)
         spec = [None, "bool"]
-        widget = create_widget(parent, "test_bool", True, spec, lambda v: None)
+        widget, refresh = create_widget(parent, "test_bool", True, spec, lambda v: None)
         assert isinstance(widget, tk.Frame)
 
     def test_string_choices_returns_combobox(self, tk_root):
@@ -119,27 +119,29 @@ class TestCreateWidget:
 
         parent = tk.Frame(tk_root)
         spec = [["option_a", "option_b"], "str"]
-        widget = create_widget(parent, "test_choices", "option_a", spec, lambda v: None)
+        widget, refresh = create_widget(
+            parent, "test_choices", "option_a", spec, lambda v: None
+        )
         assert isinstance(widget, ttk.Combobox)
 
     def test_int_range_returns_frame(self, tk_root):
         """Int range spec returns Frame (custom spinbox container)."""
         parent = tk.Frame(tk_root)
         spec = [[0, 100], "int"]
-        widget = create_widget(parent, "test_int", 50, spec, lambda v: None)
+        widget, refresh = create_widget(parent, "test_int", 50, spec, lambda v: None)
         assert isinstance(widget, tk.Frame)
 
     def test_float_range_returns_frame(self, tk_root):
         """Float range spec returns Frame (custom spinbox container)."""
         parent = tk.Frame(tk_root)
         spec = [[0.0, 1.0], "float"]
-        widget = create_widget(parent, "test_float", 0.5, spec, lambda v: None)
+        widget, refresh = create_widget(parent, "test_float", 0.5, spec, lambda v: None)
         assert isinstance(widget, tk.Frame)
 
     def test_no_spec_returns_entry(self, tk_root):
         """No spec (None) returns Entry as default."""
         parent = tk.Frame(tk_root)
-        widget = create_widget(
+        widget, refresh = create_widget(
             parent, "test_default", "some text", None, lambda v: None
         )
         assert isinstance(widget, tk.Entry)

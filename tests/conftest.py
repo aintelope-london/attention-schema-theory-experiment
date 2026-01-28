@@ -16,6 +16,7 @@ from aintelope.config.config_utils import register_resolvers
 
 register_resolvers()
 
+
 def constants() -> DictConfig:
     constants_dict = {
         "PROJECT": "aintelope",
