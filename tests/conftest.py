@@ -25,10 +25,9 @@ def constants() -> DictConfig:
 
 
 @pytest.fixture
-
 def base_test_config() -> Union[DictConfig, ListConfig]:
     """Base test configuration built on config_experiment.yaml.
-    
+
     Loads full config to satisfy external env dependencies,
     then overrides for fast test execution.
     """
@@ -45,16 +44,17 @@ def base_test_config() -> Union[DictConfig, ListConfig]:
 
     return full_params
 
+
 @pytest.fixture
 def dqn_learning_config(base_test_config) -> Union[DictConfig, ListConfig]:
     """Config for baseline ML learning tests (DQN).
-    
+
     Extends base_test_config with settings suitable for
     verifying that learning actually occurs.
     """
     config = base_test_config.copy()
-    
-    config.hparams.num_episodes = 50 
+
+    config.hparams.num_episodes = 50
     config.hparams.env_params.num_iters = 100
-    
+
     return config

@@ -5,6 +5,20 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "GUI",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "aintelope/pipeline.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "showUncaughtExceptions": true,
+            "args": [ "--gui" ],
+            "env": {
+                "PIPELINE_CONFIG": "config_pipeline.yaml",
+                "PYTHONPATH": "/home/joel/project/attention-schema-theory-experiments"
+            }
+        },
+        {
             "name": "Python: Current File",
             "type": "debugpy",
             "request": "launch",

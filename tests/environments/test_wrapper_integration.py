@@ -24,6 +24,7 @@ from aintelope.environments.savanna_safetygrid import (
 # REWARD SCALARIZATION
 # =============================================================================
 
+
 def test_reward_dict_parallel(base_test_config):
     """scalarize_rewards=False returns dict reward."""
     overrides = {"scalarize_rewards": False}
@@ -89,6 +90,7 @@ def test_reward_scalar_sequential(base_test_config):
 # =============================================================================
 # OBSERVATION COMBINATION
 # =============================================================================
+
 
 def test_obs_tuple_parallel(base_test_config):
     """combine_interoception_and_vision=False returns (vision, interoception) tuple."""
@@ -156,13 +158,14 @@ def test_obs_array_sequential(base_test_config):
 # INTEROCEPTION LENGTH
 # =============================================================================
 
+
 def test_interoception_length(base_test_config):
     """
     Interoception vector has expected length.
-    
+
     TODO: Currently checks trivial case (length > 0). When config properly
     defines interoception modalities list, this should verify:
-        len(interoception) == len(config.interoception_modalities) 
+        len(interoception) == len(config.interoception_modalities)
     """
     overrides = {"combine_interoception_and_vision": False}
     env_params = dict(base_test_config.hparams.env_params)
