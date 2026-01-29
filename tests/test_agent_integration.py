@@ -12,6 +12,31 @@ def test_agent_completes_pipeline():
     sys.argv = sys.argv[:1]
     aintelope_main()
 
+def test_agent_learns(base_test_config):
+    """Learning agent achieves reward threshold on simple gridworld."""
+    from omegaconf import OmegaConf
+    from aintelope.analytics.analytics import assert_learning_threshold
+    from aintelope.pipeline import run_pipeline
+
+    cfg = base_test_config
+
+    # Minimal learning scenario overrides
+    learning_overrides = {
+        "hparams": {
+            "agent_class": "sb3_ppo",
+            "num_episodes": 50,
+            "env_params": {
+                "map_max": 5,
+                "num_iters": 10,
+            },
+        }
+    }
+    cfg = OmegaConf.merge(cfg, OmegaConf.create(learning_overrides))
+
+    test_summaries = run_pipeline(cfg)
+
+    REWARD_THRESHOLD = 5.0  # TODO: derive analytically
+    assert_learning_threshold(test_summaries[0], REWARD_THRESHOLD)
 
 if __name__ == "__main__":  # and os.name == "nt":
     pytest.main([__file__])  # run tests only in this file
