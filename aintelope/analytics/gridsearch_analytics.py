@@ -1162,7 +1162,7 @@ def copy_log_folder(experiment_name, source_uuid, source_base, dest_base, cfg):
 def main():
     register_resolvers()
 
-    cfg = OmegaConf.load(os.path.join("aintelope", "config", "config_experiment.yaml"))
+    cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
 
     use_same_parameters_for_all_pipeline_experiments = False
     gridsearch_analytics(cfg)

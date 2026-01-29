@@ -321,7 +321,7 @@ def analytics(
 
 def aintelope_main() -> None:
     # return run_gridsearch_experiment(gridsearch_params=None)    # TODO: caching support
-    cfg = OmegaConf.load(os.path.join("aintelope", "config", "config_experiment.yaml"))
+    cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
     run_pipeline(cfg)
 
 

@@ -192,7 +192,7 @@ def recalculate_gridsearch_sfella_scores(cfg: DictConfig) -> None:
 if __name__ == "__main__":
     register_resolvers()
 
-    cfg = OmegaConf.load(os.path.join("aintelope", "config", "config_experiment.yaml"))
+    cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
 
     use_same_parameters_for_all_pipeline_experiments = False
     recalculate_gridsearch_sfella_scores(cfg)

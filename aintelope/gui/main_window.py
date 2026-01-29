@@ -61,7 +61,7 @@ class ConfigGUI:
 
         ttk.Label(top_frame, text="Config:").pack(side=tk.LEFT, padx=5)
 
-        self.config_var = tk.StringVar(value="config_experiment.yaml")
+        self.config_var = tk.StringVar(value="default_config.yaml")
         config_combo = ttk.Combobox(top_frame, textvariable=self.config_var, width=40)
         config_combo["values"] = self._list_configs()
         config_combo.pack(side=tk.LEFT, padx=5)
@@ -284,7 +284,7 @@ def run_gui(default_cfg: DictConfig) -> Optional[DictConfig]:
     Launch GUI for creating/editing config.
 
     Args:
-        default_cfg: Base config from Hydra (config_experiment.yaml)
+        default_cfg: Base config from Hydra (default_config.yaml)
 
     Returns:
         DictConfig: Diff config to merge with default
