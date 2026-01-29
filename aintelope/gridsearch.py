@@ -370,7 +370,5 @@ if __name__ == "__main__":  # for multiprocessing support
     if gridsearch_params_json is not None:
         run_gridsearch_experiment_subprocess(gridsearch_params_json)
     else:
-        cfg = OmegaConf.load(
-            os.path.join("aintelope", "config", "config_experiment.yaml")
-        )
+        cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
         run_gridsearch_experiments(cfg)

@@ -30,6 +30,8 @@ def ui_schema():
 @pytest.fixture(scope="module")
 def tk_root():
     """Create hidden Tk root for widget tests."""
+    if not os.environ.get("DISPLAY") and os.name != "nt":
+        pytest.skip("No display available")
     root = tk.Tk()
     root.withdraw()
     yield root

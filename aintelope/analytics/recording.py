@@ -33,7 +33,7 @@ from aintelope.utils import try_df_to_csv_write
 logger = logging.getLogger("aintelope.analytics.recording")
 
 """
-Uses config_experiment.yaml's fields:
+Uses default_config.yaml's fields:
 experiment_dir: ${log_dir_root}/${timestamp}/${experiment_name}
 events_dir: events.csv
 checkpoint_dir: checkpoints/
@@ -42,7 +42,7 @@ HOWTO:
 One test_conf will form one folder in outputs, that contains 
 1..n different runs for pipeline
 n agents.
-You need to change the agent params in the main config_experiment
+You need to change the agent params in the main default_config
 and run the same again in order to have a comparison point.
 """
 
