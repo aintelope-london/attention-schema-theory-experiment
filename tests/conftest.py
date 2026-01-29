@@ -27,13 +27,13 @@ def constants() -> DictConfig:
 
 @pytest.fixture
 def base_test_config() -> Union[DictConfig, ListConfig]:
-    """Base test configuration built on config_experiment.yaml.
+    """Base test configuration built on default_config.yaml.
 
     Loads full config to satisfy external env dependencies,
     then overrides for fast test execution.
     """
     full_params = OmegaConf.load(
-        os.path.join("aintelope", "config", "config_experiment.yaml")
+        os.path.join("aintelope", "config", "default_config.yaml")
     )
 
     full_params.hparams.unit_test_mode = True

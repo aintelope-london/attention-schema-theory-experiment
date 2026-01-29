@@ -1,7 +1,7 @@
 ## Test Fixtures (conftest.py)
 
 ### `base_test_config`
-Loads `config_experiment.yaml` and applies minimal overrides for fast test execution.
+Loads `default_config.yaml` and applies minimal overrides for fast test execution.
 
 **Why not hardcoded?** The external `ai_safety_gridworlds` environment expects certain parameters (e.g., `warm_start_steps`) to exist. Using the full config as a base avoids duplicating legacy params across test files.
 

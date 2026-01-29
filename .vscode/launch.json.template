@@ -41,7 +41,7 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "showUncaughtExceptions": true,
-            "args": [ "--config-name=config_experiment_random" ],
+            "args": [ "--config-name=default_config_random" ],
             "env": {
                 "PIPELINE_CONFIG": "config_pipeline.yaml"
                 //"PYTHONPATH": "your_path_here"

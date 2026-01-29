@@ -99,7 +99,7 @@ def remove_trials_from_results(cfg: DictConfig) -> None:
 if __name__ == "__main__":
     register_resolvers()
 
-    cfg = OmegaConf.load(os.path.join("aintelope", "config", "config_experiment.yaml"))
+    cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
 
     use_same_parameters_for_all_pipeline_experiments = False
     remove_trials_from_results(cfg)
