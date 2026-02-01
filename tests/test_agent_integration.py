@@ -3,20 +3,18 @@
 import sys
 import os
 import pytest
-from aintelope.pipeline import aintelope_main
+from aintelope.pipeline import run_pipeline
+from omegaconf import OmegaConf
+from aintelope.analytics.analytics import assert_learning_threshold
+from aintelope.pipeline import run_pipeline
 
 
-'''def test_agent_completes_pipeline():
+def test_agent_completes_pipeline():
     """Agent runs full train + test cycle without errors."""
-    os.environ["PIPELINE_CONFIG"] = "config_tests.yaml"
-    sys.argv = sys.argv[:1]
-    aintelope_main()
-'''
+    run_pipeline("config_tests.yaml")
+
 def test_agent_learns(cfg):
     """Learning agent achieves reward threshold on simple gridworld."""
-    from omegaconf import OmegaConf
-    from aintelope.analytics.analytics import assert_learning_threshold
-    from aintelope.pipeline import run_pipeline
 
     # Minimal learning scenario overrides
     learning_overrides = {

@@ -32,12 +32,6 @@ from aintelope.pipeline import run_pipeline
 
 # logger = logging.getLogger("aintelope.__main__")
 
-
-def aintelope_main() -> None:
-    # return run_gridsearch_experiment(gridsearch_params=None)    # TODO: caching support
-    run_pipeline()
-
-
 if __name__ == "__main__":
     register_resolvers()
 
@@ -64,4 +58,5 @@ if __name__ == "__main__":
             run_gridsearch_experiments()
         )  # TODO: use separate python file for starting gridsearch
     else:
-        aintelope_main()
+        config_file = sys.argv[1]
+        run_pipeline(config_file)

@@ -51,11 +51,8 @@ worker_count_multiplier = 1  # when running pipeline search, then having more wo
 num_workers = max(1, gpu_count) * worker_count_multiplier
 
 
-def aintelope_main() -> None:
-    run_pipeline()
-
-
-def run_pipeline(cfg: DictConfig) -> None:
+def run_pipeline(pipeline_cfg_file: str) -> None:
+    cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
     timestamp = str(cfg.timestamp)
     timestamp_pid_uuid = str(cfg.timestamp_pid_uuid)
     logger.info(f"timestamp: {timestamp}")
@@ -67,11 +64,8 @@ def run_pipeline(cfg: DictConfig) -> None:
             print("GUI cancelled.")
             return []
     else:
-        pipeline_config_file = (
-            os.environ.get("PIPELINE_CONFIG") or "config_pipeline.yaml"
-        )
         pipeline_config = OmegaConf.load(
-            os.path.join("aintelope", "config", pipeline_config_file)
+            os.path.join("aintelope", "config", pipeline_cfg_file)
         )
 
     set_console_title(cfg.hparams.params_set_title + " : " + timestamp_pid_uuid)
@@ -319,12 +313,6 @@ def analytics(
     return test_summary
 
 
-def aintelope_main() -> None:
-    # return run_gridsearch_experiment(gridsearch_params=None)    # TODO: caching support
-    cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
-    run_pipeline(cfg)
-
-
 if __name__ == "__main__":  # for multiprocessing support
     register_resolvers()
 
@@ -338,4 +326,5 @@ if __name__ == "__main__":  # for multiprocessing support
     # Need to choose GPU early before torch fully starts up. Else there may be CUDA errors later.
     select_gpu()
 
-    aintelope_main()
+    config_file = sys.argv[1]
+    run_pipeline(config_file)
