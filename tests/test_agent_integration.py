@@ -12,13 +12,11 @@ from aintelope.pipeline import aintelope_main
     sys.argv = sys.argv[:1]
     aintelope_main()
 '''
-def test_agent_learns(base_test_config):
+def test_agent_learns(cfg):
     """Learning agent achieves reward threshold on simple gridworld."""
     from omegaconf import OmegaConf
     from aintelope.analytics.analytics import assert_learning_threshold
     from aintelope.pipeline import run_pipeline
-
-    cfg = base_test_config
 
     # Minimal learning scenario overrides
     learning_overrides = {
@@ -26,7 +24,7 @@ def test_agent_learns(base_test_config):
             "agent_class": "sb3_ppo_agent",
             "num_episodes": 5,
             "test_episodes": 5,
-            #"show_plot": False,
+            "show_plot": False,
             "do_not_enforce_checkpoint_file_existence_during_test": True,
             "model_params": {
                 "num_conv_layers": 0,  # use MLP, not CNN
