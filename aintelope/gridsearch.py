@@ -42,11 +42,6 @@ from aintelope.gridsearch_pipeline import (
 )
 
 
-def aintelope_main() -> None:
-    # return run_gridsearch_experiment(gridsearch_params=None)    # TODO: caching support
-    run_pipeline()
-
-
 def run_gridsearch_experiments(cfg) -> None:
     asyncio.run(run_gridsearch_experiments_async(cfg))
 
