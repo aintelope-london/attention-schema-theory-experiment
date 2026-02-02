@@ -26,36 +26,42 @@ def constants() -> DictConfig:
 
 
 @pytest.fixture
-def base_test_config() -> Union[DictConfig, ListConfig]:
-    """Base test configuration built on default_config.yaml.
-
-    Loads full config to satisfy external env dependencies,
-    then overrides for fast test execution.
+def base_test_config():
+    """Minimal hparams diff for fast test execution.
+    Merged over default_config.yaml by run_experiments().
     """
-    full_params = OmegaConf.load(
-        os.path.join("aintelope", "config", "default_config.yaml")
+    return OmegaConf.create(
+        {
+            "unit_test_mode": True,
+            "num_episodes": 1,
+            "show_plot": False,
+            "env_params": {
+                "num_iters": 10,
+                "map_max": 5,
+            },
+        }
     )
-
-    full_params.hparams.unit_test_mode = True
-    full_params.hparams.num_episodes = min(5, full_params.hparams.num_episodes)
-    full_params.hparams.env_params.num_iters = min(
-        50, full_params.hparams.env_params.num_iters
-    )
-    full_params.hparams.warm_start_steps = min(10, full_params.hparams.warm_start_steps)
-
-    return full_params
 
 
 @pytest.fixture
-def dqn_learning_config(base_test_config) -> Union[DictConfig, ListConfig]:
-    """Config for baseline ML learning tests (DQN).
+def base_env_params(base_test_config):
+    """Flat env_params dict for tests that construct environments directly."""
+    return dict(base_test_config.env_params)
 
-    Extends base_test_config with settings suitable for
-    verifying that learning actually occurs.
-    """
-    config = base_test_config.copy()
 
-    config.hparams.num_episodes = 50
-    config.hparams.env_params.num_iters = 100
+@pytest.fixture
+def learning_config(base_test_config):
+    """Longer runs for verifying that agent actually learns."""
+    return OmegaConf.merge(
+        base_test_config,
+        {
+            "num_episodes": 50,
+            "test_episodes": 30,
+            "env_params": {"num_iters": 100},
+        },
+    )
 
-    return config
+
+def as_pipeline(config, experiment_name="test_experiment"):
+    """Wrap a flat hparams diff into pipeline shape for run()."""
+    return OmegaConf.create({experiment_name: config})
