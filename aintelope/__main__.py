@@ -6,16 +6,10 @@
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
 import os
-import copy
-import logging
 import sys
-import torch
-import gc
-import time
-import json
-import itertools
-import subprocess
-import asyncio
+from typing import Union
+
+from omegaconf import DictConfig, OmegaConf
 
 from aintelope.config.config_utils import (
     register_resolvers,
@@ -23,40 +17,61 @@ from aintelope.config.config_utils import (
     set_memory_limits,
     set_priorities,
 )
-from aintelope.gridsearch import (
-    run_gridsearch_experiments,
-    run_gridsearch_experiment_subprocess,
-)
-from aintelope.pipeline import run_pipeline
+from aintelope.pipeline import run_experiments
 
 
-# logger = logging.getLogger("aintelope.__main__")
+def run(config: Union[str, DictConfig] = "config_experiment.yaml", gui: bool = False):
+    """Single entrypoint for the whole project.
 
-if __name__ == "__main__":
+    Args:
+        config: Either a filename (relative to aintelope/config/) or a DictConfig.
+        gui: If True, launch GUI for pipeline configuration.
+
+    Usage:
+        python -m aintelope --gui
+        python -m aintelope custom_config.yaml
+        In tests: run(my_dictconfig)
+    """
     register_resolvers()
 
-    if (
-        sys.gettrace() is None
-    ):  # do not set low priority while debugging. Note that unit tests also set sys.gettrace() to not-None
+    # Do not set low priority while debugging.
+    # Unit tests also set sys.gettrace() to not-None.
+    if sys.gettrace() is None:
         set_priorities()
 
     set_memory_limits()
 
-    # Need to choose GPU early before torch fully starts up. Else there may be CUDA errors later.
+    # Need to choose GPU early before torch fully starts up.
     select_gpu()
 
-    gridsearch_params_json = os.environ.get(
-        "GRIDSEARCH_PARAMS"
-    )  # used by gridsearch subprocess
-    gridsearch_config_file = os.environ.get(
-        "GRIDSEARCH_CONFIG"
-    )  # used by main/parent gridsearch process
-    if gridsearch_params_json is not None:
-        run_gridsearch_experiment_subprocess(gridsearch_params_json)
-    elif gridsearch_config_file is not None:
-        asyncio.run(
-            run_gridsearch_experiments()
-        )  # TODO: use separate python file for starting gridsearch
-    else:
-        config_file = sys.argv[1]
-        run_pipeline(config_file)
+    if isinstance(config, str):
+        config = OmegaConf.load(os.path.join("aintelope", "config", config))
+
+    if gui:
+        from aintelope.gui.main_window import run_gui
+
+        config = run_gui(config)
+        if config is None:
+            print("GUI cancelled.")
+            return
+
+    run_experiments(config)
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="aintelope")
+    parser.add_argument(
+        "config",
+        nargs="?",
+        default="default_config.yaml",
+        help="Config filename in aintelope/config/",
+    )
+    parser.add_argument(
+        "--gui",
+        action="store_true",
+        help="Launch GUI for pipeline configuration",
+    )
+    args = parser.parse_args()
+    run(args.config, gui=args.gui)
