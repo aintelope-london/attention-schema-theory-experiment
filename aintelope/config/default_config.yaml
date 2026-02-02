@@ -17,13 +17,13 @@ experiment_dir: ${log_dir}/${experiment_name}/
 tensorboard_dir: ${experiment_dir}/tensorboard/
 
 trainer_params:
-  num_workers: 4        # unused        # TODO
+  num_workers: 1        # unused        # TODO
   checkpoint: ${log_dir}/checkpoints/
   device: gpu        # unused        # TODO
   verbose: false
 
 hparams:
-  show_plot: True
+  show_plot: False
   gridsearch_trial_no: 0        # is set by gridsearch config file
   params_set_title: "main config"
   do_not_enforce_checkpoint_file_existence_during_test: False
@@ -54,7 +54,7 @@ hparams:
   env_layout_seed_repeat_sequence_length: -1 # 10
   env_layout_seed_modulo: 0   # How many different layout seeds there should be overall? After given amount of seeds has been used, the seed will loop over to zero and repeat the seed sequence. Zero or negative modulo parameter value disables the modulo feature.
   num_pipeline_cycles: 0
-  num_episodes: 30 # how long to train. # TODO: move num_episodes to model_params
+  num_episodes: 10 # how long to train. # TODO: move num_episodes to model_params
   test_episodes: 10 # will be added to train episodes
   env_params:
     combine_interoception_and_vision: False  # needs to be set to True for OpenAI baselines learning algorithms
@@ -62,10 +62,10 @@ hparams:
     interoception_embedding_gaussian_centers: [-32, -16, -8, -4, -2, -1, 0, 1, 2, 4]   # used only when interoception_transformation_mode is 3 or 4
     interoception_embedding_gaussian_scales: [32, 16, 8, 4, 2, 1, 1, 1, 2, 4]   # used only when interoception_transformation_mode is 3 or 4
     scalarize_rewards: False
-    num_iters: 400 # duration of a single episode
+    num_iters: 50 # duration of a single episode
     env_experiment: ai_safety_gridworlds.aintelope_savanna
     level: 0
-    map_max: 7     
+    map_max: 5     
     map_width: ${hparams.env_params.map_max}   # NB! here it is exclusive max, used for Gridworld environments. Also, this width includes the walls at the border of the game, so 2 units of walls. Therefore, interior is map_width - 2.
     map_height: ${hparams.env_params.map_max}   # NB! here it is exclusive max, used for Gridworld environments. Also, this width includes the walls at the border of the game, so 2 units of walls. Therefore, interior is map_height - 2.
     #

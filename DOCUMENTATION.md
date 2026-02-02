@@ -11,7 +11,5 @@ Loads `default_config.yaml` and applies minimal overrides for fast test executio
 - `num_iters` capped at 50
 - `warm_start_steps` capped at 10
 
-### `dqn_learning_config`
-Extends `base_test_config` for ML learning verification tests. Uses slightly longer runs (50 episodes, 100 iters) to allow measurable learning signal.
 
 **Future:** Agent-specific fixtures (e.g., model-based agents) should live in their respective test files, not here.
