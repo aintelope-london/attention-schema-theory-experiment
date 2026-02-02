@@ -1,17 +1,16 @@
 """Integration test: agent completes full pipeline without errors."""
 
-import sys
-import os
 import pytest
 
 from omegaconf import OmegaConf
 from aintelope.analytics.analytics import assert_learning_threshold
 from aintelope.__main__ import run
+from tests.conftest import as_pipeline
 
 
-def test_agent_completes_pipeline():
+def test_agent_completes_pipeline(learning_config):
     """Agent runs full train + test cycle without errors."""
-    run("config_tests.yaml")
+    run(as_pipeline(learning_config))
 
 def test_agent_learns(base_test_config):
     """Learning agent achieves reward threshold on simple gridworld."""
@@ -42,4 +41,4 @@ def test_agent_learns(base_test_config):
     assert_learning_threshold(test_summaries[0], REWARD_THRESHOLD)
 
 if __name__ == "__main__":  # and os.name == "nt":
-    pytest.main([__file__])  # run tests only in this file
+    pytest.main([__file__])

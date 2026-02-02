@@ -25,11 +25,9 @@ from aintelope.environments.savanna_safetygrid import (
 # =============================================================================
 
 
-def test_reward_dict_parallel(base_test_config):
+def test_reward_dict_parallel(base_env_params):
     """scalarize_rewards=False returns dict reward."""
-    overrides = {"scalarize_rewards": False}
-    env_params = dict(base_test_config.hparams.env_params)
-    env_params.update(overrides)
+    env_params = {**base_env_params, "scalarize_rewards": False}
 
     env = SavannaGridworldParallelEnv(env_params=env_params)
     obs, _ = env.reset()
@@ -40,11 +38,9 @@ def test_reward_dict_parallel(base_test_config):
     assert isinstance(rewards[agent], dict)
 
 
-def test_reward_dict_sequential(base_test_config):
+def test_reward_dict_sequential(base_env_params):
     """scalarize_rewards=False returns dict reward."""
-    overrides = {"scalarize_rewards": False}
-    env_params = dict(base_test_config.hparams.env_params)
-    env_params.update(overrides)
+    env_params = {**base_env_params, "scalarize_rewards": False}
 
     env = SavannaGridworldSequentialEnv(env_params=env_params)
     env.reset()
@@ -56,11 +52,9 @@ def test_reward_dict_sequential(base_test_config):
     assert isinstance(reward, dict)
 
 
-def test_reward_scalar_parallel(base_test_config):
+def test_reward_scalar_parallel(base_env_params):
     """scalarize_rewards=True returns numeric reward."""
-    overrides = {"scalarize_rewards": True}
-    env_params = dict(base_test_config.hparams.env_params)
-    env_params.update(overrides)
+    env_params = {**base_env_params, "scalarize_rewards": True}
 
     env = SavannaGridworldParallelEnv(env_params=env_params)
     obs, _ = env.reset()
@@ -71,11 +65,9 @@ def test_reward_scalar_parallel(base_test_config):
     assert isinstance(rewards[agent], (int, float, np.number))
 
 
-def test_reward_scalar_sequential(base_test_config):
+def test_reward_scalar_sequential(base_env_params):
     """scalarize_rewards=True returns numeric reward."""
-    overrides = {"scalarize_rewards": True}
-    env_params = dict(base_test_config.hparams.env_params)
-    env_params.update(overrides)
+    env_params = {**base_env_params, "scalarize_rewards": True}
 
     env = SavannaGridworldSequentialEnv(env_params=env_params)
     env.reset()
@@ -92,11 +84,9 @@ def test_reward_scalar_sequential(base_test_config):
 # =============================================================================
 
 
-def test_obs_tuple_parallel(base_test_config):
+def test_obs_tuple_parallel(base_env_params):
     """combine_interoception_and_vision=False returns (vision, interoception) tuple."""
-    overrides = {"combine_interoception_and_vision": False}
-    env_params = dict(base_test_config.hparams.env_params)
-    env_params.update(overrides)
+    env_params = {**base_env_params, "combine_interoception_and_vision": False}
 
     env = SavannaGridworldParallelEnv(env_params=env_params)
     obs, _ = env.reset()
@@ -108,11 +98,9 @@ def test_obs_tuple_parallel(base_test_config):
     assert isinstance(obs[agent][1], np.ndarray)
 
 
-def test_obs_tuple_sequential(base_test_config):
+def test_obs_tuple_sequential(base_env_params):
     """combine_interoception_and_vision=False returns (vision, interoception) tuple."""
-    overrides = {"combine_interoception_and_vision": False}
-    env_params = dict(base_test_config.hparams.env_params)
-    env_params.update(overrides)
+    env_params = {**base_env_params, "combine_interoception_and_vision": False}
 
     env = SavannaGridworldSequentialEnv(env_params=env_params)
     env.reset()
@@ -125,11 +113,9 @@ def test_obs_tuple_sequential(base_test_config):
     assert isinstance(obs[1], np.ndarray)
 
 
-def test_obs_array_parallel(base_test_config):
+def test_obs_array_parallel(base_env_params):
     """combine_interoception_and_vision=True returns single array."""
-    overrides = {"combine_interoception_and_vision": True}
-    env_params = dict(base_test_config.hparams.env_params)
-    env_params.update(overrides)
+    env_params = {**base_env_params, "combine_interoception_and_vision": True}
 
     env = SavannaGridworldParallelEnv(env_params=env_params)
     obs, _ = env.reset()
@@ -139,11 +125,9 @@ def test_obs_array_parallel(base_test_config):
     assert not isinstance(obs[agent], tuple)
 
 
-def test_obs_array_sequential(base_test_config):
+def test_obs_array_sequential(base_env_params):
     """combine_interoception_and_vision=True returns single array."""
-    overrides = {"combine_interoception_and_vision": True}
-    env_params = dict(base_test_config.hparams.env_params)
-    env_params.update(overrides)
+    env_params = {**base_env_params, "combine_interoception_and_vision": True}
 
     env = SavannaGridworldSequentialEnv(env_params=env_params)
     env.reset()
@@ -159,7 +143,7 @@ def test_obs_array_sequential(base_test_config):
 # =============================================================================
 
 
-def test_interoception_length(base_test_config):
+def test_interoception_length(base_env_params):
     """
     Interoception vector has expected length.
 
@@ -167,9 +151,7 @@ def test_interoception_length(base_test_config):
     defines interoception modalities list, this should verify:
         len(interoception) == len(config.interoception_modalities)
     """
-    overrides = {"combine_interoception_and_vision": False}
-    env_params = dict(base_test_config.hparams.env_params)
-    env_params.update(overrides)
+    env_params = {**base_env_params, "combine_interoception_and_vision": False}
 
     env = SavannaGridworldParallelEnv(env_params=env_params)
     obs, _ = env.reset()
