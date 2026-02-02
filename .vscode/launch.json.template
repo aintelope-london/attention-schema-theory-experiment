@@ -8,14 +8,14 @@
             "name": "GUI",
             "type": "debugpy",
             "request": "launch",
-            "program": "aintelope/pipeline.py",
+            //"program": "aintelope/pipeline.py",
+            "module": "aintelope",
             "console": "integratedTerminal",
             "justMyCode": false,
             "showUncaughtExceptions": true,
             "args": [ "--gui" ],
             "env": {
-                "PIPELINE_CONFIG": "config_pipeline.yaml",
-                "PYTHONPATH": "/home/joel/project/attention-schema-theory-experiments"
+                //"PYTHONPATH": "your_path_here"
             }
         },
         {
@@ -37,13 +37,13 @@
             "name": "Python: Run pipeline with random agent and default params",
             "type": "debugpy",
             "request": "launch",
-            "program": "aintelope/pipeline.py",
+            //"program": "aintelope/pipeline.py",
+            "module": "aintelope",
             "console": "integratedTerminal",
             "justMyCode": false,
             "showUncaughtExceptions": true,
             "args": [ "--config-name=default_config_random" ],
             "env": {
-                "PIPELINE_CONFIG": "config_pipeline.yaml"
                 //"PYTHONPATH": "your_path_here"
             }
         },
