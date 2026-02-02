@@ -3,15 +3,15 @@
 import sys
 import os
 import pytest
-from aintelope.pipeline import run_pipeline
+
 from omegaconf import OmegaConf
 from aintelope.analytics.analytics import assert_learning_threshold
-from aintelope.pipeline import run_pipeline
+from aintelope.__main__ import run
 
 
 def test_agent_completes_pipeline():
     """Agent runs full train + test cycle without errors."""
-    run_pipeline("config_tests.yaml")
+    run("config_tests.yaml")
 
 def test_agent_learns(cfg):
     """Learning agent achieves reward threshold on simple gridworld."""

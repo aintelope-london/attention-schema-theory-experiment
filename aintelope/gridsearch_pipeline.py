@@ -53,7 +53,7 @@ cache = Cache(cache_folder)
 gridsearch_params_global = None
 
 
-# this method is used by grid search, but it needs to be in same file as run_pipeline, else sharing the gridsearch_params_global would not work
+# this method is used by grid search, but it needs to be in same file as run_experiments, else sharing the gridsearch_params_global would not work
 # TODO: auto-detect need for cache update then pipeline has different configuration
 # @cache.memoize(    # TODO: disable this for the duration of evals since then the gridsearch parameters are nulls
 #    ignore={"gridsearch_params"},
@@ -67,11 +67,11 @@ def run_gridsearch_experiment_cache_helper(
     # cfg.timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")    # TODO: re-parse date format from config file
 
     gridsearch_params_global = gridsearch_params
-    test_summaries = run_pipeline()
+    test_summaries = run_experiments()
     return test_summaries  # this result will be cached
 
 
-def run_pipeline(cfg: DictConfig) -> None:
+def run_experiments(cfg: DictConfig) -> None:
     gridsearch_params_in = gridsearch_params_global  # TODO: hydra main does not allow multiple arguments, but probably there is a more typical way to do it
     show_plot = gridsearch_params_in is None
 
