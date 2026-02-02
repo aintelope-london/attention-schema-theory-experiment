@@ -11,11 +11,7 @@ import logging
 import sys
 import torch
 import gc
-import time
 import json
-import itertools
-import subprocess
-import asyncio
 
 from omegaconf import DictConfig, OmegaConf
 from flatten_dict import flatten
@@ -27,17 +23,10 @@ from diskcache import Cache
 from filelock import FileLock
 
 from aintelope.utils import RobustProgressBar, Semaphore, wait_for_enter
-from aintelope.gui.main_window import run_gui
-from matplotlib import pyplot as plt
 
 from aintelope.analytics import plotting, recording
 from aintelope.config.config_utils import (
-    register_resolvers,
-    select_gpu,
-    set_memory_limits,
-    set_priorities,
     archive_code,
-    get_pipeline_score_dimensions,
     get_score_dimensions,
     set_console_title,
 )
@@ -51,22 +40,15 @@ worker_count_multiplier = 1  # when running pipeline search, then having more wo
 num_workers = max(1, gpu_count) * worker_count_multiplier
 
 
-def run_pipeline(pipeline_cfg_file: str) -> None:
+def run_experiments(pipeline_config):
+    """
+    extra_cfg: filename, DictConfig or nothing
+    """
     cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
     timestamp = str(cfg.timestamp)
     timestamp_pid_uuid = str(cfg.timestamp_pid_uuid)
     logger.info(f"timestamp: {timestamp}")
     logger.info(f"timestamp_pid_uuid: {timestamp_pid_uuid}")
-
-    if "--gui" in sys.argv:
-        pipeline_config = run_gui(cfg)
-        if pipeline_config is None:
-            print("GUI cancelled.")
-            return []
-    else:
-        pipeline_config = OmegaConf.load(
-            os.path.join("aintelope", "config", pipeline_cfg_file)
-        )
 
     set_console_title(cfg.hparams.params_set_title + " : " + timestamp_pid_uuid)
 
@@ -313,18 +295,5 @@ def analytics(
     return test_summary
 
 
-if __name__ == "__main__":  # for multiprocessing support
-    register_resolvers()
-
-    if (
-        sys.gettrace() is None
-    ):  # do not set low priority while debugging. Note that unit tests also set sys.gettrace() to not-None
-        set_priorities()
-
-    set_memory_limits()
-
-    # Need to choose GPU early before torch fully starts up. Else there may be CUDA errors later.
-    select_gpu()
-
-    config_file = sys.argv[1]
-    run_pipeline(config_file)
+# if __name__ == "__main__":
+#    run()

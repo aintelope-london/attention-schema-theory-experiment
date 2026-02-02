@@ -37,7 +37,7 @@ from aintelope.gridsearch_pipeline import (
     gpu_count,
     worker_count_multiplier,
     cache,
-    run_pipeline,
+    run_experiments,
     run_gridsearch_experiment_cache_helper,
 )
 
