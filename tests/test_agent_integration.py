@@ -13,7 +13,7 @@ def test_agent_completes_pipeline():
     """Agent runs full train + test cycle without errors."""
     run("config_tests.yaml")
 
-def test_agent_learns(cfg):
+def test_agent_learns(base_test_config):
     """Learning agent achieves reward threshold on simple gridworld."""
 
     # Minimal learning scenario overrides
@@ -34,9 +34,9 @@ def test_agent_learns(cfg):
             },
         }
     }
-    cfg = OmegaConf.merge(cfg, OmegaConf.create(learning_overrides))
+    cfg = OmegaConf.merge(base_test_config, OmegaConf.create(learning_overrides))
 
-    test_summaries = run_pipeline(cfg)
+    test_summaries = run(cfg)
 
     REWARD_THRESHOLD = 5.0  # TODO: derive analytically
     assert_learning_threshold(test_summaries[0], REWARD_THRESHOLD)
