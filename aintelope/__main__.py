@@ -55,7 +55,7 @@ def run(config: Union[str, DictConfig] = "config_experiment.yaml", gui: bool = F
             print("GUI cancelled.")
             return
 
-    run_experiments(config)
+    return run_experiments(config)
 
 
 if __name__ == "__main__":

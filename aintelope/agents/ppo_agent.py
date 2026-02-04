@@ -182,6 +182,7 @@ def ppo_model_constructor(env, env_classname, agent_id, cfg):
         policy,
         env,
         verbose=1,
+        n_steps=cfg.hparams.agent_params.ppo_n_steps,
         policy_kwargs=(
             {
                 "normalize_images": False,
