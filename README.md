@@ -22,8 +22,8 @@ Install Python 3.10.3 or later. We recommend CPython from python.org. Do not use
 ### 2. Clone and install
 
 ```bash
-git clone https://github.com/aintelope/attention-schema-theory-experiments.git
-cd attention-schema-theory-experiments
+git clone https://github.com/aintelope-london/attention-schema-theory-experiment.git
+cd attention-schema-theory-experiment
 python install.py
 ```
 
