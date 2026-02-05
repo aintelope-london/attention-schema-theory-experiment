@@ -20,7 +20,7 @@ from aintelope.config.config_utils import (
 from aintelope.pipeline import run_experiments
 
 
-def run(config: Union[str, DictConfig] = "config_experiment.yaml", gui: bool = False):
+def run(config: Union[str, DictConfig] = "default_config.yaml", gui: bool = False):
     """Single entrypoint for the whole project.
 
     Args:
@@ -56,6 +56,11 @@ def run(config: Union[str, DictConfig] = "config_experiment.yaml", gui: bool = F
             return
 
     return run_experiments(config)
+
+
+def gui_main():
+    """Entry point for aintelope-gui console script."""
+    run(gui=True)
 
 
 if __name__ == "__main__":
