@@ -6,7 +6,7 @@ Description pending.
 
 ### 1. Install Python
 
-Install Python 3.10.3 or later. We recommend CPython from python.org. Do not use Conda.
+Install Python 3.10.3 - 3.10.13. We recommend CPython from python.org. Do not use Conda.
 
 - **Linux (Ubuntu/Debian):**
   ```bash
