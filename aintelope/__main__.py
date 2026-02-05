@@ -58,6 +58,11 @@ def run(config: Union[str, DictConfig] = "config_experiment.yaml", gui: bool = F
     run_experiments(config)
 
 
+def gui_main():
+    """Entry point for aintelope-gui console script."""
+    run(gui=True)
+
+
 if __name__ == "__main__":
     import argparse
 
