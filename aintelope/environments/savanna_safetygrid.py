@@ -897,7 +897,7 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
         observations, infos = GridworldZooParallelEnv.reset(
             self, seed=seed, options=options, *args, **kwargs
         )
-
+        """
         print(
             "env_layout_seed: "
             + str(GridworldZooParallelEnv.get_env_layout_seed(self))
@@ -906,7 +906,7 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
                 GridworldZooParallelEnv.get_episode_no(self)
             )  # this counter is reset for each new env_layout_seed
         )
-
+        """
         infos = self.format_infos(infos)
         self._last_infos = infos
         # transform observations
@@ -1107,7 +1107,7 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
                 return  # TODO!!! return value
 
         GridworldZooAecEnv.reset(self, seed=seed, options=options, *args, **kwargs)
-
+        """
         print(
             "env_layout_seed: "
             + str(GridworldZooParallelEnv.get_env_layout_seed(self))
@@ -1116,7 +1116,7 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
                 GridworldZooParallelEnv.get_episode_no(self)
             )  # this counter is reset for each new env_layout_seed
         )
-
+        """
         # observe observations, transform observations
         infos = {}
         for agent in self.possible_agents:
