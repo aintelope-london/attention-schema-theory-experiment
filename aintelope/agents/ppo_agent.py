@@ -181,8 +181,9 @@ def ppo_model_constructor(env, env_classname, agent_id, cfg):
     return PPO(
         policy,
         env,
-        verbose=1,
-        n_steps=cfg.hparams.agent_params.ppo_n_steps,
+        verbose=0,
+        n_steps=cfg.hparams.model_params.get("ppo_n_steps", 2048),
+        learning_rate=cfg.hparams.model_params.get("learning_rate", 3e-4),
         policy_kwargs=(
             {
                 "normalize_images": False,

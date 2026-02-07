@@ -52,8 +52,8 @@ def run_experiments(pipeline_config):
 
     set_console_title(cfg.hparams.params_set_title + " : " + timestamp_pid_uuid)
 
-    test_summaries_to_return = []
-    test_summaries_to_jsonl = []
+    summaries = []
+    configs = []
 
     # use additional semaphore here since the user may launch multiple processes manually
     semaphore_name = (
@@ -164,7 +164,7 @@ def run_experiments(pipeline_config):
                                 + " : "
                                 + env_conf_name
                             )
-                            test_summary = analytics(
+                            summary = analytics(
                                 experiment_cfg,
                                 score_dimensions,
                                 title=title,
@@ -174,8 +174,8 @@ def run_experiments(pipeline_config):
                                 gridsearch_params=None,
                                 show_plot=experiment_cfg.hparams.show_plot,
                             )
-                            test_summaries_to_return.append(test_summary)
-                            test_summaries_to_jsonl.append(test_summary)
+                            summaries.append(summary)
+                            configs.append(experiment_cfg)
 
                         pipeline_bar.update(env_conf_i + 1)
 
@@ -195,9 +195,9 @@ def run_experiments(pipeline_config):
         aggregated_results_file_lock = FileLock(aggregated_results_file + ".lock")
         with aggregated_results_file_lock:
             with open(aggregated_results_file, mode="a", encoding="utf-8") as fh:
-                for test_summary in test_summaries_to_jsonl:
+                for summary in summaries:
                     # Do not write directly to file. If JSON serialization error occurs during json.dump() then a broken line would be written into the file (I have verified this). Therefore using json.dumps() is safer.
-                    json_text = json.dumps(test_summary)
+                    json_text = json.dumps(summary)
                     fh.write(
                         json_text + "\n"
                     )  # \n : Prepare the file for appending new lines upon subsequent append. The last character in the JSONL file is allowed to be a line separator, and it will be treated the same as if there was no line separator present.
@@ -213,7 +213,7 @@ def run_experiments(pipeline_config):
         # uses less CPU on Windows than input() function. Note that the graph window will be frozen, but will still show graphs
         wait_for_enter("\nPipeline done. Press [enter] to continue.")
 
-    return test_summaries_to_return
+    return {"summaries": summaries, "configs": configs}
 
 
 def analytics(
