@@ -97,22 +97,24 @@ def recalculate_gridsearch_sfella_scores(cfg: DictConfig) -> None:
                 print(test_summary)
                 continue
 
-            # here gridsearch_params includes pipeline config for experiment
+            # here gridsearch_params includes orchestrator config for experiment
             gridsearch_params = OmegaConf.create(test_summary["gridsearch_params"])
             experiment_cfg = copy.deepcopy(
                 cfg
             )  # need to deepcopy in order to not accumulate keys that were present in previous experiment and are not present in next experiment
             OmegaConf.update(experiment_cfg, "experiment_name", experiment_name)
-            OmegaConf.update(  # here gridsearch_params includes pipeline config for experiment
+            OmegaConf.update(  # here gridsearch_params includes orchestrator config for experiment
                 experiment_cfg, "hparams", gridsearch_params, force_add=True
             )
 
-            num_train_pipeline_cycles = experiment_cfg.hparams.num_pipeline_cycles
+            num_train_orchestrator_cycles = (
+                experiment_cfg.hparams.num_orchestrator_cycles
+            )
             # score_dimensions = get_score_dimensions(experiment_cfg)
             score_dimensions = test_summary["score_dimensions"]
             score_dimensions.remove("Score")
             score_dimensions.remove("Reward")
-            group_by_pipeline_cycle = cfg.hparams.num_pipeline_cycles >= 1
+            group_by_orchestrator_cycle = cfg.hparams.num_orchestrator_cycles >= 1
 
             (
                 test_totals,
@@ -127,9 +129,9 @@ def recalculate_gridsearch_sfella_scores(cfg: DictConfig) -> None:
                 score_dimensions_out,
             ) = plotting.aggregate_scores(
                 events,
-                num_train_pipeline_cycles,
+                num_train_orchestrator_cycles,
                 score_dimensions,
-                group_by_pipeline_cycle=group_by_pipeline_cycle,
+                group_by_orchestrator_cycle=group_by_orchestrator_cycle,
             )
 
             recalculated_test_summary = {
@@ -143,9 +145,9 @@ def recalculate_gridsearch_sfella_scores(cfg: DictConfig) -> None:
                 )
                 if gridsearch_params is not None
                 else None,  # Object of type DictConfig is not JSON serializable, neither can yaml.dump in plotting.prettyprint digest it, so need to convert it to ordinary dictionary
-                "num_train_pipeline_cycles": num_train_pipeline_cycles,
+                "num_train_orchestrator_cycles": num_train_orchestrator_cycles,
                 "score_dimensions": score_dimensions_out,
-                "group_by_pipeline_cycle": group_by_pipeline_cycle,
+                "group_by_orchestrator_cycle": group_by_orchestrator_cycle,
                 "test_totals": test_totals,
                 "test_averages": test_averages,
                 "test_variances": test_variances,
@@ -194,5 +196,5 @@ if __name__ == "__main__":
 
     cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
 
-    use_same_parameters_for_all_pipeline_experiments = False
+    use_same_parameters_for_all_orchestrator_experiments = False
     recalculate_gridsearch_sfella_scores(cfg)

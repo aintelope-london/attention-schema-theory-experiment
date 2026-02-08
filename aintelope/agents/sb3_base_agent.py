@@ -48,7 +48,7 @@ import gymnasium as gym
 from pettingzoo import AECEnv, ParallelEnv
 
 # TODO: implement these infos in savanna_safetygrid.py instead
-INFO_PIPELINE_CYCLE = "pipeline_cycle"
+INFO_orchestrator_CYCLE = "orchestrator_cycle"
 INFO_EPISODE = "i_episode"  # NB! cannot use "episode" because it is used internally by Stable Baselines (including ver 3), see: https://github.com/hill-a/stable-baselines/issues/977
 INFO_ENV_LAYOUT_SEED = "env_layout_seed"
 INFO_STEP = "step"
@@ -231,7 +231,7 @@ class SB3BaseAgent(Agent):
         env: Environment,
         cfg: DictConfig,
         test_mode: bool = False,
-        i_pipeline_cycle: int = 0,
+        i_orchestrator_cycle: int = 0,
         events: pd.DataFrame = None,  # TODO: this is no longer a DataFrame, but an EventLog
         score_dimensions: list = [],
         progressbar: RobustProgressBar = None,
@@ -246,7 +246,7 @@ class SB3BaseAgent(Agent):
             + env.__class__.__bases__[0].__qualname__
         )
         self.test_mode = test_mode
-        self.i_pipeline_cycle = i_pipeline_cycle
+        self.i_orchestrator_cycle = i_orchestrator_cycle
         self.next_episode_no = 0
         self.total_steps_across_episodes = 0
         self.score_dimensions = score_dimensions
@@ -289,7 +289,7 @@ class SB3BaseAgent(Agent):
         step: int = 0,
         env_layout_seed: int = 0,
         episode: int = 0,
-        pipeline_cycle: int = 0,
+        orchestrator_cycle: int = 0,
         test_mode: bool = False,
         *args,
         **kwargs,
@@ -306,7 +306,7 @@ class SB3BaseAgent(Agent):
         # action_space = self.env.action_space(self.id)
         self.info = info
 
-        self.info[INFO_PIPELINE_CYCLE] = pipeline_cycle
+        self.info[INFO_orchestrator_CYCLE] = orchestrator_cycle
         self.info[INFO_EPISODE] = episode
         self.info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
         self.info[INFO_STEP] = step
@@ -369,7 +369,7 @@ class SB3BaseAgent(Agent):
         self.states = states
         self.infos = infos
 
-        i_pipeline_cycle = self.i_pipeline_cycle
+        i_orchestrator_cycle = self.i_orchestrator_cycle
         i_episode = (
             self.next_episode_no - 1
         )  # cannot use env.get_next_episode_no() here since its counter is reset for each new env_layout_seed
@@ -383,7 +383,7 @@ class SB3BaseAgent(Agent):
             agent,
             info,
         ) in infos.items():  # TODO: move this code to savanna_safetygrid.py
-            info[INFO_PIPELINE_CYCLE] = i_pipeline_cycle
+            info[INFO_orchestrator_CYCLE] = i_orchestrator_cycle
             info[INFO_EPISODE] = i_episode
             info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
             info[INFO_STEP] = 0
@@ -420,7 +420,7 @@ class SB3BaseAgent(Agent):
                 )  # PPO does extra episodes, which causes the step counter to go beyond max_value of progress bar
             )
 
-        i_pipeline_cycle = self.i_pipeline_cycle
+        i_orchestrator_cycle = self.i_orchestrator_cycle
         i_episode = (
             self.next_episode_no - 1
         )  # cannot use env.get_next_episode_no() here since its counter is reset for each new env_layout_seed
@@ -448,7 +448,7 @@ class SB3BaseAgent(Agent):
             done = terminateds[agent] or truncateds[agent]
 
             # TODO: move this code to savanna_safetygrid.py
-            info[INFO_PIPELINE_CYCLE] = i_pipeline_cycle
+            info[INFO_orchestrator_CYCLE] = i_orchestrator_cycle
             info[INFO_EPISODE] = i_episode
             info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
             info[INFO_STEP] = step
@@ -472,7 +472,7 @@ class SB3BaseAgent(Agent):
             self.events.log_event(
                 [
                     self.cfg.experiment_name,
-                    i_pipeline_cycle,
+                    i_orchestrator_cycle,
                     i_episode,
                     env_layout_seed,
                     step,
@@ -541,7 +541,7 @@ class SB3BaseAgent(Agent):
             else [score2]
         )
 
-        i_pipeline_cycle = self.i_pipeline_cycle
+        i_orchestrator_cycle = self.i_orchestrator_cycle
         i_episode = (
             self.next_episode_no - 1
         )  # cannot use env.get_next_episode_no() here since its counter is reset for each new env_layout_seed
@@ -554,7 +554,7 @@ class SB3BaseAgent(Agent):
         test_mode = False
 
         # TODO: move this code to savanna_safetygrid.py
-        self.info[INFO_PIPELINE_CYCLE] = i_pipeline_cycle
+        self.info[INFO_orchestrator_CYCLE] = i_orchestrator_cycle
         self.info[INFO_EPISODE] = i_episode
         self.info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
         self.info[INFO_STEP] = step
@@ -568,7 +568,7 @@ class SB3BaseAgent(Agent):
         self.events.log_event(
             [
                 self.cfg.experiment_name,
-                i_pipeline_cycle,
+                i_orchestrator_cycle,
                 i_episode,
                 env_layout_seed,
                 step,

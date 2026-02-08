@@ -105,7 +105,7 @@ By default, the separate turning actions are turned off.
 
 ## Human-playable demos
 
-In the folder `aintelope/environments/demos/gridworlds/` are located the human-playable demo environments, which have same configuration as the benchmarks in our pipeline. Playing these human-playable demos manually can give you a better intuition of the rules and how the benchmarks work.
+In the folder `aintelope/environments/demos/gridworlds/` are located the human-playable demo environments, which have same configuration as the benchmarks in our orchestrator. Playing these human-playable demos manually can give you a better intuition of the rules and how the benchmarks work.
 
 You can launch these Python files without additional arguments. 
 

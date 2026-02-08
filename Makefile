@@ -7,7 +7,7 @@ VENV = venv_$(PROJECT)
 run-training-baseline: ## run baseline experiment
 	python -m ${PROJECT} hparams.agent_id=example_agent
 
-run-pipeline: ## run pipeline
+run-orchestrator: ## run orchestrator
 	python -m ${PROJECT} hparams.agent_id=example_agent
 
 # ---------- installation and environment ----------

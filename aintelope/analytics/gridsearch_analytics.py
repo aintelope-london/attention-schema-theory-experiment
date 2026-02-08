@@ -37,7 +37,7 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
     gridsearch_cycle_count = 10  # max cycle count   # TODO: read from config
     eval_cycle_count = 100  # gridsearch_cycle_count if gridsearch_cycle_count is not None else 25    # min cycle count       # TODO: read from config
 
-    create_specialised_pipeline_config_with_best_parameters = True
+    create_specialised_orchestrator_config_with_best_parameters = True
     copy_log_files_of_best_parameter_combinations_to_separate_folder = False
 
     compute_average_evals_scores_per_parameter_combination = False  # if set to false then all cycles of evals with best gridsearch parameter combination are outputted in separate rows of the output CSV file
@@ -977,23 +977,23 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
 
     # / if create_box_plots:
 
-    if create_specialised_pipeline_config_with_best_parameters:
-        # create a new specialised pipeline config files based on the best parameters per experiment
-        pipeline_config_file = os.environ.get("PIPELINE_CONFIG")
-        using_default_pipeline_config_file = False
-        if pipeline_config_file is None:
-            pipeline_config_file = "config_pipeline.yaml"
-            using_default_pipeline_config_file = True
+    if create_specialised_orchestrator_config_with_best_parameters:
+        # create a new specialised orchestrator config files based on the best parameters per experiment
+        orchestrator_config_file = os.environ.get("orchestrator_CONFIG")
+        using_default_orchestrator_config_file = False
+        if orchestrator_config_file is None:
+            orchestrator_config_file = "config_orchestrator.yaml"
+            using_default_orchestrator_config_file = True
 
-        pipeline_config = OmegaConf.load(
-            os.path.join("aintelope", "config", pipeline_config_file)
+        orchestrator_config = OmegaConf.load(
+            os.path.join("aintelope", "config", orchestrator_config_file)
         )
 
         for combination_i in range(0, return_n_best_combinations):
-            # TODO: ensure to do not use special pipeline config when doing initial gridsearch
-            if using_default_pipeline_config_file:
-                parts = os.path.splitext(pipeline_config_file)
-                specialised_pipeline_config_file = (
+            # TODO: ensure to do not use special orchestrator config when doing initial gridsearch
+            if using_default_orchestrator_config_file:
+                parts = os.path.splitext(orchestrator_config_file)
+                specialised_orchestrator_config_file = (
                     parts[0]
                     + "_"
                     + cfg.hparams.params_set_title
@@ -1006,10 +1006,10 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
                     + parts[1]
                 )
             else:
-                parts = os.path.splitext(pipeline_config_file)
-                specialised_pipeline_config_file = (
+                parts = os.path.splitext(orchestrator_config_file)
+                specialised_orchestrator_config_file = (
                     parts[0]
-                    + f"_{combination_i + 1}"  # NB! If PIPELINE_CONFIG is specified then do not overwrite it. Therefore we need to append combination_i for combination_i == 0 as well.
+                    + f"_{combination_i + 1}"  # NB! If orchestrator_CONFIG is specified then do not overwrite it. Therefore we need to append combination_i for combination_i == 0 as well.
                     + parts[1]
                 )
 
@@ -1022,11 +1022,11 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
                 .dropna()
             )  # dropna() will drop rows which match indexes missing in the source
 
-            specialised_pipeline_config = copy.deepcopy(pipeline_config)
+            specialised_orchestrator_config = copy.deepcopy(orchestrator_config)
             for map_size in [
                 7
             ]:  # TODO: config, or select all available map sizes from gridsearch config
-                for env_conf_name in pipeline_config:
+                for env_conf_name in orchestrator_config:
                     result_row_selector = (
                         specialised_config_params_source[
                             "gridsearch_params.hparams.env_params.map_max"
@@ -1047,7 +1047,7 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
                         key = env_conf_name + ".env_params.map_max"
                         value = map_size
                         OmegaConf.update(
-                            specialised_pipeline_config, key, value, force_add=True
+                            specialised_orchestrator_config, key, value, force_add=True
                         )
 
                         for gridsearch_col in gridsearch_cols:
@@ -1058,20 +1058,25 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
                             )
                             value = result_row[gridsearch_col].item()
                             OmegaConf.update(
-                                specialised_pipeline_config, key, value, force_add=True
+                                specialised_orchestrator_config,
+                                key,
+                                value,
+                                force_add=True,
                             )
 
             # TODO: confirm overwriting existing file
-            print(f"\nWriting to {specialised_pipeline_config_file}")
+            print(f"\nWriting to {specialised_orchestrator_config_file}")
             OmegaConf.save(
-                specialised_pipeline_config,
-                os.path.join("aintelope", "config", specialised_pipeline_config_file),
+                specialised_orchestrator_config,
+                os.path.join(
+                    "aintelope", "config", specialised_orchestrator_config_file
+                ),
                 resolve=False,
             )
 
         # / for combination_i in range(0, return_n_best_combinations):
 
-    # / if create_specialised_pipeline_config_with_best_parameters:
+    # / if create_specialised_orchestrator_config_with_best_parameters:
 
     wait_for_enter("\nAnalytics done. Press [enter] to continue.")
     qqq = True
@@ -1081,15 +1086,15 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
 
 
 def copy_log_folder(experiment_name, source_uuid, source_base, dest_base, cfg):
-    source_pipeline_log = os.path.abspath(os.path.join(source_base, source_uuid))
-    dest_pipeline_log = os.path.join(dest_base, source_uuid)
+    source_orchestrator_log = os.path.abspath(os.path.join(source_base, source_uuid))
+    dest_orchestrator_log = os.path.join(dest_base, source_uuid)
 
-    os.makedirs(dest_pipeline_log, exist_ok=True)
+    os.makedirs(dest_orchestrator_log, exist_ok=True)
 
     # copy experiment logs
 
-    source_experiment_log = os.path.join(source_pipeline_log, experiment_name)
-    dest_experiment_log = os.path.join(dest_pipeline_log, experiment_name)
+    source_experiment_log = os.path.join(source_orchestrator_log, experiment_name)
+    dest_experiment_log = os.path.join(dest_orchestrator_log, experiment_name)
     if not os.path.exists(dest_experiment_log):
         os.symlink(source_experiment_log, dest_experiment_log, target_is_directory=True)
     else:
@@ -1097,8 +1102,8 @@ def copy_log_folder(experiment_name, source_uuid, source_base, dest_base, cfg):
 
     # copy plots
 
-    source_plot = os.path.join(source_pipeline_log, "plot_" + experiment_name)
-    dest_plot = os.path.join(dest_pipeline_log, "plot_" + experiment_name)
+    source_plot = os.path.join(source_orchestrator_log, "plot_" + experiment_name)
+    dest_plot = os.path.join(dest_orchestrator_log, "plot_" + experiment_name)
 
     if (
         os.name == "nt"
@@ -1120,10 +1125,10 @@ def copy_log_folder(experiment_name, source_uuid, source_base, dest_base, cfg):
     # copy code archives
     if False:  # TODO: function parameter
         source_code_archive = os.path.join(
-            source_pipeline_log, "aintelope_code_archive.zip"
+            source_orchestrator_log, "aintelope_code_archive.zip"
         )
         dest_code_archive = os.path.join(
-            source_pipeline_log, "aintelope_code_archive.zip"
+            source_orchestrator_log, "aintelope_code_archive.zip"
         )
 
         if not os.path.exists(dest_code_archive):
@@ -1137,10 +1142,10 @@ def copy_log_folder(experiment_name, source_uuid, source_base, dest_base, cfg):
                 )
 
         source_code_archive = os.path.join(
-            source_pipeline_log, "gridworlds_code_archive.zip"
+            source_orchestrator_log, "gridworlds_code_archive.zip"
         )
         dest_code_archive = os.path.join(
-            source_pipeline_log, "gridworlds_code_archive.zip"
+            source_orchestrator_log, "gridworlds_code_archive.zip"
         )
 
         if not os.path.exists(dest_code_archive):
@@ -1164,7 +1169,7 @@ def main():
 
     cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
 
-    use_same_parameters_for_all_pipeline_experiments = False
+    use_same_parameters_for_all_orchestrator_experiments = False
     gridsearch_analytics(cfg)
 
 

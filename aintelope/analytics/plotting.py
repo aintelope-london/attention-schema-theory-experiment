@@ -46,7 +46,10 @@ def plot_groupby(all_events, group_keys, score_dimensions):
 
 
 def filter_train_and_test_events(
-    all_events, num_train_pipeline_cycles, score_dimensions, group_by_pipeline_cycle
+    all_events,
+    num_train_orchestrator_cycles,
+    score_dimensions,
+    group_by_orchestrator_cycle,
 ):
     events = pd.concat(all_events)
 
@@ -57,10 +60,14 @@ def filter_train_and_test_events(
     events[score_dimensions] = events[score_dimensions].astype(float)
 
     if (
-        group_by_pipeline_cycle
+        group_by_orchestrator_cycle
     ):  # TODO: perhaps this branch is not needed and the "IsTest" column is sufficient in all cases?
-        train_events = events[events["Pipeline cycle"] < num_train_pipeline_cycles]
-        test_events = events[events["Pipeline cycle"] >= num_train_pipeline_cycles]
+        train_events = events[
+            events["orchestrator cycle"] < num_train_orchestrator_cycles
+        ]
+        test_events = events[
+            events["orchestrator cycle"] >= num_train_orchestrator_cycles
+        ]
     else:
         train_events = events[events["IsTest"] == 0]
         test_events = events[events["IsTest"] == 1]
@@ -120,9 +127,9 @@ def calc_sfellas(df):
 
 def aggregate_scores(
     all_events,
-    num_train_pipeline_cycles,
+    num_train_orchestrator_cycles,
     score_dimensions,
-    group_by_pipeline_cycle: bool = False,
+    group_by_orchestrator_cycle: bool = False,
 ):
     """In case of multi-agent environments, the scores are aggregated
     over both agents without grouping by agent. Right now the agents use
@@ -136,7 +143,10 @@ def aggregate_scores(
         test_events,
         score_dimensions,
     ) = filter_train_and_test_events(
-        all_events, num_train_pipeline_cycles, score_dimensions, group_by_pipeline_cycle
+        all_events,
+        num_train_orchestrator_cycles,
+        score_dimensions,
+        group_by_orchestrator_cycle,
     )
     test_events = test_events[score_dimensions]
 
@@ -215,11 +225,11 @@ def maximise_plot():
 def plot_performance(
     all_events,
     num_train_episodes,
-    num_train_pipeline_cycles,
+    num_train_orchestrator_cycles,
     score_dimensions,
     save_path: Optional[str],
     title: Optional[str] = "",
-    group_by_pipeline_cycle: bool = False,
+    group_by_orchestrator_cycle: bool = False,
     show_plot: bool = False,
 ):
     """
@@ -234,14 +244,19 @@ def plot_performance(
         test_events,
         score_dimensions,
     ) = filter_train_and_test_events(
-        all_events, num_train_pipeline_cycles, score_dimensions, group_by_pipeline_cycle
+        all_events,
+        num_train_orchestrator_cycles,
+        score_dimensions,
+        group_by_orchestrator_cycle,
     )
 
-    if group_by_pipeline_cycle:
+    if group_by_orchestrator_cycle:
         plot_data1 = (
-            "Pipeline cycle",
+            "orchestrator cycle",
             plot_groupby(
-                all_events, ["Run_id", "Pipeline cycle", "Agent_id"], score_dimensions
+                all_events,
+                ["Run_id", "orchestrator cycle", "Agent_id"],
+                score_dimensions,
             ),
         )
     else:

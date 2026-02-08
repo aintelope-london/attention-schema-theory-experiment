@@ -17,7 +17,7 @@ from aintelope.config.config_utils import (
     set_memory_limits,
     set_priorities,
 )
-from aintelope.pipeline import run_experiments
+from aintelope.orchestrator import run_experiments
 
 
 def run(config: Union[str, DictConfig] = "default_config.yaml", gui: bool = False):
@@ -25,7 +25,7 @@ def run(config: Union[str, DictConfig] = "default_config.yaml", gui: bool = Fals
 
     Args:
         config: Either a filename (relative to aintelope/config/) or a DictConfig.
-        gui: If True, launch GUI for pipeline configuration.
+        gui: If True, launch GUI for orchestrator configuration.
 
     Usage:
         python -m aintelope --gui
@@ -76,7 +76,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--gui",
         action="store_true",
-        help="Launch GUI for pipeline configuration",
+        help="Launch GUI for orchestrator configuration",
     )
     args = parser.parse_args()
     run(args.config, gui=args.gui)

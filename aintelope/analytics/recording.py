@@ -40,7 +40,7 @@ checkpoint_dir: checkpoints/
 
 HOWTO:
 One test_conf will form one folder in outputs, that contains 
-1..n different runs for pipeline
+1..n different runs for orchestrator
 n agents.
 You need to change the agent params in the main default_config
 and run the same again in order to have a comparison point.

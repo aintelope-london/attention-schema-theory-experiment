@@ -1,4 +1,4 @@
-"""Integration test: agent completes full pipeline without errors."""
+"""Integration test: agent completes full orchestrator without errors."""
 
 import os
 import pytest
@@ -11,12 +11,12 @@ from aintelope.analytics.analytics import (
 )
 from aintelope.analytics.recording import read_events
 from aintelope.__main__ import run
-from tests.conftest import as_pipeline
+from tests.conftest import as_orchestrator
 
 
-def test_agent_completes_pipeline(learning_config):
+def test_agent_completes_orchestrator(learning_config):
     """Agent runs full train + test cycle without errors."""
-    run(as_pipeline(learning_config))
+    run(as_orchestrator(learning_config))
 
 
 def test_agent_learns(base_test_config):
@@ -43,7 +43,7 @@ def test_agent_learns(base_test_config):
     }
     cfg = OmegaConf.merge(base_test_config, OmegaConf.create(learning_overrides))
 
-    result = run(as_pipeline(cfg))
+    result = run(as_orchestrator(cfg))
 
     # Get config and summary for first experiment
     exp_cfg = result["configs"][0]

@@ -23,7 +23,7 @@ from aintelope.agents.sb3_base_agent import (
     SB3BaseAgent,
     CustomCNN,
     PolicyWithConfigFactory,
-    INFO_PIPELINE_CYCLE,
+    INFO_orchestrator_CYCLE,
     INFO_EPISODE,
     INFO_ENV_LAYOUT_SEED,
     INFO_STEP,
@@ -83,7 +83,7 @@ class ExpertOverrideMixin:
         step = self.info[INFO_STEP]
         env_layout_seed = self.info[INFO_ENV_LAYOUT_SEED]
         episode = self.info[INFO_EPISODE]
-        pipeline_cycle = self.info[INFO_PIPELINE_CYCLE]
+        orchestrator_cycle = self.info[INFO_orchestrator_CYCLE]
         test_mode = self.info[INFO_TEST_MODE]
 
         obs_nps = obs.detach().cpu().numpy()
@@ -94,7 +94,7 @@ class ExpertOverrideMixin:
             step,
             env_layout_seed,
             episode,
-            pipeline_cycle,
+            orchestrator_cycle,
             test_mode,
             obs_np,
         )
@@ -105,7 +105,7 @@ class ExpertOverrideMixin:
                 step,
                 env_layout_seed,
                 episode,
-                pipeline_cycle,
+                orchestrator_cycle,
                 test_mode,
                 override_type,
                 deterministic,

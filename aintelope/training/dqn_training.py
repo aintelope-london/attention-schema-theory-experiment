@@ -132,7 +132,7 @@ class Trainer:
         step: int = 0,
         env_layout_seed: int = 0,
         episode: int = 0,
-        pipeline_cycle: int = 0,
+        orchestrator_cycle: int = 0,
     ) -> npt.NDArray:
         """
         Get action from an agent

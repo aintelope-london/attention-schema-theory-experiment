@@ -33,17 +33,17 @@ from matplotlib import pyplot as plt
 from aintelope.analytics import plotting, recording
 from aintelope.config.config_utils import (
     archive_code,
-    get_pipeline_score_dimensions,
+    get_orchestrator_score_dimensions,
     get_score_dimensions,
 )
 from aintelope.experiments import run_experiment
-from aintelope.pipeline import analytics
+from aintelope.orchestrator import analytics
 
 
 logger = logging.getLogger("aintelope.__main__")
 
 gpu_count = torch.cuda.device_count()
-worker_count_multiplier = 1  # when running pipeline search, then having more workers than GPU-s will cause all sorts of Python and CUDA errors under Windows for some reason, even though there is plenty of free RAM and GPU memory. Yet, when the pipeline processes are run manually, there is no concurrency limit except the real hardware capacity limits. # TODO: why?
+worker_count_multiplier = 1  # when running orchestrator search, then having more workers than GPU-s will cause all sorts of Python and CUDA errors under Windows for some reason, even though there is plenty of free RAM and GPU memory. Yet, when the orchestrator processes are run manually, there is no concurrency limit except the real hardware capacity limits. # TODO: why?
 num_workers = max(1, gpu_count) * worker_count_multiplier
 
 # needs to be initialised here in order to avoid circular imports in gridsearch
@@ -54,7 +54,7 @@ gridsearch_params_global = None
 
 
 # this method is used by grid search, but it needs to be in same file as run_experiments, else sharing the gridsearch_params_global would not work
-# TODO: auto-detect need for cache update then pipeline has different configuration
+# TODO: auto-detect need for cache update then orchestrator has different configuration
 # @cache.memoize(    # TODO: disable this for the duration of evals since then the gridsearch parameters are nulls
 #    ignore={"gridsearch_params"},
 #    name="__main__.run_gridsearch_experiment_cache_helper"
@@ -82,12 +82,12 @@ def run_experiments(cfg: DictConfig) -> None:
 
     archive_code(cfg)
 
-    # TODO: ensure to do not use special pipeline config when doing initial gridsearch
-    pipeline_config_file = os.environ.get("PIPELINE_CONFIG")
-    if pipeline_config_file is None:
-        pipeline_config_file = "config_pipeline.yaml"
-    pipeline_config = OmegaConf.load(
-        os.path.join("aintelope", "config", pipeline_config_file)
+    # TODO: ensure to do not use special orchestrator config when doing initial gridsearch
+    orchestrator_config_file = os.environ.get("orchestrator_CONFIG")
+    if orchestrator_config_file is None:
+        orchestrator_config_file = "config_orchestrator.yaml"
+    orchestrator_config = OmegaConf.load(
+        os.path.join("aintelope", "config", orchestrator_config_file)
     )
 
     test_summaries_to_return = []
@@ -95,7 +95,7 @@ def run_experiments(cfg: DictConfig) -> None:
 
     # use additional semaphore here (in addition to gridsearch multiprocessing worker count) since the user may launch multiple gridsearch as well as non-gridsearch processes manually
     semaphore_name = (
-        "AIntelope_pipeline_semaphore"
+        "AIntelope_orchestrator_semaphore"
         + (
             "_" + cfg.hparams.params_set_title
             if cfg.hparams.params_set_title in ["handwritten_rules", "random"]
@@ -116,26 +116,26 @@ def run_experiments(cfg: DictConfig) -> None:
         if gridsearch_params_in is None:
             print("Semaphore acquired...")
 
-        # In case of 0 pipeline cycles (num_pipeline_cycles == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
-        # In case of (num_pipeline_cycles > 0), train a SHARED model over all environments in the pipeline steps for num_pipeline_cycles. Then test that shared model for one additional cycle.
-        # Therefore, the + 1 cycle is for testing. In case of (num_pipeline_cycles == 0), run testing inside the same cycle immediately after each environment's training ends.
-        max_pipeline_cycle = cfg.hparams.num_pipeline_cycles + 1
+        # In case of 0 orchestrator cycles (num_orchestrator_cycles == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
+        # In case of (num_orchestrator_cycles > 0), train a SHARED model over all environments in the orchestrator steps for num_orchestrator_cycles. Then test that shared model for one additional cycle.
+        # Therefore, the + 1 cycle is for testing. In case of (num_orchestrator_cycles == 0), run testing inside the same cycle immediately after each environment's training ends.
+        max_orchestrator_cycle = cfg.hparams.num_orchestrator_cycles + 1
         with RobustProgressBar(
-            max_value=max_pipeline_cycle
-        ) as pipeline_cycle_bar:  # this is a slow task so lets use a progress bar
-            for i_pipeline_cycle in range(0, max_pipeline_cycle):
-                # In case of (num_pipeline_cycles == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
-                # In case of (num_pipeline_cycles > 0), train a SHARED model over all environments in the pipeline steps for num_pipeline_cycles. Then test that shared model for one additional cycle
+            max_value=max_orchestrator_cycle
+        ) as orchestrator_cycle_bar:  # this is a slow task so lets use a progress bar
+            for i_orchestrator_cycle in range(0, max_orchestrator_cycle):
+                # In case of (num_orchestrator_cycles == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
+                # In case of (num_orchestrator_cycles > 0), train a SHARED model over all environments in the orchestrator steps for num_orchestrator_cycles. Then test that shared model for one additional cycle
                 train_mode = (
-                    i_pipeline_cycle < cfg.hparams.num_pipeline_cycles
-                    or cfg.hparams.num_pipeline_cycles == 0
+                    i_orchestrator_cycle < cfg.hparams.num_orchestrator_cycles
+                    or cfg.hparams.num_orchestrator_cycles == 0
                 )
-                test_mode = i_pipeline_cycle == cfg.hparams.num_pipeline_cycles
+                test_mode = i_orchestrator_cycle == cfg.hparams.num_orchestrator_cycles
 
                 with RobustProgressBar(
-                    max_value=len(pipeline_config)
-                ) as pipeline_bar:  # this is a slow task so lets use a progress bar
-                    for env_conf_i, env_conf_name in enumerate(pipeline_config):
+                    max_value=len(orchestrator_config)
+                ) as orchestrator_bar:  # this is a slow task so lets use a progress bar
+                    for env_conf_i, env_conf_name in enumerate(orchestrator_config):
                         experiment_cfg = copy.deepcopy(
                             cfg
                         )  # need to deepcopy in order to not accumulate keys that were present in previous experiment and are not present in next experiment
@@ -155,13 +155,13 @@ def run_experiments(cfg: DictConfig) -> None:
                         OmegaConf.update(
                             experiment_cfg,
                             "hparams",
-                            pipeline_config[env_conf_name],
+                            orchestrator_config[env_conf_name],
                             force_add=True,
                         )
 
                         if gridsearch_params_in is not None:
                             gridsearch_params = copy.deepcopy(gridsearch_params_in)
-                            # replace all null-valued params with params from pipeline config, and do aggregated results file check and reporting using these replaced values
+                            # replace all null-valued params with params from orchestrator config, and do aggregated results file check and reporting using these replaced values
                             gridsearch_params_dict = OmegaConf.to_container(
                                 gridsearch_params, resolve=False
                             )
@@ -176,22 +176,22 @@ def run_experiments(cfg: DictConfig) -> None:
                             ]
 
                             # OmegaConf does not support dot-path style access, so need to use flattened config dict for that.  # TODO: create a helper method for this instead
-                            pipeline_config_dict = OmegaConf.to_container(
-                                pipeline_config[env_conf_name],
+                            orchestrator_config_dict = OmegaConf.to_container(
+                                orchestrator_config[env_conf_name],
                                 resolve=False,  # do not resolve yet - loop over null valued entries only, not including references to them
                             )
-                            flattened_pipeline_config = flatten(
-                                pipeline_config_dict,
+                            flattened_orchestrator_config = flatten(
+                                orchestrator_config_dict,
                                 reducer=make_reducer(delimiter="."),
                             )  # convert to format {'a': 1, 'c.a': 2, 'c.b.x': 5, 'c.b.y': 10, 'd': [1, 2, 3]}
 
                             for null_entry_key in null_entry_keys:
-                                value = flattened_pipeline_config.get(
+                                value = flattened_orchestrator_config.get(
                                     null_entry_key[len("hparams.") :], None
                                 )
                                 if (
                                     value is None
-                                ):  # if the value is not available in pipeline config, then take it from experiment config
+                                ):  # if the value is not available in orchestrator config, then take it from experiment config
                                     value = flattened_experiment_cfg[
                                         null_entry_key[len("hparams.") :]
                                     ]
@@ -210,7 +210,7 @@ def run_experiments(cfg: DictConfig) -> None:
                                 force_add=True,
                             )
 
-                            # check whether this experiment has already been run during an earlier or aborted gridsearch pipeline run
+                            # check whether this experiment has already been run during an earlier or aborted gridsearch orchestrator run
                             if cfg.hparams.aggregated_results_file:
                                 aggregated_results_file = os.path.normpath(
                                     cfg.hparams.aggregated_results_file
@@ -253,7 +253,7 @@ def run_experiments(cfg: DictConfig) -> None:
                                         test_summaries_to_return.append(
                                             test_summaries2[0]
                                         )  # NB! do not add to test_summaries_to_jsonl, else it will be duplicated in the jsonl file
-                                        pipeline_bar.update(env_conf_i + 1)
+                                        orchestrator_bar.update(env_conf_i + 1)
                                         logger.info(
                                             os.linesep
                                             + f"Skipping experiment that is already in jsonl file: {env_conf_name}"
@@ -290,23 +290,23 @@ def run_experiments(cfg: DictConfig) -> None:
                         num_actual_train_episodes = -1
                         if (
                             train_mode and test_mode
-                        ):  # In case of (num_pipeline_cycles == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
+                        ):  # In case of (num_orchestrator_cycles == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
                             num_actual_train_episodes = run_experiment(
                                 experiment_cfg,
                                 experiment_name=env_conf_name,
                                 score_dimensions=score_dimensions,
                                 test_mode=False,
-                                i_pipeline_cycle=i_pipeline_cycle,
+                                i_orchestrator_cycle=i_orchestrator_cycle,
                             )
                         elif test_mode:
-                            pass  # TODO: optional: obtain num_actual_train_episodes. But this is not too important: in case of training a model over one or more pipeline cycles, the final test cycle gets its own i_pipeline_cycle index, therefore it is clearly distinguishable anyway
+                            pass  # TODO: optional: obtain num_actual_train_episodes. But this is not too important: in case of training a model over one or more orchestrator cycles, the final test cycle gets its own i_orchestrator_cycle index, therefore it is clearly distinguishable anyway
 
                         run_experiment(
                             experiment_cfg,
                             experiment_name=env_conf_name,
                             score_dimensions=score_dimensions,
                             test_mode=test_mode,
-                            i_pipeline_cycle=i_pipeline_cycle,
+                            i_orchestrator_cycle=i_orchestrator_cycle,
                             num_actual_train_episodes=num_actual_train_episodes,
                         )
 
@@ -327,7 +327,7 @@ def run_experiments(cfg: DictConfig) -> None:
                                 score_dimensions,
                                 title=title,
                                 experiment_name=env_conf_name,
-                                group_by_pipeline_cycle=cfg.hparams.num_pipeline_cycles
+                                group_by_orchestrator_cycle=cfg.hparams.num_orchestrator_cycles
                                 >= 1,
                                 gridsearch_params=gridsearch_params,
                                 show_plot=show_plot,
@@ -335,18 +335,18 @@ def run_experiments(cfg: DictConfig) -> None:
                             test_summaries_to_return.append(test_summary)
                             test_summaries_to_jsonl.append(test_summary)
 
-                        pipeline_bar.update(env_conf_i + 1)
+                        orchestrator_bar.update(env_conf_i + 1)
 
-                    # / for env_conf_name in pipeline_config:
-                # / with RobustProgressBar(max_value=len(pipeline_config)) as pipeline_bar:
+                    # / for env_conf_name in orchestrator_config:
+                # / with RobustProgressBar(max_value=len(orchestrator_config)) as orchestrator_bar:
 
-                pipeline_cycle_bar.update(i_pipeline_cycle + 1)
+                orchestrator_cycle_bar.update(i_orchestrator_cycle + 1)
 
-            # / for i_pipeline_cycle in range(0, max_pipeline_cycle):
-        # / with RobustProgressBar(max_value=max_pipeline_cycle) as pipeline_cycle_bar:
+            # / for i_orchestrator_cycle in range(0, max_orchestrator_cycle):
+        # / with RobustProgressBar(max_value=max_orchestrator_cycle) as orchestrator_cycle_bar:
     # / with Semaphore('name', max_count=num_workers, disable=gridsearch_params_in is not None) as semaphore:
 
-    # Write the pipeline results to file only when entire pipeline has run. Else crashing the program during pipeline run will cause the aggregated results file to contain partial data which will be later duplicated by re-run.
+    # Write the orchestrator results to file only when entire orchestrator has run. Else crashing the program during orchestrator run will cause the aggregated results file to contain partial data which will be later duplicated by re-run.
     # TODO: alternatively, cache the results of each experiment separately
     if cfg.hparams.aggregated_results_file:
         aggregated_results_file = os.path.normpath(cfg.hparams.aggregated_results_file)
@@ -367,6 +367,6 @@ def run_experiments(cfg: DictConfig) -> None:
     # keep plots visible until the user decides to close the program
     if show_plot:
         # uses less CPU on Windows than input() function. Note that the graph window will be frozen, but will still show graphs
-        wait_for_enter("\nPipeline done. Press [enter] to continue.")
+        wait_for_enter("\norchestrator done. Press [enter] to continue.")
 
     return test_summaries_to_return

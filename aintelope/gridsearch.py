@@ -32,7 +32,7 @@ from flatten_dict.reducers import make_reducer
 from aintelope.utils import RobustProgressBar, wait_for_enter
 
 from aintelope.analytics import plotting, recording
-from aintelope.gridsearch_pipeline import (
+from aintelope.gridsearch_orchestrator import (
     num_workers,
     gpu_count,
     worker_count_multiplier,
@@ -54,13 +54,13 @@ async def run_gridsearch_experiments_async(cfg) -> None:
     ):  # no need for multiprocessing if only one experiment is run at a time
         use_multiprocessing = False
 
-    pipeline_config_file = os.environ.get("PIPELINE_CONFIG")
+    orchestrator_config_file = os.environ.get("orchestrator_CONFIG")
     gridsearch_config_file = os.environ.get("GRIDSEARCH_CONFIG")
 
     set_console_title(
         cfg.hparams.params_set_title
         + " : "
-        + pipeline_config_file
+        + orchestrator_config_file
         + " : "
         + gridsearch_config_file
     )
@@ -233,7 +233,7 @@ async def run_gridsearch_experiment_multiprocess(
 
     # enable this the commented out lines of code below if you want to remove a some sets from the cache and recompute it
     # delete_param_sets = [
-    #    {'hparams': {'gridsearch_trial_no': 0, 'params_set_title': 'mixed', 'batch_size': 16, 'lr': 0.015, 'amsgrad': True, 'use_separate_models_for_each_experiment': True, 'model_params': {'hidden_sizes': [8, 16, 8], 'num_conv_layers': 2, 'conv_size': 2, 'gamma': 0.9, 'tau': 0.05, 'eps_start': 0.66, 'eps_end': 0.0, 'replay_size': 99, 'eps_last_pipeline_cycle': 1, 'eps_last_episode': 30, 'eps_last_env_layout_seed': -1, 'eps_last_frame': 400}, 'env_layout_seed_repeat_sequence_length': -1, 'num_pipeline_cycles': 0, 'num_episodes': 30, 'test_episodes': 10, 'env_params': {'num_iters': 400, 'map_max': 7, 'map_width': 7, 'map_height': 7, 'render_agent_radius': 4}}},
+    #    {'hparams': {'gridsearch_trial_no': 0, 'params_set_title': 'mixed', 'batch_size': 16, 'lr': 0.015, 'amsgrad': True, 'use_separate_models_for_each_experiment': True, 'model_params': {'hidden_sizes': [8, 16, 8], 'num_conv_layers': 2, 'conv_size': 2, 'gamma': 0.9, 'tau': 0.05, 'eps_start': 0.66, 'eps_end': 0.0, 'replay_size': 99, 'eps_last_orchestrator_cycle': 1, 'eps_last_episode': 30, 'eps_last_env_layout_seed': -1, 'eps_last_frame': 400}, 'env_layout_seed_repeat_sequence_length': -1, 'num_orchestrator_cycles': 0, 'num_episodes': 30, 'test_episodes': 10, 'env_params': {'num_iters': 400, 'map_max': 7, 'map_width': 7, 'map_height': 7, 'render_agent_radius': 4}}},
     # ]
 
     # gridsearch_params_dict = OmegaConf.to_container(gridsearch_params, resolve=True)
@@ -265,7 +265,7 @@ async def run_gridsearch_experiment_multiprocess(
         gridsearch_params_json = json.dumps(
             OmegaConf.to_container(
                 gridsearch_params, resolve=cache_key is not None
-            )  # NB! do not resolve the param values when doing further cycles based on best parameters from grid search. In this case if the referred valus contain nulls then we want to handle that inside pipeline loop first.
+            )  # NB! do not resolve the param values when doing further cycles based on best parameters from grid search. In this case if the referred valus contain nulls then we want to handle that inside orchestrator loop first.
         )
         env = dict(
             environ

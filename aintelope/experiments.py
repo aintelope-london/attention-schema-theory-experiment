@@ -35,7 +35,7 @@ def run_experiment(
     experiment_name: str = "",  # TODO: remove this argument and read it from cfg.experiment_name
     score_dimensions: list = [],
     test_mode: bool = True,
-    i_pipeline_cycle: int = 0,
+    i_orchestrator_cycle: int = 0,
     num_actual_train_episodes: int = -1,
 ) -> None:
     if "trial_length" in cfg:  # backwards compatibility
@@ -69,7 +69,7 @@ def run_experiment(
     # NB! gridsearch_trial_no is NOT saved to output data files. Instead, the individual trials are identified by the timestamp_pid_uuid available in the experiment folder name. This enables running gridsearch on multiple computers concurrently without having to worry about unique gridsearch trial numbers allocation and potential collisions.
     events_columns = [
         "Run_id",  # Experiment name
-        "Pipeline cycle",
+        "orchestrator cycle",
         "Episode",
         "Env layout seed",
         "Step",
@@ -131,7 +131,7 @@ def run_experiment(
         agents.append(agent)
 
         if is_sb3:
-            agent.i_pipeline_cycle = i_pipeline_cycle
+            agent.i_orchestrator_cycle = i_orchestrator_cycle
             agent.events = events
             agent.score_dimensions = score_dimensions
 
@@ -210,7 +210,7 @@ def run_experiment(
 
     if is_sb3 and not test_mode:
         num_actual_train_episodes = run_baseline_training(
-            cfg, i_pipeline_cycle, env, agents
+            cfg, i_orchestrator_cycle, env, agents
         )
 
     else:
@@ -259,7 +259,7 @@ def run_experiment(
                     )
 
                 print(
-                    f"\ni_pipeline_cycle: {i_pipeline_cycle} experiment: {experiment_name} episode: {i_episode} env_layout_seed: {env_layout_seed} test_mode: {test_mode}"
+                    f"\ni_orchestrator_cycle: {i_orchestrator_cycle} experiment: {experiment_name} episode: {i_episode} env_layout_seed: {env_layout_seed} test_mode: {test_mode}"
                 )
 
                 # TODO: refactor these checks into separate function        # Save models
@@ -330,7 +330,7 @@ def run_experiment(
                                     step=step,
                                     env_layout_seed=env_layout_seed,
                                     episode=i_episode,
-                                    pipeline_cycle=i_pipeline_cycle,
+                                    orchestrator_cycle=i_orchestrator_cycle,
                                     test_mode=test_mode,
                                 )
 
@@ -386,7 +386,7 @@ def run_experiment(
                                 events.log_event(
                                     [
                                         cfg.experiment_name,
-                                        i_pipeline_cycle,
+                                        i_orchestrator_cycle,
                                         i_episode,
                                         env_layout_seed,
                                         step,
@@ -421,7 +421,7 @@ def run_experiment(
                                         step=step,
                                         env_layout_seed=env_layout_seed,
                                         episode=i_episode,
-                                        pipeline_cycle=i_pipeline_cycle,
+                                        orchestrator_cycle=i_orchestrator_cycle,
                                         test_mode=test_mode,
                                     )
 
@@ -477,7 +477,7 @@ def run_experiment(
                                     events.log_event(
                                         [
                                             cfg.experiment_name,
-                                            i_pipeline_cycle,
+                                            i_orchestrator_cycle,
                                             i_episode,
                                             env_layout_seed,
                                             step,
@@ -545,7 +545,7 @@ def run_experiment(
 
 
 def run_baseline_training(
-    cfg: DictConfig, i_pipeline_cycle: int, env: Environment, agents: list
+    cfg: DictConfig, i_orchestrator_cycle: int, env: Environment, agents: list
 ):
     # SB3 models are designed for single-agent settings, we get around this by using the same model for every agent
     # https://pettingzoo.farama.org/tutorials/sb3/waterworld/

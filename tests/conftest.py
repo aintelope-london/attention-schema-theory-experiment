@@ -62,6 +62,6 @@ def learning_config(base_test_config):
     )
 
 
-def as_pipeline(config, experiment_name="test_experiment"):
-    """Wrap a flat hparams diff into pipeline shape for run()."""
+def as_orchestrator(config, experiment_name="test_experiment"):
+    """Wrap a flat hparams diff into orchestrator shape for run()."""
     return OmegaConf.create({experiment_name: config})

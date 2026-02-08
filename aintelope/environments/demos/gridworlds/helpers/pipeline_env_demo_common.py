@@ -33,7 +33,7 @@ class SavannaGridworldDemoEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
         GridworldZooParallelEnv.__init__(self, **self.super_initargs)
 
 
-def main(pipeline_env_conf_name):
+def main(orchestrator_env_conf_name):
     try:
         register_resolvers()
 
@@ -41,16 +41,18 @@ def main(pipeline_env_conf_name):
             os.path.join("aintelope", "config", "default_config.yaml")
         )
 
-        if pipeline_env_conf_name is not None:
-            pipeline_cfg = OmegaConf.load(
-                os.path.join("aintelope", "config", "config_pipeline.yaml")
+        if orchestrator_env_conf_name is not None:
+            orchestrator_cfg = OmegaConf.load(
+                os.path.join("aintelope", "config", "config_orchestrator.yaml")
             )
 
-            OmegaConf.update(experiment_cfg, "experiment_name", pipeline_env_conf_name)
+            OmegaConf.update(
+                experiment_cfg, "experiment_name", orchestrator_env_conf_name
+            )
             OmegaConf.update(
                 experiment_cfg,
                 "hparams",
-                pipeline_cfg[pipeline_env_conf_name],
+                orchestrator_cfg[orchestrator_env_conf_name],
                 force_add=True,
             )
 
