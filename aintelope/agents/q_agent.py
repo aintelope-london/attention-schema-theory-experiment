@@ -62,7 +62,7 @@ class QAgent(Agent):
         step: int = 0,
         env_layout_seed: int = 0,
         episode: int = 0,
-        orchestrator_cycle: int = 0,
+        trial: int = 0,
         test_mode: bool = False,
         *args,
         **kwargs,
@@ -92,7 +92,7 @@ class QAgent(Agent):
                 step,
                 env_layout_seed,
                 episode,
-                orchestrator_cycle,
+                trial,
             )
 
             if isinstance(action_space, Discrete):

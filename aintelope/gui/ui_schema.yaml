@@ -32,13 +32,13 @@ hparams:
     eps_end: [[0.0, 1.0], "float"]
     instinct_bias_epsilon_start: [[0.0, 1.0], "float"]
     instinct_bias_epsilon_end: [[0.0, 1.0], "float"]
-    eps_last_orchestrator_cycle: [[-1, 100], "int"]
+    eps_last_trial: [[-1, 100], "int"]
     eps_last_episode: [[-1, 10000], "int"]
     eps_last_env_layout_seed: [[-1, 1000], "int"]
   
   env_layout_seed_repeat_sequence_length: [[-1, 1000], "int"]
   env_layout_seed_modulo: [[0, 1000], "int"]
-  num_orchestrator_cycles: [[0, 100], "int"]
+  num_trials: [[0, 100], "int"]
   num_episodes: [[1, 10000], "int"]
   test_episodes: [[1, 1000], "int"]
   

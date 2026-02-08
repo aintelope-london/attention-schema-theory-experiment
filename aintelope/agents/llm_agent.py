@@ -315,7 +315,7 @@ class LLMAgent(Agent):
         step: int = 0,
         env_layout_seed: int = 0,
         episode: int = 0,
-        orchestrator_cycle: int = 0,
+        trial: int = 0,
         test_mode: bool = False,
         *args,
         **kwargs,
@@ -381,12 +381,12 @@ class LLMAgent(Agent):
             )
         if self.hparams.model_params.eps_last_episode > 1:
             epsilon *= max(0, 1 - episode / self.hparams.model_params.eps_last_episode)
-        if self.hparams.model_params.eps_last_orchestrator_cycle > 1:
+        if self.hparams.model_params.eps_last_trial > 1:
             epsilon *= max(
                 0,
                 1
-                - orchestrator_cycle
-                / self.hparams.model_params.eps_last_orchestrator_cycle,
+                - trial
+                / self.hparams.model_params.eps_last_trial,
             )
         epsilon += self.hparams.model_params.eps_end
 

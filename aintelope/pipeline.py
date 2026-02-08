@@ -76,21 +76,21 @@ def run_experiments(orchestrator_config):
         ),  # Linux does not unlock semaphore after a process gets killed, therefore disabling Semaphore under Linux until this gets resolved.
     ) as semaphore:
         print("Semaphore acquired...")
-        # In case of 0 orchestrator cycles (num_orchestrator_cycles == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
-        # In case of (num_orchestrator_cycles > 0), train a SHARED model over all environments in the orchestrator steps for num_orchestrator_cycles. Then test that shared model for one additional cycle.
-        # Therefore, the + 1 cycle is for testing. In case of (num_orchestrator_cycles == 0), run testing inside the same cycle immediately after each environment's training ends.
-        max_orchestrator_cycle = cfg.hparams.num_orchestrator_cycles + 1
+        # In case of 0 orchestrator cycles (num_trials == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
+        # In case of (num_trials > 0), train a SHARED model over all environments in the orchestrator steps for num_trials. Then test that shared model for one additional cycle.
+        # Therefore, the + 1 cycle is for testing. In case of (num_trials == 0), run testing inside the same cycle immediately after each environment's training ends.
+        max_trial = cfg.hparams.num_trials + 1
         with RobustProgressBar(
-            max_value=max_orchestrator_cycle
-        ) as orchestrator_cycle_bar:  # this is a slow task so lets use a progress bar
-            for i_orchestrator_cycle in range(0, max_orchestrator_cycle):
-                # In case of (num_orchestrator_cycles == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
-                # In case of (num_orchestrator_cycles > 0), train a SHARED model over all environments in the orchestrator steps for num_orchestrator_cycles. Then test that shared model for one additional cycle
+            max_value=max_trial
+        ) as trial_bar:  # this is a slow task so lets use a progress bar
+            for i_trial in range(0, max_trial):
+                # In case of (num_trials == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
+                # In case of (num_trials > 0), train a SHARED model over all environments in the orchestrator steps for num_trials. Then test that shared model for one additional cycle
                 train_mode = (
-                    i_orchestrator_cycle < cfg.hparams.num_orchestrator_cycles
-                    or cfg.hparams.num_orchestrator_cycles == 0
+                    i_trial < cfg.hparams.num_trials
+                    or cfg.hparams.num_trials == 0
                 )
-                test_mode = i_orchestrator_cycle == cfg.hparams.num_orchestrator_cycles
+                test_mode = i_trial == cfg.hparams.num_trials
 
                 with RobustProgressBar(
                     max_value=len(orchestrator_config)
@@ -132,23 +132,23 @@ def run_experiments(orchestrator_config):
                         num_actual_train_episodes = -1
                         if (
                             train_mode and test_mode
-                        ):  # In case of (num_orchestrator_cycles == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
+                        ):  # In case of (num_trials == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
                             num_actual_train_episodes = run_experiment(
                                 experiment_cfg,
                                 experiment_name=env_conf_name,
                                 score_dimensions=score_dimensions,
                                 test_mode=False,
-                                i_orchestrator_cycle=i_orchestrator_cycle,
+                                i_trial=i_trial,
                             )
                         elif test_mode:
-                            pass  # TODO: optional: obtain num_actual_train_episodes. But this is not too important: in case of training a model over one or more orchestrator cycles, the final test cycle gets its own i_orchestrator_cycle index, therefore it is clearly distinguishable anyway
+                            pass  # TODO: optional: obtain num_actual_train_episodes. But this is not too important: in case of training a model over one or more orchestrator cycles, the final test cycle gets its own i_trial index, therefore it is clearly distinguishable anyway
 
                         run_experiment(
                             experiment_cfg,
                             experiment_name=env_conf_name,
                             score_dimensions=score_dimensions,
                             test_mode=test_mode,
-                            i_orchestrator_cycle=i_orchestrator_cycle,
+                            i_trial=i_trial,
                             num_actual_train_episodes=num_actual_train_episodes,
                         )
 
@@ -169,7 +169,7 @@ def run_experiments(orchestrator_config):
                                 score_dimensions,
                                 title=title,
                                 experiment_name=env_conf_name,
-                                group_by_orchestrator_cycle=cfg.hparams.num_orchestrator_cycles
+                                group_by_trial=cfg.hparams.num_trials
                                 >= 1,
                                 gridsearch_params=None,
                                 show_plot=experiment_cfg.hparams.show_plot,
@@ -182,10 +182,10 @@ def run_experiments(orchestrator_config):
                     # / for env_conf_name in orchestrator_config:
                 # / with RobustProgressBar(max_value=len(orchestrator_config)) as orchestrator_bar:
 
-                orchestrator_cycle_bar.update(i_orchestrator_cycle + 1)
+                trial_bar.update(i_trial + 1)
 
-            # / for i_orchestrator_cycle in range(0, max_orchestrator_cycle):
-        # / with RobustProgressBar(max_value=max_orchestrator_cycle) as orchestrator_cycle_bar:
+            # / for i_trial in range(0, max_trial):
+        # / with RobustProgressBar(max_value=max_trial) as trial_bar:
     # / with Semaphore('name', max_count=num_workers, disable=False) as semaphore:
 
     # Write the orchestrator results to file only when entire orchestrator has run. Else crashing the program during orchestrator run will cause the aggregated results file to contain partial data which will be later duplicated by re-run.
@@ -221,7 +221,7 @@ def analytics(
     score_dimensions,
     title,
     experiment_name,
-    group_by_orchestrator_cycle,
+    group_by_trial,
     gridsearch_params=DictConfig,
     show_plot=False,
 ):
@@ -230,7 +230,7 @@ def analytics(
     experiment_dir = os.path.normpath(cfg.experiment_dir)
     events_fname = cfg.events_fname
     num_train_episodes = cfg.hparams.num_episodes
-    num_train_orchestrator_cycles = cfg.hparams.num_orchestrator_cycles
+    num_train_trials = cfg.hparams.num_trials
 
     savepath = os.path.join(log_dir, "plot_" + experiment_name)
     events = recording.read_events(experiment_dir, events_fname)
@@ -248,9 +248,9 @@ def analytics(
         score_dimensions_out,
     ) = plotting.aggregate_scores(
         events,
-        num_train_orchestrator_cycles,
+        num_train_trials,
         score_dimensions,
-        group_by_orchestrator_cycle=group_by_orchestrator_cycle,
+        group_by_trial=group_by_trial,
     )
 
     test_summary = {
@@ -262,9 +262,9 @@ def analytics(
         "gridsearch_params": OmegaConf.to_container(gridsearch_params, resolve=True)
         if gridsearch_params is not None
         else None,  # Object of type DictConfig is not JSON serializable, neither can yaml.dump in plotting.prettyprint digest it, so need to convert it to ordinary dictionary
-        "num_train_orchestrator_cycles": num_train_orchestrator_cycles,
+        "num_train_trials": num_train_trials,
         "score_dimensions": score_dimensions_out,
-        "group_by_orchestrator_cycle": group_by_orchestrator_cycle,
+        "group_by_trial": group_by_trial,
         "test_totals": test_totals,
         "test_averages": test_averages,
         "test_variances": test_variances,
@@ -284,11 +284,11 @@ def analytics(
     plotting.plot_performance(
         events,
         num_train_episodes,
-        num_train_orchestrator_cycles,
+        num_train_trials,
         score_dimensions,
         save_path=savepath,
         title=title,
-        group_by_orchestrator_cycle=group_by_orchestrator_cycle,
+        group_by_trial=group_by_trial,
         show_plot=show_plot,
     )
 
