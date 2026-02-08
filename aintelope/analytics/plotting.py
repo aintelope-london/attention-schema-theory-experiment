@@ -62,12 +62,8 @@ def filter_train_and_test_events(
     if (
         group_by_trial
     ):  # TODO: perhaps this branch is not needed and the "IsTest" column is sufficient in all cases?
-        train_events = events[
-            events["Trial"] < num_train_trials
-        ]
-        test_events = events[
-            events["Trial"] >= num_train_trials
-        ]
+        train_events = events[events["Trial"] < num_train_trials]
+        test_events = events[events["Trial"] >= num_train_trials]
     else:
         train_events = events[events["IsTest"] == 0]
         test_events = events[events["IsTest"] == 1]

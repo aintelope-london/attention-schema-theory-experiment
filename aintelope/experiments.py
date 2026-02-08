@@ -67,8 +67,9 @@ def run_experiment(
         raise NotImplementedError(f"Unknown environment type {type(env)}")
 
     # NB! gridsearch_trial_no is NOT saved to output data files. Instead, the individual trials are identified by the timestamp_pid_uuid available in the experiment folder name. This enables running gridsearch on multiple computers concurrently without having to worry about unique gridsearch trial numbers allocation and potential collisions.
-    events_columns = cfg.run_params.event_columns
-    + (score_dimensions if isinstance(env, GridworldZooBaseEnv) else ["Score"])
+    events_columns = list(cfg.run_params.event_columns) + (
+        score_dimensions if isinstance(env, GridworldZooBaseEnv) else ["Score"]
+    )
 
     experiment_dir = os.path.normpath(cfg.experiment_dir)
     events_fname = cfg.events_fname
@@ -197,9 +198,7 @@ def run_experiment(
     # Main loop
 
     if is_sb3 and not test_mode:
-        num_actual_train_episodes = run_baseline_training(
-            cfg, i_trial, env, agents
-        )
+        num_actual_train_episodes = run_baseline_training(cfg, i_trial, env, agents)
 
     else:
         model_needs_saving = (
@@ -303,7 +302,6 @@ def run_experiment(
                     disable=unit_test_mode,
                 ) as step_bar:  # this is a slow task so lets use a progress bar    # note that ProgressBar crashes under unit test mode, so it will be disabled if unit_test_mode is on
                     for step in range(cfg.hparams.env_params.num_iters):
-
                         if isinstance(env, ParallelEnv):
                             # loop: get observations and collect actions
                             actions = {}

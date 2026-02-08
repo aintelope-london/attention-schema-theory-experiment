@@ -384,9 +384,7 @@ class LLMAgent(Agent):
         if self.hparams.model_params.eps_last_trial > 1:
             epsilon *= max(
                 0,
-                1
-                - trial
-                / self.hparams.model_params.eps_last_trial,
+                1 - trial / self.hparams.model_params.eps_last_trial,
             )
         epsilon += self.hparams.model_params.eps_end
 

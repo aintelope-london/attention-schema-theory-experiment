@@ -127,8 +127,7 @@ def run_experiments(cfg: DictConfig) -> None:
                 # In case of (num_trials == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
                 # In case of (num_trials > 0), train a SHARED model over all environments in the orchestrator steps for num_trials. Then test that shared model for one additional cycle
                 train_mode = (
-                    i_trial < cfg.hparams.num_trials
-                    or cfg.hparams.num_trials == 0
+                    i_trial < cfg.hparams.num_trials or cfg.hparams.num_trials == 0
                 )
                 test_mode = i_trial == cfg.hparams.num_trials
 
@@ -327,8 +326,7 @@ def run_experiments(cfg: DictConfig) -> None:
                                 score_dimensions,
                                 title=title,
                                 experiment_name=env_conf_name,
-                                group_by_trial=cfg.hparams.num_trials
-                                >= 1,
+                                group_by_trial=cfg.hparams.num_trials >= 1,
                                 gridsearch_params=gridsearch_params,
                                 show_plot=show_plot,
                             )

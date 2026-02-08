@@ -107,9 +107,7 @@ def recalculate_gridsearch_sfella_scores(cfg: DictConfig) -> None:
                 experiment_cfg, "hparams", gridsearch_params, force_add=True
             )
 
-            num_train_trials = (
-                experiment_cfg.hparams.num_trials
-            )
+            num_train_trials = experiment_cfg.hparams.num_trials
             # score_dimensions = get_score_dimensions(experiment_cfg)
             score_dimensions = test_summary["score_dimensions"]
             score_dimensions.remove("Score")

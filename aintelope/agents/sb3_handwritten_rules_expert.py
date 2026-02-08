@@ -124,9 +124,7 @@ class SB3HandWrittenRulesExpert(object):
         if self.hparams.model_params.eps_last_trial > 1:
             epsilon *= max(
                 0,
-                1
-                - trial
-                / self.hparams.model_params.eps_last_trial,
+                1 - trial / self.hparams.model_params.eps_last_trial,
             )
         epsilon += self.hparams.model_params.eps_end
 
@@ -151,9 +149,7 @@ class SB3HandWrittenRulesExpert(object):
         if self.hparams.model_params.eps_last_trial > 1:
             handwritten_rule_epsilon *= max(
                 0,
-                1
-                - trial
-                / self.hparams.model_params.eps_last_trial,
+                1 - trial / self.hparams.model_params.eps_last_trial,
             )
         handwritten_rule_epsilon += (
             self.hparams.model_params.handwritten_rule_bias_epsilon_end
