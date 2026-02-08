@@ -101,5 +101,5 @@ if __name__ == "__main__":
 
     cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
 
-    use_same_parameters_for_all_pipeline_experiments = False
+    use_same_parameters_for_all_orchestrator_experiments = False
     remove_trials_from_results(cfg)

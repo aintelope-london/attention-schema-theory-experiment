@@ -5,7 +5,7 @@
 # Repository:
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
-from aintelope.environments.demos.gridworlds.helpers.pipeline_env_demo_common import *
+from aintelope.environments.demos.gridworlds.helpers.orchestrator_env_demo_common import *
 
 if __name__ == "__main__":
     main("e_9_food_sharing")

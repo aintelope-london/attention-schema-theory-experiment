@@ -8,7 +8,7 @@
             "name": "GUI",
             "type": "debugpy",
             "request": "launch",
-            //"program": "aintelope/pipeline.py",
+            //"program": "aintelope/orchestrator.py",
             "module": "aintelope",
             "console": "integratedTerminal",
             "justMyCode": false,
@@ -31,13 +31,13 @@
             }
         },
         //-----------------------------------------------------------------------------------
-        // Configurations to run pipeline with X agent and default params
+        // Configurations to run orchestrator with X agent and default params
         //-----------------------------------------------------------------------------------
         {
-            "name": "Python: Run pipeline with random agent and default params",
+            "name": "Python: Run orchestrator with random agent and default params",
             "type": "debugpy",
             "request": "launch",
-            //"program": "aintelope/pipeline.py",
+            //"program": "aintelope/orchestrator.py",
             "module": "aintelope",
             "console": "integratedTerminal",
             "justMyCode": false,

@@ -67,7 +67,7 @@ class ExampleAgent(Agent):
         step: int = 0,
         env_layout_seed: int = 0,
         episode: int = 0,
-        pipeline_cycle: int = 0,
+        orchestrator_cycle: int = 0,
         test_mode: bool = False,
         *args,
         **kwargs,

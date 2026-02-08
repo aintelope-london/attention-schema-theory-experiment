@@ -125,14 +125,14 @@ def get_score_dimensions(cfg: DictConfig):
     return dimensions
 
 
-def get_pipeline_score_dimensions(cfg: DictConfig, pipeline_config: DictConfig):
+def get_orchestrator_score_dimensions(cfg: DictConfig, orchestrator_config: DictConfig):
     dimensions = set()
-    for env_conf in pipeline_config:
+    for env_conf in orchestrator_config:
         experiment_cfg = copy.deepcopy(
             cfg
         )  # need to deepcopy in order to not accumulate keys that were present in previous experiment and are not present in next experiment
         OmegaConf.update(  # need to merge configs here too since dimensions inside scores are not merged, but instead overwritten by experiment config. If main config has some score dimension that experiment does not have, then then that score dimension should not be used
-            experiment_cfg, "hparams", pipeline_config[env_conf], force_add=True
+            experiment_cfg, "hparams", orchestrator_config[env_conf], force_add=True
         )
         experiment_score_dimensions = get_score_dimensions(experiment_cfg)
         for dimension in experiment_score_dimensions:

@@ -38,7 +38,7 @@ run(base_test_config)
 Use `"module": "aintelope"` instead of `"program"`:
 ```jsonc
 {
-    "name": "Run pipeline",
+    "name": "Run orchestrator",
     "type": "debugpy",
     "request": "launch",
     "module": "aintelope",

@@ -253,7 +253,7 @@ class ConfigGUI:
         self.config_var.set(output_name)
 
     def _run(self):
-        """Return diff config as pipeline config and close GUI."""
+        """Return diff config as orchestrator config and close GUI."""
         hparams_diff = self.diff_config.get("hparams", {})
         self.result = OmegaConf.create({"gui_run": hparams_diff})
         self.root.quit()

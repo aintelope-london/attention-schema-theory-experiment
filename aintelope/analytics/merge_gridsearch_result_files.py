@@ -156,5 +156,5 @@ def merge_gridsearch_result_files() -> None:
 if __name__ == "__main__":
     register_resolvers()
 
-    use_same_parameters_for_all_pipeline_experiments = False
+    use_same_parameters_for_all_orchestrator_experiments = False
     merge_gridsearch_result_files()

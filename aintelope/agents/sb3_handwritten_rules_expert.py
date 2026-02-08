@@ -95,7 +95,7 @@ class SB3HandWrittenRulesExpert(object):
         step: int = 0,
         env_layout_seed: int = 0,
         episode: int = 0,
-        pipeline_cycle: int = 0,
+        orchestrator_cycle: int = 0,
         test_mode: bool = False,
         observation=None,
     ) -> int:
@@ -121,10 +121,12 @@ class SB3HandWrittenRulesExpert(object):
             )
         if self.hparams.model_params.eps_last_episode > 1:
             epsilon *= max(0, 1 - episode / self.hparams.model_params.eps_last_episode)
-        if self.hparams.model_params.eps_last_pipeline_cycle > 1:
+        if self.hparams.model_params.eps_last_orchestrator_cycle > 1:
             epsilon *= max(
                 0,
-                1 - pipeline_cycle / self.hparams.model_params.eps_last_pipeline_cycle,
+                1
+                - orchestrator_cycle
+                / self.hparams.model_params.eps_last_orchestrator_cycle,
             )
         epsilon += self.hparams.model_params.eps_end
 
@@ -146,10 +148,12 @@ class SB3HandWrittenRulesExpert(object):
             handwritten_rule_epsilon *= max(
                 0, 1 - episode / self.hparams.model_params.eps_last_episode
             )
-        if self.hparams.model_params.eps_last_pipeline_cycle > 1:
+        if self.hparams.model_params.eps_last_orchestrator_cycle > 1:
             handwritten_rule_epsilon *= max(
                 0,
-                1 - pipeline_cycle / self.hparams.model_params.eps_last_pipeline_cycle,
+                1
+                - orchestrator_cycle
+                / self.hparams.model_params.eps_last_orchestrator_cycle,
             )
         handwritten_rule_epsilon += (
             self.hparams.model_params.handwritten_rule_bias_epsilon_end
@@ -188,7 +192,7 @@ class SB3HandWrittenRulesExpert(object):
         step: int = 0,
         env_layout_seed: int = 0,
         episode: int = 0,
-        pipeline_cycle: int = 0,
+        orchestrator_cycle: int = 0,
         test_mode: bool = False,
         override_type: int = 0,
         deterministic: bool = False,  # This is set only during evaluation, not training and the meaning is that the agent is greedy - it takes the best action. It does NOT mean that the action is always same.
