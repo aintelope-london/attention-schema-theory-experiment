@@ -85,7 +85,7 @@ def run_experiments(cfg: DictConfig) -> None:
     # TODO: ensure to do not use special orchestrator config when doing initial gridsearch
     orchestrator_config_file = os.environ.get("orchestrator_CONFIG")
     if orchestrator_config_file is None:
-        orchestrator_config_file = "config_orchestrator.yaml"
+        orchestrator_config_file = "example_config.yaml"
     orchestrator_config = OmegaConf.load(
         os.path.join("aintelope", "config", orchestrator_config_file)
     )

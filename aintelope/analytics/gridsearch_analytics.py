@@ -982,7 +982,7 @@ def gridsearch_analytics(cfg: DictConfig) -> None:
         orchestrator_config_file = os.environ.get("orchestrator_CONFIG")
         using_default_orchestrator_config_file = False
         if orchestrator_config_file is None:
-            orchestrator_config_file = "config_orchestrator.yaml"
+            orchestrator_config_file = "example_config.yaml"
             using_default_orchestrator_config_file = True
 
         orchestrator_config = OmegaConf.load(
