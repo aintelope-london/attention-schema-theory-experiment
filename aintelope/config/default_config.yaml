@@ -22,7 +22,12 @@ trainer_params:
   device: gpu        # unused        # TODO
   verbose: false
 
+ 
 hparams:
+  run_params:
+    event_columns: [
+      Run_id, Trial, Episode, Env layout seed, Step, IsTest,
+      Agent_id, State, Action, Reward, Done, Next_state,]
   show_plot: False
   gridsearch_trial_no: 0        # is set by gridsearch config file
   params_set_title: "main config"
@@ -47,13 +52,13 @@ hparams:
     eps_end: 0.0
     instinct_bias_epsilon_start: 0.0
     instinct_bias_epsilon_end: 0.0
-    eps_last_orchestrator_cycle: -1
+    eps_last_trial: -1
     eps_last_episode: -1       # use -1 when episode counting for eps is disabled
     eps_last_env_layout_seed: -1  # 10       # use -1 when trials counting for eps is disabled
     eps_last_frame: ${hparams.env_params.num_iters}       # use -1 when iteration counting for eps is disabled
   env_layout_seed_repeat_sequence_length: -1 # 10
   env_layout_seed_modulo: 0   # How many different layout seeds there should be overall? After given amount of seeds has been used, the seed will loop over to zero and repeat the seed sequence. Zero or negative modulo parameter value disables the modulo feature.
-  num_orchestrator_cycles: 0
+  num_trials: 0
   num_episodes: 10 # how long to train. # TODO: move num_episodes to model_params
   test_episodes: 10 # will be added to train episodes
   env_params:

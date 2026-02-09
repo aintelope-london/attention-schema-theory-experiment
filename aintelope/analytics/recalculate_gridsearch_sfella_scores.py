@@ -107,14 +107,12 @@ def recalculate_gridsearch_sfella_scores(cfg: DictConfig) -> None:
                 experiment_cfg, "hparams", gridsearch_params, force_add=True
             )
 
-            num_train_orchestrator_cycles = (
-                experiment_cfg.hparams.num_orchestrator_cycles
-            )
+            num_train_trials = experiment_cfg.hparams.num_trials
             # score_dimensions = get_score_dimensions(experiment_cfg)
             score_dimensions = test_summary["score_dimensions"]
             score_dimensions.remove("Score")
             score_dimensions.remove("Reward")
-            group_by_orchestrator_cycle = cfg.hparams.num_orchestrator_cycles >= 1
+            group_by_trial = cfg.hparams.num_trials >= 1
 
             (
                 test_totals,
@@ -129,9 +127,9 @@ def recalculate_gridsearch_sfella_scores(cfg: DictConfig) -> None:
                 score_dimensions_out,
             ) = plotting.aggregate_scores(
                 events,
-                num_train_orchestrator_cycles,
+                num_train_trials,
                 score_dimensions,
-                group_by_orchestrator_cycle=group_by_orchestrator_cycle,
+                group_by_trial=group_by_trial,
             )
 
             recalculated_test_summary = {
@@ -145,9 +143,9 @@ def recalculate_gridsearch_sfella_scores(cfg: DictConfig) -> None:
                 )
                 if gridsearch_params is not None
                 else None,  # Object of type DictConfig is not JSON serializable, neither can yaml.dump in plotting.prettyprint digest it, so need to convert it to ordinary dictionary
-                "num_train_orchestrator_cycles": num_train_orchestrator_cycles,
+                "num_train_trials": num_train_trials,
                 "score_dimensions": score_dimensions_out,
-                "group_by_orchestrator_cycle": group_by_orchestrator_cycle,
+                "group_by_trial": group_by_trial,
                 "test_totals": test_totals,
                 "test_averages": test_averages,
                 "test_variances": test_variances,

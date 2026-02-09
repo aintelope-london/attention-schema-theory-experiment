@@ -43,7 +43,7 @@ def main(orchestrator_env_conf_name):
 
         if orchestrator_env_conf_name is not None:
             orchestrator_cfg = OmegaConf.load(
-                os.path.join("aintelope", "config", "config_orchestrator.yaml")
+                os.path.join("aintelope", "config", "example_config.yaml")
             )
 
             OmegaConf.update(

@@ -8,7 +8,6 @@
             "name": "GUI",
             "type": "debugpy",
             "request": "launch",
-            //"program": "aintelope/orchestrator.py",
             "module": "aintelope",
             "console": "integratedTerminal",
             "justMyCode": false,
@@ -37,12 +36,11 @@
             "name": "Python: Run orchestrator with random agent and default params",
             "type": "debugpy",
             "request": "launch",
-            //"program": "aintelope/orchestrator.py",
             "module": "aintelope",
             "console": "integratedTerminal",
             "justMyCode": false,
             "showUncaughtExceptions": true,
-            "args": [ "--config-name=default_config_random" ],
+            "args": [ "example_config.yaml" ],
             "env": {
                 //"PYTHONPATH": "your_path_here"
             }

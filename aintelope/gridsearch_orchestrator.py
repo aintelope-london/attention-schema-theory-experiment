@@ -85,7 +85,7 @@ def run_experiments(cfg: DictConfig) -> None:
     # TODO: ensure to do not use special orchestrator config when doing initial gridsearch
     orchestrator_config_file = os.environ.get("orchestrator_CONFIG")
     if orchestrator_config_file is None:
-        orchestrator_config_file = "config_orchestrator.yaml"
+        orchestrator_config_file = "example_config.yaml"
     orchestrator_config = OmegaConf.load(
         os.path.join("aintelope", "config", orchestrator_config_file)
     )
@@ -116,21 +116,20 @@ def run_experiments(cfg: DictConfig) -> None:
         if gridsearch_params_in is None:
             print("Semaphore acquired...")
 
-        # In case of 0 orchestrator cycles (num_orchestrator_cycles == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
-        # In case of (num_orchestrator_cycles > 0), train a SHARED model over all environments in the orchestrator steps for num_orchestrator_cycles. Then test that shared model for one additional cycle.
-        # Therefore, the + 1 cycle is for testing. In case of (num_orchestrator_cycles == 0), run testing inside the same cycle immediately after each environment's training ends.
-        max_orchestrator_cycle = cfg.hparams.num_orchestrator_cycles + 1
+        # In case of 0 orchestrator cycles (num_trials == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
+        # In case of (num_trials > 0), train a SHARED model over all environments in the orchestrator steps for num_trials. Then test that shared model for one additional cycle.
+        # Therefore, the + 1 cycle is for testing. In case of (num_trials == 0), run testing inside the same cycle immediately after each environment's training ends.
+        max_trial = cfg.hparams.num_trials + 1
         with RobustProgressBar(
-            max_value=max_orchestrator_cycle
-        ) as orchestrator_cycle_bar:  # this is a slow task so lets use a progress bar
-            for i_orchestrator_cycle in range(0, max_orchestrator_cycle):
-                # In case of (num_orchestrator_cycles == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
-                # In case of (num_orchestrator_cycles > 0), train a SHARED model over all environments in the orchestrator steps for num_orchestrator_cycles. Then test that shared model for one additional cycle
+            max_value=max_trial
+        ) as trial_bar:  # this is a slow task so lets use a progress bar
+            for i_trial in range(0, max_trial):
+                # In case of (num_trials == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
+                # In case of (num_trials > 0), train a SHARED model over all environments in the orchestrator steps for num_trials. Then test that shared model for one additional cycle
                 train_mode = (
-                    i_orchestrator_cycle < cfg.hparams.num_orchestrator_cycles
-                    or cfg.hparams.num_orchestrator_cycles == 0
+                    i_trial < cfg.hparams.num_trials or cfg.hparams.num_trials == 0
                 )
-                test_mode = i_orchestrator_cycle == cfg.hparams.num_orchestrator_cycles
+                test_mode = i_trial == cfg.hparams.num_trials
 
                 with RobustProgressBar(
                     max_value=len(orchestrator_config)
@@ -290,23 +289,23 @@ def run_experiments(cfg: DictConfig) -> None:
                         num_actual_train_episodes = -1
                         if (
                             train_mode and test_mode
-                        ):  # In case of (num_orchestrator_cycles == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
+                        ):  # In case of (num_trials == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
                             num_actual_train_episodes = run_experiment(
                                 experiment_cfg,
                                 experiment_name=env_conf_name,
                                 score_dimensions=score_dimensions,
                                 test_mode=False,
-                                i_orchestrator_cycle=i_orchestrator_cycle,
+                                i_trial=i_trial,
                             )
                         elif test_mode:
-                            pass  # TODO: optional: obtain num_actual_train_episodes. But this is not too important: in case of training a model over one or more orchestrator cycles, the final test cycle gets its own i_orchestrator_cycle index, therefore it is clearly distinguishable anyway
+                            pass  # TODO: optional: obtain num_actual_train_episodes. But this is not too important: in case of training a model over one or more orchestrator cycles, the final test cycle gets its own i_trial index, therefore it is clearly distinguishable anyway
 
                         run_experiment(
                             experiment_cfg,
                             experiment_name=env_conf_name,
                             score_dimensions=score_dimensions,
                             test_mode=test_mode,
-                            i_orchestrator_cycle=i_orchestrator_cycle,
+                            i_trial=i_trial,
                             num_actual_train_episodes=num_actual_train_episodes,
                         )
 
@@ -327,8 +326,7 @@ def run_experiments(cfg: DictConfig) -> None:
                                 score_dimensions,
                                 title=title,
                                 experiment_name=env_conf_name,
-                                group_by_orchestrator_cycle=cfg.hparams.num_orchestrator_cycles
-                                >= 1,
+                                group_by_trial=cfg.hparams.num_trials >= 1,
                                 gridsearch_params=gridsearch_params,
                                 show_plot=show_plot,
                             )
@@ -340,10 +338,10 @@ def run_experiments(cfg: DictConfig) -> None:
                     # / for env_conf_name in orchestrator_config:
                 # / with RobustProgressBar(max_value=len(orchestrator_config)) as orchestrator_bar:
 
-                orchestrator_cycle_bar.update(i_orchestrator_cycle + 1)
+                trial_bar.update(i_trial + 1)
 
-            # / for i_orchestrator_cycle in range(0, max_orchestrator_cycle):
-        # / with RobustProgressBar(max_value=max_orchestrator_cycle) as orchestrator_cycle_bar:
+            # / for i_trial in range(0, max_trial):
+        # / with RobustProgressBar(max_value=max_trial) as trial_bar:
     # / with Semaphore('name', max_count=num_workers, disable=gridsearch_params_in is not None) as semaphore:
 
     # Write the orchestrator results to file only when entire orchestrator has run. Else crashing the program during orchestrator run will cause the aggregated results file to contain partial data which will be later duplicated by re-run.
