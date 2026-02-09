@@ -48,8 +48,6 @@ dependencies = [
   "supersuit==3.9.3",
   "tenacity==8.2.2",
   "tiktoken==0.9.0",
-  "ai-safety-gridworlds @ git+https://github.com/biological-alignment-benchmarks/ai-safety-gridworlds@biological-compatibility-benchmarks",
-  "zoo-to-gym-multiagent-adapter @ git+https://github.com/biological-alignment-benchmarks/zoo_to_gym_multiagent_adapter@main",
 ]
 
 [project.optional-dependencies]

@@ -22,8 +22,10 @@ venv-310: ## create virtual environment
 clean-venv: ## remove virtual environment
 	if [ -d $(VENV) ]; then rm -r $(VENV) ; fi;
 
-install: ## Install packages
+install:
 	pip uninstall -y ai_safety_gridworlds 2>&1 | grep -v "not installed" | cat
+	pip install -e "git+https://github.com/biological-alignment-benchmarks/ai-safety-gridworlds@biological-compatibility-benchmarks#egg=ai-safety-gridworlds"
+	pip install -e "git+https://github.com/biological-alignment-benchmarks/zoo_to_gym_multiagent_adapter@main#egg=zoo-to-gym-multiagent-adapter"
 	pip install -e .
 
 install-dev: ## Install development packages

@@ -13,6 +13,9 @@ jobs:
           cache: 'pip'
           cache-dependency-path: pyproject.toml
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: |
+          pip install -e "git+https://github.com/biological-alignment-benchmarks/ai-safety-gridworlds@biological-compatibility-benchmarks#egg=ai-safety-gridworlds"
+          pip install -e "git+https://github.com/biological-alignment-benchmarks/zoo_to_gym_multiagent_adapter@main#egg=zoo-to-gym-multiagent-adapter"
+          pip install -e ".[dev]"
       - name: Run tests
         run: python -m pytest --cov=aintelope tests
