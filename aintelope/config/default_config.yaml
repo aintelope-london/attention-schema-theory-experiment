@@ -22,12 +22,12 @@ trainer_params:
   device: gpu        # unused        # TODO
   verbose: false
 
-run_params:
-  event_columns: [
-    Run_id, Trial, Episode, Env layout seed, Step, IsTest,
-    Agent_id, State, Action, Reward, Done, Next_state,]
-  
+ 
 hparams:
+  run_params:
+    event_columns: [
+      Run_id, Trial, Episode, Env layout seed, Step, IsTest,
+      Agent_id, State, Action, Reward, Done, Next_state,]
   show_plot: False
   gridsearch_trial_no: 0        # is set by gridsearch config file
   params_set_title: "main config"
