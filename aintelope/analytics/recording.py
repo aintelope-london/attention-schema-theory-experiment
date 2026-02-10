@@ -14,6 +14,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pickle
 
 from filelock import FileLock
 
@@ -24,26 +25,6 @@ logger = logging.getLogger("aintelope.analytics.recording")
 """
 
 """
-
-'''
-def serialize_state(state):
-    """Bool-cast, compress, base64-encode a state array for CSV storage."""
-    arr = np.asarray(state, dtype=np.bool_)
-    header = ",".join(str(d) for d in arr.shape).encode("ascii")
-    payload = zlib.compress(arr.tobytes())
-    return base64.b64encode(header + b"|" + payload).decode("ascii")
-
-
-def deserialize_state(cell):
-    """Reverse of serialize_state."""
-    raw = base64.b64decode(cell)
-    header, payload = raw.split(b"|", 1)
-    shape = tuple(int(d) for d in header.decode("ascii").split(","))
-    data = zlib.decompress(payload)
-    return np.frombuffer(data, dtype=np.bool_).copy().reshape(shape)
-'''
-
-import pickle
 
 
 def serialize_state(state):
