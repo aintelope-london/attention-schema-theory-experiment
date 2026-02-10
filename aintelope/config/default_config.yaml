@@ -8,8 +8,7 @@
 timestamp: ${now:%Y%m%d%H%M%S}      # TODO: currently this applies only to log_dir name, not to checkpoint filename. Checkpoint filename timestamp format is hardcoded in dqn_training.py
 timestamp_pid_uuid: ${append_pid_and_uuid:${timestamp}}
 experiment_name: experiment
-events_fname: events.csv
-lzma_events_log: True          
+events_fname: events.csv         
 checkpoint_dir: checkpoints/
 log_dir_root: outputs
 log_dir: ${log_dir_root}/${timestamp_pid_uuid}/
@@ -22,12 +21,12 @@ trainer_params:
   device: gpu        # unused        # TODO
   verbose: false
 
- 
 hparams:
   run_params:
     event_columns: [
       Run_id, Trial, Episode, Env layout seed, Step, IsTest,
       Agent_id, State, Action, Reward, Done, Next_state,]
+    save_logs: True
   show_plot: False
   gridsearch_trial_no: 0        # is set by gridsearch config file
   params_set_title: "main config"
