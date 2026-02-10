@@ -102,18 +102,7 @@ def run_experiments(orchestrator_config):
                         experiment_cfg.hparams = OmegaConf.merge(
                             experiment_cfg.hparams, orchestrator_config[env_conf_name]
                         )
-                        """
-                        OmegaConf.update(
-                            experiment_cfg, "experiment_name", env_conf_name
-                        )
 
-                        OmegaConf.update(
-                            experiment_cfg,
-                            "hparams",
-                            orchestrator_config[env_conf_name],
-                            force_add=True,
-                        )
-                        """
                         logger.info("Running training with the following configuration")
                         logger.info(
                             os.linesep
@@ -128,33 +117,24 @@ def run_experiments(orchestrator_config):
 
                         score_dimensions = get_score_dimensions(experiment_cfg)
 
-                        num_actual_train_episodes = -1
-                        if (
-                            train_mode and test_mode
-                        ):  # In case of (num_trials == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
-                            num_actual_train_episodes = run_experiment(
+                        if train_mode:
+                            run_experiment(
                                 experiment_cfg,
                                 experiment_name=env_conf_name,
                                 score_dimensions=score_dimensions,
                                 test_mode=False,
                                 i_trial=i_trial,
                             )
-                        elif test_mode:
-                            pass  # TODO: optional: obtain num_actual_train_episodes. But this is not too important: in case of training a model over one or more orchestrator cycles, the final test cycle gets its own i_trial index, therefore it is clearly distinguishable anyway
-
-                        run_experiment(
-                            experiment_cfg,
-                            experiment_name=env_conf_name,
-                            score_dimensions=score_dimensions,
-                            test_mode=test_mode,
-                            i_trial=i_trial,
-                            num_actual_train_episodes=num_actual_train_episodes,
-                        )
-
-                        # torch.cuda.empty_cache()
-                        # gc.collect()
 
                         if test_mode:
+                            run_experiment(
+                                experiment_cfg,
+                                experiment_name=env_conf_name,
+                                score_dimensions=score_dimensions,
+                                test_mode=True,
+                                i_trial=i_trial,
+                            )
+
                             # Not using timestamp_pid_uuid here since it would make the title too long. In case of manual execution with plots, the pid-uuid is probably not needed anyway.
                             title = (
                                 timestamp
