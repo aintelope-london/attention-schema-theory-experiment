@@ -23,11 +23,12 @@ from aintelope.config.config_utils import (
 )
 from aintelope.experiments import run_experiment
 from aintelope.utils.progress import ProgressReporter
+from aintelope.utils.seeding import set_global_seeds
 
 logger = logging.getLogger("aintelope.__main__")
 
 
-def run_experiments(orchestrator_config):
+def run_experiments(main_config):
     """
     extra_cfg: filename, DictConfig or nothing
     """
@@ -48,20 +49,23 @@ def run_experiments(orchestrator_config):
     )
     reporter.set_total("trial", cfg.hparams.trials)
     for i_trial in range(0, cfg.hparams.trials):
+        trial_seed = cfg.hparams.run_params.seed + i_trial
+        set_global_seeds(trial_seed)
         reporter.update("trial", i_trial + 1)
         # In case of (num_trials == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
         # In case of (num_trials > 0), train a SHARED model over all environments in the orchestrator steps for num_trials. Then test that shared model for one additional cycle
         train_mode = i_trial < cfg.hparams.num_trials or cfg.hparams.num_trials == 0
         test_mode = i_trial == cfg.hparams.num_trials
 
-        for env_conf_i, env_conf_name in enumerate(orchestrator_config):
+        for _, experiment_name in enumerate(main_config):
             experiment_cfg = copy.deepcopy(
                 cfg
             )  # need to deepcopy in order to not accumulate keys that were present in previous experiment and are not present in next experiment
 
             experiment_cfg.hparams = OmegaConf.merge(
-                experiment_cfg.hparams, orchestrator_config[env_conf_name]
+                experiment_cfg.hparams, main_config[experiment_name]
             )
+            OmegaConf.update(experiment_cfg.hparams, "seed", trial_seed, force_add=True)
 
             logger.info("Running training with the following configuration")
             logger.info(
@@ -70,14 +74,14 @@ def run_experiments(orchestrator_config):
 
             # Training
             params_set_title = experiment_cfg.hparams.params_set_title
-            logger.info(f"params_set: {params_set_title}, experiment: {env_conf_name}")
+            logger.info(f"params_set: {params_set_title}, experiment: {experiment_name}")
 
             score_dimensions = get_score_dimensions(experiment_cfg)
 
             if train_mode:
                 run_experiment(
                     experiment_cfg,
-                    experiment_name=env_conf_name,
+                    experiment_name=experiment_name,
                     score_dimensions=score_dimensions,
                     test_mode=False,
                     i_trial=i_trial,
@@ -87,7 +91,7 @@ def run_experiments(orchestrator_config):
             if test_mode:
                 run_experiment(
                     experiment_cfg,
-                    experiment_name=env_conf_name,
+                    experiment_name=experiment_name,
                     score_dimensions=score_dimensions,
                     test_mode=True,
                     i_trial=i_trial,
@@ -95,12 +99,12 @@ def run_experiments(orchestrator_config):
                 )
 
                 # Not using timestamp_pid_uuid here since it would make the title too long. In case of manual execution with plots, the pid-uuid is probably not needed anyway.
-                title = timestamp + " : " + params_set_title + " : " + env_conf_name
+                title = timestamp + " : " + params_set_title + " : " + experiment_name
                 summary = analytics(
                     experiment_cfg,
                     score_dimensions,
                     title=title,
-                    experiment_name=env_conf_name,
+                    experiment_name=experiment_name,
                     group_by_trial=cfg.hparams.num_trials >= 1,
                 )
                 summaries.append(summary)
@@ -165,7 +169,7 @@ def analytics(
         "timestamp": cfg.timestamp,
         "timestamp_pid_uuid": cfg.timestamp_pid_uuid,
         "experiment_name": experiment_name,
-        "title": title,  # timestamp + " : " + params_set_title + " : " + env_conf_name
+        "title": title,  # timestamp + " : " + params_set_title + " : " + experiment_name
         "params_set_title": cfg.hparams.params_set_title,
         "num_train_trials": num_train_trials,
         "score_dimensions": score_dimensions_out,
