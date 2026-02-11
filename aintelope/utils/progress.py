@@ -21,10 +21,10 @@ class ProgressReporter:
         self.state[level]["current"] = current
         # Reset all levels below
         reset = False
-        for l in self.levels:
+        for lev in self.levels:
             if reset:
-                self.state[l]["current"] = 0
-            if l == level:
+                self.state[lev]["current"] = 0
+            if lev == level:
                 reset = True
         self._notify()
 
