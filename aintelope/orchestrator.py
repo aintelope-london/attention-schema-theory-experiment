@@ -214,12 +214,12 @@ def analytics(
     return test_summary
 
 
-def print_progress(state):
-    print(
-        f"\rtrial {state['trial']['current']}/{state['trial']['total']}  episode {state['episode']['current']}/{state['episode']['total']}",
-        end="",
-        flush=True,
-    )
+def print_progress(reporter):
+    parts = [
+        f"{level} {reporter.state[level]['current']}/{reporter.state[level]['total']}"
+        for level in reporter.levels
+    ]
+    print(f"\r{' | '.join(parts)}", end="", flush=True)
 
 
 # if __name__ == "__main__":

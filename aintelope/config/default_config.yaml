@@ -27,6 +27,7 @@ hparams:
       Run_id, Trial, Episode, Env layout seed, Step, IsTest,
       Agent_id, State, Action, Reward, Done, Next_state,]
     save_logs: True
+  trials: 1
   gridsearch_trial_no: 0        # is set by gridsearch config file
   params_set_title: "main config"
   do_not_enforce_checkpoint_file_existence_during_test: False

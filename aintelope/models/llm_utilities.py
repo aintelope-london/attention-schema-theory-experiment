@@ -20,8 +20,6 @@ import json_tricks
 import openai
 from openai import OpenAI
 
-from aintelope.utils import Timer, wait_for_enter
-
 
 client = (
     OpenAI(
@@ -116,13 +114,11 @@ def completion_with_backoff(
             if attempt_number < max_attempt_number:
                 print("Rate limit error, retrying...")
             else:
-                wait_for_enter("Rate limit error. Press any key to retry")
+                print("Rate limit error.")
 
         else:  # / if (t ishttpcore.ReadTimeout
             msg = str(ex) + "\n" + traceback.format_exc()
             print(msg)
-
-            wait_for_enter("Press any key to retry")
 
         # / if (t ishttpcore.ReadTimeout
 
