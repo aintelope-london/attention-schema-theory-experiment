@@ -14,8 +14,6 @@ from gymnasium.spaces import Discrete
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 
-from aintelope.utils import RobustProgressBar
-
 import numpy as np
 import numpy.typing as npt
 import os
@@ -234,7 +232,6 @@ class SB3BaseAgent(Agent):
         i_trial: int = 0,
         events: pd.DataFrame = None,  # TODO: this is no longer a DataFrame, but an EventLog
         score_dimensions: list = [],
-        progressbar: RobustProgressBar = None,
         **kwargs,
     ) -> None:
         self.id = agent_id
@@ -250,7 +247,6 @@ class SB3BaseAgent(Agent):
         self.next_episode_no = 0
         self.total_steps_across_episodes = 0
         self.score_dimensions = score_dimensions
-        self.progressbar = progressbar
         self.events = events
         self.done = False
         self.last_action = None
@@ -412,14 +408,6 @@ class SB3BaseAgent(Agent):
         if self.events is None:
             return
 
-        self.total_steps_across_episodes += 1
-        if self.progressbar is not None:
-            self.progressbar.update(
-                min(
-                    self.total_steps_across_episodes, self.progressbar.max_value
-                )  # PPO does extra episodes, which causes the step counter to go beyond max_value of progress bar
-            )
-
         i_trial = self.i_trial
         i_episode = (
             self.next_episode_no - 1
@@ -509,12 +497,6 @@ class SB3BaseAgent(Agent):
             return
 
         self.total_steps_across_episodes += 1
-        if self.progressbar is not None:
-            self.progressbar.update(
-                min(
-                    self.total_steps_across_episodes, self.progressbar.max_value
-                )  # PPO does extra episodes, which causes the step counter to go beyond max_value of progress bar
-            )
 
         action = np.asarray(
             action

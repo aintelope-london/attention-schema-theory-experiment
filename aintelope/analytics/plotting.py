@@ -226,7 +226,6 @@ def plot_performance(
     save_path: Optional[str],
     title: Optional[str] = "",
     group_by_trial: bool = False,
-    show_plot: bool = False,
 ):
     """
     Plot performance between rewards and scores.
@@ -303,18 +302,19 @@ def plot_performance(
     if save_path:
         save_plot(fig, save_path)
 
-    if show_plot:
-        # enable this code if you want the plot to open automatically
-        plt.ion()
-        maximise_plot()
-        fig.show()
-        plt.draw()
-        # TODO: use multithreading for rendering the plot
-        plt.pause(
-            60
-        )  # render the plot. Usually the plot is rendered quickly but sometimes it may require up to 60 sec. Else you get just a blank window
-
     return fig
+
+
+def show_plot(fig):
+    # Unused TODO will be removed when we do proper gui
+    plt.ion()
+    maximise_plot()
+    fig.show()
+    plt.draw()
+    # TODO: use multithreading for rendering the plot
+    plt.pause(
+        60
+    )  # render the plot. Usually the plot is rendered quickly but sometimes it may require up to 60 sec. Else you get just a blank window
 
 
 def plot_heatmap(agent, env):

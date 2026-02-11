@@ -8,13 +8,9 @@
 import glob
 import logging
 import os
-from pathlib import Path
 import gc
 
-import pandas as pd
 from omegaconf import DictConfig
-
-from aintelope.utils import RobustProgressBar
 
 from aintelope.agents import get_agent_class
 from aintelope.analytics import recording
@@ -22,7 +18,7 @@ from aintelope.environments import get_env_class
 from aintelope.environments.savanna_safetygrid import GridworldZooBaseEnv
 from aintelope.training.dqn_training import Trainer
 
-from typing import Any, Union
+from typing import Union
 import gymnasium as gym
 from pettingzoo import AECEnv, ParallelEnv
 
@@ -36,6 +32,7 @@ def run_experiment(
     score_dimensions: list = [],
     test_mode: bool = True,
     i_trial: int = 0,
+    reporter=None,
 ) -> None:
     if "trial_length" in cfg:  # backwards compatibility
         cfg.env_layout_seed_repeat_sequence_length = cfg.trial_length
@@ -201,281 +198,251 @@ def run_experiment(
     model_needs_saving = (
         False  # if no training episodes are specified then do not save models
     )
+    reporter.set_total("episode", cfg.hparams.num_episodes)
+    for i_episode in range(cfg.hparams.num_episodes):
+        reporter.update("episode", i_episode + 1)
+        events.flush()
 
-    r = range(cfg.hparams.num_episodes)
+        env_layout_seed = (
+            int(i_episode / cfg.hparams.env_layout_seed_repeat_sequence_length)
+            if cfg.hparams.env_layout_seed_repeat_sequence_length > 0
+            else i_episode  # this ensures that during test episodes, env_layout_seed based map randomization seed is different from training seeds. The environment is re-constructed when testing starts. Without explicitly providing env_layout_seed, the map randomization seed would be automatically reset to env_layout_seed = 0, which would overlap with the training seeds.
+        )
 
-    with RobustProgressBar(
-        max_value=len(r), disable=unit_test_mode
-    ) as episode_bar:  # this is a slow task so lets use a progress bar    # note that ProgressBar crashes under unit test mode, so it will be disabled if unit_test_mode is on   # TODO: create a custom extended ProgressBar class that automatically turns itself off during unit test mode
-        for i_episode in r:
-            events.flush()
+        # How many different layout seeds there should be overall? After given amount of seeds has been used, the seed will loop over to zero and repeat the seed sequence. Zero or negative modulo parameter value disables the modulo feature.
+        if cfg.hparams.env_layout_seed_modulo > 0:
+            env_layout_seed = env_layout_seed % cfg.hparams.env_layout_seed_modulo
 
-            env_layout_seed = (
-                int(i_episode / cfg.hparams.env_layout_seed_repeat_sequence_length)
-                if cfg.hparams.env_layout_seed_repeat_sequence_length > 0
-                else i_episode  # this ensures that during test episodes, env_layout_seed based map randomization seed is different from training seeds. The environment is re-constructed when testing starts. Without explicitly providing env_layout_seed, the map randomization seed would be automatically reset to env_layout_seed = 0, which would overlap with the training seeds.
-            )
+        print(
+            f"\ni_trial: {i_trial} experiment: {experiment_name} episode: {i_episode} env_layout_seed: {env_layout_seed} test_mode: {test_mode}"
+        )
 
-            # How many different layout seeds there should be overall? After given amount of seeds has been used, the seed will loop over to zero and repeat the seed sequence. Zero or negative modulo parameter value disables the modulo feature.
-            if cfg.hparams.env_layout_seed_modulo > 0:
-                env_layout_seed = env_layout_seed % cfg.hparams.env_layout_seed_modulo
+        # TODO: refactor these checks into separate function        # Save models
+        # https://pytorch.org/tutorials/recipes/recipes/
+        # saving_and_loading_a_general_checkpoint.html
+        if not test_mode:
+            if (
+                i_episode > 0 and cfg.hparams.save_frequency != 0
+            ):  # cfg.hparams.save_frequency == 0 means that the model is saved only at the end, improving training performance
+                model_needs_saving = True
+                if i_episode % cfg.hparams.save_frequency == 0:
+                    os.makedirs(dir_cp, exist_ok=True)
+                    for agent in agents:
+                        agent.save_model(
+                            i_episode,
+                            dir_cp,
+                            experiment_name,
+                            use_separate_models_for_each_experiment,
+                        )
 
-            print(
-                f"\ni_trial: {i_trial} experiment: {experiment_name} episode: {i_episode} env_layout_seed: {env_layout_seed} test_mode: {test_mode}"
-            )
+                    model_needs_saving = False
+            else:
+                model_needs_saving = True
 
-            # TODO: refactor these checks into separate function        # Save models
-            # https://pytorch.org/tutorials/recipes/recipes/
-            # saving_and_loading_a_general_checkpoint.html
-            if not test_mode:
-                if (
-                    i_episode > 0 and cfg.hparams.save_frequency != 0
-                ):  # cfg.hparams.save_frequency == 0 means that the model is saved only at the end, improving training performance
-                    model_needs_saving = True
-                    if i_episode % cfg.hparams.save_frequency == 0:
-                        os.makedirs(dir_cp, exist_ok=True)
-                        for agent in agents:
-                            agent.save_model(
-                                i_episode,
-                                dir_cp,
-                                experiment_name,
-                                use_separate_models_for_each_experiment,
-                            )
+        # Reset
+        if isinstance(env, ParallelEnv):
+            (
+                observations,
+                infos,
+            ) = env.reset(
+                env_layout_seed=env_layout_seed
+            )  # if not test_mode else -(env_layout_seed - cfg.hparams.num_episodes + 1))
+            for agent in agents:
+                agent.reset(observations[agent.id], infos[agent.id], type(env))
+                # trainer.reset_agent(agent.id)	# TODO: configuration flag
+                dones[agent.id] = False
 
-                        model_needs_saving = False
-                else:
-                    model_needs_saving = True
+        elif isinstance(env, AECEnv):
+            env.reset(  # TODO: actually savanna_safetygrid wrapper provides observations and infos as a return value, so need for branching here
+                env_layout_seed=env_layout_seed
+            )  # if not test_mode else -(env_layout_seed - cfg.hparams.num_episodes + 1))
+            for agent in agents:
+                agent.reset(
+                    env.observe(agent.id), env.observe_info(agent.id), type(env)
+                )
+                # trainer.reset_agent(agent.id)	# TODO: configuration flag
+                dones[agent.id] = False
 
-            # Reset
+        # Iterations within the episode
+        for step in range(cfg.hparams.env_params.num_iters):
             if isinstance(env, ParallelEnv):
+                # loop: get observations and collect actions
+                actions = {}
+                for agent in agents:  # TODO: exclude terminated agents
+                    observation = observations[agent.id]
+                    info = infos[agent.id]
+                    actions[agent.id] = agent.get_action(
+                        observation=observation,
+                        info=info,
+                        step=step,
+                        env_layout_seed=env_layout_seed,
+                        episode=i_episode,
+                        trial=i_trial,
+                        test_mode=test_mode,
+                    )
+
+                # call: send actions and get observations
                 (
                     observations,
+                    scores,
+                    terminateds,
+                    truncateds,
                     infos,
-                ) = env.reset(
-                    env_layout_seed=env_layout_seed
-                )  # if not test_mode else -(env_layout_seed - cfg.hparams.num_episodes + 1))
+                ) = env.step(actions)
+                # call update since the list of terminateds will become smaller on
+                # second step after agents have died
+                dones.update(
+                    {
+                        key: terminated or truncateds[key]
+                        for (key, terminated) in terminateds.items()
+                    }
+                )
+
+                # loop: update
                 for agent in agents:
-                    agent.reset(observations[agent.id], infos[agent.id], type(env))
-                    # trainer.reset_agent(agent.id)	# TODO: configuration flag
-                    dones[agent.id] = False
+                    observation = observations[agent.id]
+                    info = infos[agent.id]
+                    score = scores[agent.id]
+                    done = dones[agent.id]
+                    terminated = terminateds[agent.id]
+                    if terminated:
+                        observation = None
+                    agent_step_info = agent.update(
+                        env=env,
+                        observation=observation,
+                        info=info,
+                        score=sum(score.values())
+                        if isinstance(score, dict)
+                        else score,  # TODO: make a function to handle obs->rew in Q-agent too, remove this
+                        done=done,  # TODO: should it be "terminated" in place of "done" here?
+                        test_mode=test_mode,
+                    )
+
+                    # Record what just happened
+                    env_step_info = (
+                        [score.get(dimension, 0) for dimension in score_dimensions]
+                        if isinstance(score, dict)
+                        else [score]
+                    )
+
+                    events.log_event(
+                        [
+                            cfg.experiment_name,
+                            i_trial,
+                            i_episode,
+                            env_layout_seed,
+                            step,
+                            test_mode,
+                        ]
+                        + agent_step_info
+                        + env_step_info
+                    )
 
             elif isinstance(env, AECEnv):
-                env.reset(  # TODO: actually savanna_safetygrid wrapper provides observations and infos as a return value, so need for branching here
-                    env_layout_seed=env_layout_seed
-                )  # if not test_mode else -(env_layout_seed - cfg.hparams.num_episodes + 1))
-                for agent in agents:
-                    agent.reset(
-                        env.observe(agent.id), env.observe_info(agent.id), type(env)
-                    )
-                    # trainer.reset_agent(agent.id)	# TODO: configuration flag
-                    dones[agent.id] = False
+                # loop: observe, collect action, send action, get observation, update
+                agents_dict = {agent.id: agent for agent in agents}
+                for agent_id in env.agent_iter(
+                    max_iter=env.num_agents
+                ):  # num_agents returns number of alive (non-done) agents
+                    agent = agents_dict[agent_id]
 
-            # Iterations within the episode
-            with RobustProgressBar(
-                max_value=cfg.hparams.env_params.num_iters,
-                granularity=100,
-                disable=unit_test_mode,
-            ) as step_bar:  # this is a slow task so lets use a progress bar    # note that ProgressBar crashes under unit test mode, so it will be disabled if unit_test_mode is on
-                for step in range(cfg.hparams.env_params.num_iters):
-                    if isinstance(env, ParallelEnv):
-                        # loop: get observations and collect actions
-                        actions = {}
-                        for agent in agents:  # TODO: exclude terminated agents
-                            observation = observations[agent.id]
-                            info = infos[agent.id]
-                            actions[agent.id] = agent.get_action(
-                                observation=observation,
-                                info=info,
-                                step=step,
-                                env_layout_seed=env_layout_seed,
-                                episode=i_episode,
-                                trial=i_trial,
-                                test_mode=test_mode,
-                            )
-
-                        # call: send actions and get observations
-                        (
-                            observations,
-                            scores,
-                            terminateds,
-                            truncateds,
-                            infos,
-                        ) = env.step(actions)
-                        # call update since the list of terminateds will become smaller on
-                        # second step after agents have died
-                        dones.update(
-                            {
-                                key: terminated or truncateds[key]
-                                for (key, terminated) in terminateds.items()
-                            }
-                        )
-
-                        # loop: update
-                        for agent in agents:
-                            observation = observations[agent.id]
-                            info = infos[agent.id]
-                            score = scores[agent.id]
-                            done = dones[agent.id]
-                            terminated = terminateds[agent.id]
-                            if terminated:
-                                observation = None
-                            agent_step_info = agent.update(
-                                env=env,
-                                observation=observation,
-                                info=info,
-                                score=sum(score.values())
-                                if isinstance(score, dict)
-                                else score,  # TODO: make a function to handle obs->rew in Q-agent too, remove this
-                                done=done,  # TODO: should it be "terminated" in place of "done" here?
-                                test_mode=test_mode,
-                            )
-
-                            # Record what just happened
-                            env_step_info = (
-                                [
-                                    score.get(dimension, 0)
-                                    for dimension in score_dimensions
-                                ]
-                                if isinstance(score, dict)
-                                else [score]
-                            )
-
-                            events.log_event(
-                                [
-                                    cfg.experiment_name,
-                                    i_trial,
-                                    i_episode,
-                                    env_layout_seed,
-                                    step,
-                                    test_mode,
-                                ]
-                                + agent_step_info
-                                + env_step_info
-                            )
-
-                    elif isinstance(env, AECEnv):
-                        # loop: observe, collect action, send action, get observation, update
-                        agents_dict = {agent.id: agent for agent in agents}
-                        for agent_id in env.agent_iter(
-                            max_iter=env.num_agents
-                        ):  # num_agents returns number of alive (non-done) agents
-                            agent = agents_dict[agent_id]
-
-                            # Per Zoo API, a dead agent must call .step(None) once more after
-                            # becoming dead. Only after that call will this dead agent be
-                            # removed from various dictionaries and from .agent_iter loop.
-                            if env.terminations[agent.id] or env.truncations[agent.id]:
-                                action = None
-                            else:
-                                observation = env.observe(agent.id)
-                                info = env.observe_info(agent.id)
-                                action = agent.get_action(
-                                    observation=observation,
-                                    info=info,
-                                    step=step,
-                                    env_layout_seed=env_layout_seed,
-                                    episode=i_episode,
-                                    trial=i_trial,
-                                    test_mode=test_mode,
-                                )
-
-                            # Env step
-                            # NB! both AIntelope Zoo and Gridworlds Zoo wrapper in AIntelope
-                            # provide slightly modified Zoo API. Normal Zoo sequential API
-                            # step() method does not return values and is not allowed to return
-                            # values else Zoo API tests will fail.
-                            result = env.step_single_agent(action)
-
-                            if agent.id in env.agents:  # was not "dead step"
-                                # NB! This is only initial reward upon agent's own step.
-                                # When other agents take their turns then the reward of the
-                                # agent may change. If you need to learn an agent's accumulated
-                                # reward over other agents turns (plus its own step's reward)
-                                # then use env.last property.
-                                (
-                                    observation,
-                                    score,
-                                    terminated,
-                                    truncated,
-                                    info,
-                                ) = result
-
-                                done = terminated or truncated
-
-                                # Agent is updated based on what the env shows.
-                                # All commented above included ^
-                                if terminated:
-                                    observation = None  # TODO: why is this here?
-
-                                agent_step_info = agent.update(
-                                    env=env,
-                                    observation=observation,
-                                    info=info,
-                                    score=sum(score.values())
-                                    if isinstance(score, dict)
-                                    else score,
-                                    done=done,  # TODO: should it be "terminated" in place of "done" here?
-                                    test_mode=test_mode,
-                                )  # note that score is used ONLY by baseline
-
-                                # Record what just happened
-                                env_step_info = (
-                                    [
-                                        score.get(dimension, 0)
-                                        for dimension in score_dimensions
-                                    ]
-                                    if isinstance(score, dict)
-                                    else [score]
-                                )
-
-                                events.log_event(
-                                    [
-                                        cfg.experiment_name,
-                                        i_trial,
-                                        i_episode,
-                                        env_layout_seed,
-                                        step,
-                                        test_mode,
-                                    ]
-                                    + agent_step_info
-                                    + env_step_info
-                                )
-
-                                # NB! any agent could die at any other agent's step
-                                for agent_id2 in env.agents:
-                                    dones[agent_id2] = (
-                                        env.terminations[agent_id2]
-                                        or env.truncations[agent_id2]
-                                    )
-                                    # TODO: if the agent died during some other agents step,
-                                    # should we call agent.update() on the dead agent,
-                                    # else it will be never called?
-
+                    # Per Zoo API, a dead agent must call .step(None) once more after
+                    # becoming dead. Only after that call will this dead agent be
+                    # removed from various dictionaries and from .agent_iter loop.
+                    if env.terminations[agent.id] or env.truncations[agent.id]:
+                        action = None
                     else:
-                        raise NotImplementedError(
-                            f"Unknown environment type {type(env)}"
+                        observation = env.observe(agent.id)
+                        info = env.observe_info(agent.id)
+                        action = agent.get_action(
+                            observation=observation,
+                            info=info,
+                            step=step,
+                            env_layout_seed=env_layout_seed,
+                            episode=i_episode,
+                            trial=i_trial,
+                            test_mode=test_mode,
                         )
 
-                    # Perform one step of the optimization (on the policy network)
-                    if not test_mode:
-                        trainer.optimize_models()
+                    # Env step
+                    # NB! both AIntelope Zoo and Gridworlds Zoo wrapper in AIntelope
+                    # provide slightly modified Zoo API. Normal Zoo sequential API
+                    # step() method does not return values and is not allowed to return
+                    # values else Zoo API tests will fail.
+                    result = env.step_single_agent(action)
 
-                    # Break when all agents are done
-                    if all(dones.values()):
-                        step_bar.update(
-                            cfg.hparams.env_params.num_iters
-                        )  # TODO: maybe this line is not needed and progress bar automatically jumps to 100%
-                        break
+                    if agent.id in env.agents:  # was not "dead step"
+                        # NB! This is only initial reward upon agent's own step.
+                        # When other agents take their turns then the reward of the
+                        # agent may change. If you need to learn an agent's accumulated
+                        # reward over other agents turns (plus its own step's reward)
+                        # then use env.last property.
+                        (
+                            observation,
+                            score,
+                            terminated,
+                            truncated,
+                            info,
+                        ) = result
 
-                    step_bar.update(step + 1)
+                        done = terminated or truncated
 
-                # / for step in range(cfg.hparams.env_params.num_iters):
-            # / with RobustProgressBar(max_value=cfg.hparams.env_params.num_iters) as step_bar:
+                        # Agent is updated based on what the env shows.
+                        # All commented above included ^
+                        if terminated:
+                            observation = None  # TODO: why is this here?
 
-            episode_bar.update(i_episode + 1 - r.start)
+                        agent_step_info = agent.update(
+                            env=env,
+                            observation=observation,
+                            info=info,
+                            score=sum(score.values())
+                            if isinstance(score, dict)
+                            else score,
+                            done=done,  # TODO: should it be "terminated" in place of "done" here?
+                            test_mode=test_mode,
+                        )  # note that score is used ONLY by baseline
 
-            # / for i_episode in range(cfg.hparams.num_episodes + cfg.hparams.test_episodes):
-        # / with RobustProgressBar(max_value=len(r)) as bar:
+                        # Record what just happened
+                        env_step_info = (
+                            [score.get(dimension, 0) for dimension in score_dimensions]
+                            if isinstance(score, dict)
+                            else [score]
+                        )
+
+                        events.log_event(
+                            [
+                                cfg.experiment_name,
+                                i_trial,
+                                i_episode,
+                                env_layout_seed,
+                                step,
+                                test_mode,
+                            ]
+                            + agent_step_info
+                            + env_step_info
+                        )
+
+                        # NB! any agent could die at any other agent's step
+                        for agent_id2 in env.agents:
+                            dones[agent_id2] = (
+                                env.terminations[agent_id2]
+                                or env.truncations[agent_id2]
+                            )
+                            # TODO: if the agent died during some other agents step,
+                            # should we call agent.update() on the dead agent,
+                            # else it will be never called?
+
+            else:
+                raise NotImplementedError(f"Unknown environment type {type(env)}")
+
+            # Perform one step of the optimization (on the policy network)
+            if not test_mode:
+                trainer.optimize_models()
+
+            # Break when all agents are done
+            if all(dones.values()):
+                break
 
         if (
             model_needs_saving
@@ -502,23 +469,13 @@ def run_baseline_training(
     # SB3 models are designed for single-agent settings, we get around this by using the same model for every agent
     # https://pettingzoo.farama.org/tutorials/sb3/waterworld/
 
-    # TODO: we could still allow multiple agents WITH SEPARATE MODELS training if we use an appropriate env wrapper
-
-    unit_test_mode = cfg.hparams.unit_test_mode
-
     # num_total_steps = cfg.hparams.env_params.num_iters * 1
     num_total_steps = cfg.hparams.env_params.num_iters * cfg.hparams.num_episodes
 
     # During multi-agent multi-model training the actual agents will run in threads/subprocesses because SB3 requires Gym interface. Agent[0] will be used just as an interface to call train(), the SB3BaseAgent base class will automatically set up the actual agents.
     # In case of multi-agent weight-shared model training it is partially similar: Agent[0] will be used just as an interface to call train(), the SB3 weight-shared model will handle the actual agents present in the environment.
 
-    with RobustProgressBar(
-        max_value=num_total_steps,  # TODO: somehow obtain the total number of steps PPO plans to actually take, considering that it rounds the number of steps up with some logic. The rounding up seems to be same every time, so it does not depend on the events happending during training.
-        granularity=100,
-        disable=unit_test_mode,
-    ) as step_bar:  # this is a slow task so lets use a progress bar    # note that ProgressBar crashes under unit test mode, so it will be disabled if unit_test_mode is on
-        agents[0].progressbar = step_bar
-        agents[0].train(num_total_steps)
+    agents[0].train(num_total_steps)
 
     # Save models
     # for agent in agents:

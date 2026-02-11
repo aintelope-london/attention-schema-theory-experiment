@@ -18,8 +18,6 @@ import pickle
 
 from filelock import FileLock
 
-from aintelope.utils import try_df_to_csv_write
-
 logger = logging.getLogger("aintelope.analytics.recording")
 
 """
