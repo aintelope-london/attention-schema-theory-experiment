@@ -8,9 +8,6 @@
 import os
 import copy
 import logging
-import sys
-import torch
-import gc
 import json
 
 from omegaconf import DictConfig, OmegaConf
@@ -28,10 +25,6 @@ from aintelope.experiments import run_experiment
 from aintelope.utils.progress import ProgressReporter
 
 logger = logging.getLogger("aintelope.__main__")
-
-gpu_count = torch.cuda.device_count()
-worker_count_multiplier = 1  # when running orchestrator search, then having more workers than GPU-s will cause all sorts of Python and CUDA errors under Windows for some reason, even though there is plenty of free RAM and GPU memory. Yet, when the orchestrator processes are run manually, there is no concurrency limit except the real hardware capacity limits. # TODO: why?
-num_workers = max(1, gpu_count) * worker_count_multiplier
 
 
 def run_experiments(orchestrator_config):
