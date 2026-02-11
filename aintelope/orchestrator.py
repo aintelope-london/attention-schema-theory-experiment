@@ -50,8 +50,8 @@ def run_experiments(orchestrator_config):
     configs = []
 
     reporter = ProgressReporter(
-        ["trial", "environment", "episode", "step"],
-        on_update=None,  # wire a renderer here at launch time when needed
+        ["trial", "episode"],
+        on_update=print_progress,
     )
     reporter.set_total("trial", cfg.hparams.trials)
     for i_trial in range(0, cfg.hparams.trials):
@@ -212,6 +212,14 @@ def analytics(
     )
 
     return test_summary
+
+
+def print_progress(state):
+    print(
+        f"\rtrial {state['trial']['current']}/{state['trial']['total']}  episode {state['episode']['current']}/{state['episode']['total']}",
+        end="",
+        flush=True,
+    )
 
 
 # if __name__ == "__main__":
