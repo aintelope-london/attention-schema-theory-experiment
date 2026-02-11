@@ -34,7 +34,6 @@ def base_test_config():
         {
             "unit_test_mode": True,
             "num_episodes": 1,
-            "show_plot": False,
             "env_params": {
                 "num_iters": 10,
                 "map_max": 5,

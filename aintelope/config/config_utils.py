@@ -350,7 +350,7 @@ def archive_code_in_dir(directory_path, zip_path):
                     )
 
 
-# used for disabling context objects like multiprocessing pool or progressbar
+# used for disabling context objects like multiprocessing pool
 class DummyContext(object):
     def __init__(self, *args, **kwargs):
         pass

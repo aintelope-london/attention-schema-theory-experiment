@@ -14,15 +14,9 @@ import gc
 import json
 
 from omegaconf import DictConfig, OmegaConf
-from flatten_dict import flatten
-from flatten_dict.reducers import make_reducer
-
-from diskcache import Cache
 
 # this one is cross-platform
 from filelock import FileLock
-
-from aintelope.utils import RobustProgressBar, Semaphore, wait_for_enter
 
 from aintelope.analytics import plotting, recording
 from aintelope.config.config_utils import (
@@ -31,7 +25,7 @@ from aintelope.config.config_utils import (
     set_console_title,
 )
 from aintelope.experiments import run_experiment
-
+from aintelope.utils.progress import ProgressReporter
 
 logger = logging.getLogger("aintelope.__main__")
 
@@ -55,116 +49,70 @@ def run_experiments(orchestrator_config):
     summaries = []
     configs = []
 
-    # use additional semaphore here since the user may launch multiple processes manually
-    semaphore_name = (
-        "AIntelope_orchestrator_semaphore"
-        + (
-            "_" + cfg.hparams.params_set_title
-            if cfg.hparams.params_set_title in ["handwritten_rules", "random"]
-            else ""
-        )
-        + ("_debug" if sys.gettrace() is not None else "")
+    reporter = ProgressReporter(
+        ["trial", "environment", "episode", "step"],
+        on_update=None,  # wire a renderer here at launch time when needed
     )
-    print("Waiting for semaphore...")
-    with Semaphore(
-        semaphore_name,
-        max_count=num_workers,
-        disable=(
-            os.name != "nt"
-            or gpu_count == 0
-            or True  # TODO: config flag for disabling the semaphore
-        ),  # Linux does not unlock semaphore after a process gets killed, therefore disabling Semaphore under Linux until this gets resolved.
-    ) as semaphore:
-        print("Semaphore acquired...")
-        # In case of 0 orchestrator cycles (num_trials == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
-        # In case of (num_trials > 0), train a SHARED model over all environments in the orchestrator steps for num_trials. Then test that shared model for one additional cycle.
-        # Therefore, the + 1 cycle is for testing. In case of (num_trials == 0), run testing inside the same cycle immediately after each environment's training ends.
-        max_trial = cfg.hparams.num_trials + 1
-        with RobustProgressBar(
-            max_value=max_trial
-        ) as trial_bar:  # this is a slow task so lets use a progress bar
-            for i_trial in range(0, max_trial):
-                # In case of (num_trials == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
-                # In case of (num_trials > 0), train a SHARED model over all environments in the orchestrator steps for num_trials. Then test that shared model for one additional cycle
-                train_mode = (
-                    i_trial < cfg.hparams.num_trials or cfg.hparams.num_trials == 0
+    reporter.set_total("trial", cfg.hparams.trials)
+    for i_trial in range(0, cfg.hparams.trials):
+        reporter.update("trial", i_trial + 1)
+        # In case of (num_trials == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
+        # In case of (num_trials > 0), train a SHARED model over all environments in the orchestrator steps for num_trials. Then test that shared model for one additional cycle
+        train_mode = i_trial < cfg.hparams.num_trials or cfg.hparams.num_trials == 0
+        test_mode = i_trial == cfg.hparams.num_trials
+
+        for env_conf_i, env_conf_name in enumerate(orchestrator_config):
+            experiment_cfg = copy.deepcopy(
+                cfg
+            )  # need to deepcopy in order to not accumulate keys that were present in previous experiment and are not present in next experiment
+
+            experiment_cfg.hparams = OmegaConf.merge(
+                experiment_cfg.hparams, orchestrator_config[env_conf_name]
+            )
+
+            logger.info("Running training with the following configuration")
+            logger.info(
+                os.linesep + str(OmegaConf.to_yaml(experiment_cfg, resolve=True))
+            )
+
+            # Training
+            params_set_title = experiment_cfg.hparams.params_set_title
+            logger.info(f"params_set: {params_set_title}, experiment: {env_conf_name}")
+
+            score_dimensions = get_score_dimensions(experiment_cfg)
+
+            if train_mode:
+                run_experiment(
+                    experiment_cfg,
+                    experiment_name=env_conf_name,
+                    score_dimensions=score_dimensions,
+                    test_mode=False,
+                    i_trial=i_trial,
+                    reporter=reporter,
                 )
-                test_mode = i_trial == cfg.hparams.num_trials
 
-                with RobustProgressBar(
-                    max_value=len(orchestrator_config)
-                ) as orchestrator_bar:  # this is a slow task so lets use a progress bar
-                    for env_conf_i, env_conf_name in enumerate(orchestrator_config):
-                        experiment_cfg = copy.deepcopy(
-                            cfg
-                        )  # need to deepcopy in order to not accumulate keys that were present in previous experiment and are not present in next experiment
+            if test_mode:
+                run_experiment(
+                    experiment_cfg,
+                    experiment_name=env_conf_name,
+                    score_dimensions=score_dimensions,
+                    test_mode=True,
+                    i_trial=i_trial,
+                    reporter=reporter,
+                )
 
-                        experiment_cfg.hparams = OmegaConf.merge(
-                            experiment_cfg.hparams, orchestrator_config[env_conf_name]
-                        )
-
-                        logger.info("Running training with the following configuration")
-                        logger.info(
-                            os.linesep
-                            + str(OmegaConf.to_yaml(experiment_cfg, resolve=True))
-                        )
-
-                        # Training
-                        params_set_title = experiment_cfg.hparams.params_set_title
-                        logger.info(
-                            f"params_set: {params_set_title}, experiment: {env_conf_name}"
-                        )
-
-                        score_dimensions = get_score_dimensions(experiment_cfg)
-
-                        if train_mode:
-                            run_experiment(
-                                experiment_cfg,
-                                experiment_name=env_conf_name,
-                                score_dimensions=score_dimensions,
-                                test_mode=False,
-                                i_trial=i_trial,
-                            )
-
-                        if test_mode:
-                            run_experiment(
-                                experiment_cfg,
-                                experiment_name=env_conf_name,
-                                score_dimensions=score_dimensions,
-                                test_mode=True,
-                                i_trial=i_trial,
-                            )
-
-                            # Not using timestamp_pid_uuid here since it would make the title too long. In case of manual execution with plots, the pid-uuid is probably not needed anyway.
-                            title = (
-                                timestamp
-                                + " : "
-                                + params_set_title
-                                + " : "
-                                + env_conf_name
-                            )
-                            summary = analytics(
-                                experiment_cfg,
-                                score_dimensions,
-                                title=title,
-                                experiment_name=env_conf_name,
-                                group_by_trial=cfg.hparams.num_trials >= 1,
-                                gridsearch_params=None,
-                                show_plot=experiment_cfg.hparams.show_plot,
-                            )
-                            summaries.append(summary)
-                            configs.append(experiment_cfg)
-
-                        orchestrator_bar.update(env_conf_i + 1)
-
-                    # / for env_conf_name in orchestrator_config:
-                # / with RobustProgressBar(max_value=len(orchestrator_config)) as orchestrator_bar:
-
-                trial_bar.update(i_trial + 1)
-
-            # / for i_trial in range(0, max_trial):
-        # / with RobustProgressBar(max_value=max_trial) as trial_bar:
-    # / with Semaphore('name', max_count=num_workers, disable=False) as semaphore:
+                # Not using timestamp_pid_uuid here since it would make the title too long. In case of manual execution with plots, the pid-uuid is probably not needed anyway.
+                title = timestamp + " : " + params_set_title + " : " + env_conf_name
+                summary = analytics(
+                    experiment_cfg,
+                    score_dimensions,
+                    title=title,
+                    experiment_name=env_conf_name,
+                    group_by_trial=cfg.hparams.num_trials >= 1,
+                    gridsearch_params=None,
+                )
+                summaries.append(summary)
+                configs.append(experiment_cfg)
 
     # Write the orchestrator results to file only when entire orchestrator has run. Else crashing the program during orchestrator run will cause the aggregated results file to contain partial data which will be later duplicated by re-run.
     # TODO: alternatively, cache the results of each experiment separately
@@ -186,11 +134,6 @@ def run_experiments(orchestrator_config):
     torch.cuda.empty_cache()
     gc.collect()
 
-    # keep plots visible until the user decides to close the program
-    if experiment_cfg.hparams.show_plot:
-        # uses less CPU on Windows than input() function. Note that the graph window will be frozen, but will still show graphs
-        wait_for_enter("\norchestrator done. Press [enter] to continue.")
-
     return {"summaries": summaries, "configs": configs}
 
 
@@ -201,7 +144,6 @@ def analytics(
     experiment_name,
     group_by_trial,
     gridsearch_params=DictConfig,
-    show_plot=False,
 ):
     # normalise slashes in paths. This is not mandatory, but will be cleaner to debug
     log_dir = os.path.normpath(cfg.log_dir)
@@ -267,7 +209,6 @@ def analytics(
         save_path=savepath,
         title=title,
         group_by_trial=group_by_trial,
-        show_plot=show_plot,
     )
 
     return test_summary
