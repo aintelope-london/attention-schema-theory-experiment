@@ -26,7 +26,6 @@ from aintelope.utils.progress import ProgressReporter
 
 logger = logging.getLogger("aintelope.__main__")
 
-
 def run_experiments(orchestrator_config):
     """
     extra_cfg: filename, DictConfig or nothing
@@ -102,7 +101,6 @@ def run_experiments(orchestrator_config):
                     title=title,
                     experiment_name=env_conf_name,
                     group_by_trial=cfg.hparams.num_trials >= 1,
-                    gridsearch_params=None,
                 )
                 summaries.append(summary)
                 configs.append(experiment_cfg)
@@ -124,9 +122,6 @@ def run_experiments(orchestrator_config):
 
     archive_code(cfg)
 
-    torch.cuda.empty_cache()
-    gc.collect()
-
     return {"summaries": summaries, "configs": configs}
 
 
@@ -136,7 +131,6 @@ def analytics(
     title,
     experiment_name,
     group_by_trial,
-    gridsearch_params=DictConfig,
 ):
     # normalise slashes in paths. This is not mandatory, but will be cleaner to debug
     log_dir = os.path.normpath(cfg.log_dir)
@@ -172,9 +166,6 @@ def analytics(
         "experiment_name": experiment_name,
         "title": title,  # timestamp + " : " + params_set_title + " : " + env_conf_name
         "params_set_title": cfg.hparams.params_set_title,
-        "gridsearch_params": OmegaConf.to_container(gridsearch_params, resolve=True)
-        if gridsearch_params is not None
-        else None,  # Object of type DictConfig is not JSON serializable, neither can yaml.dump in plotting.prettyprint digest it, so need to convert it to ordinary dictionary
         "num_train_trials": num_train_trials,
         "score_dimensions": score_dimensions_out,
         "group_by_trial": group_by_trial,
