@@ -8,9 +8,6 @@
 import os
 import copy
 import logging
-import sys
-import torch
-import gc
 import json
 
 from omegaconf import DictConfig, OmegaConf
@@ -28,10 +25,6 @@ from aintelope.experiments import run_experiment
 from aintelope.utils.progress import ProgressReporter
 
 logger = logging.getLogger("aintelope.__main__")
-
-gpu_count = torch.cuda.device_count()
-worker_count_multiplier = 1  # when running orchestrator search, then having more workers than GPU-s will cause all sorts of Python and CUDA errors under Windows for some reason, even though there is plenty of free RAM and GPU memory. Yet, when the orchestrator processes are run manually, there is no concurrency limit except the real hardware capacity limits. # TODO: why?
-num_workers = max(1, gpu_count) * worker_count_multiplier
 
 
 def run_experiments(orchestrator_config):
@@ -109,7 +102,6 @@ def run_experiments(orchestrator_config):
                     title=title,
                     experiment_name=env_conf_name,
                     group_by_trial=cfg.hparams.num_trials >= 1,
-                    gridsearch_params=None,
                 )
                 summaries.append(summary)
                 configs.append(experiment_cfg)
@@ -131,9 +123,6 @@ def run_experiments(orchestrator_config):
 
     archive_code(cfg)
 
-    torch.cuda.empty_cache()
-    gc.collect()
-
     return {"summaries": summaries, "configs": configs}
 
 
@@ -143,7 +132,6 @@ def analytics(
     title,
     experiment_name,
     group_by_trial,
-    gridsearch_params=DictConfig,
 ):
     # normalise slashes in paths. This is not mandatory, but will be cleaner to debug
     log_dir = os.path.normpath(cfg.log_dir)
@@ -179,9 +167,6 @@ def analytics(
         "experiment_name": experiment_name,
         "title": title,  # timestamp + " : " + params_set_title + " : " + env_conf_name
         "params_set_title": cfg.hparams.params_set_title,
-        "gridsearch_params": OmegaConf.to_container(gridsearch_params, resolve=True)
-        if gridsearch_params is not None
-        else None,  # Object of type DictConfig is not JSON serializable, neither can yaml.dump in plotting.prettyprint digest it, so need to convert it to ordinary dictionary
         "num_train_trials": num_train_trials,
         "score_dimensions": score_dimensions_out,
         "group_by_trial": group_by_trial,
