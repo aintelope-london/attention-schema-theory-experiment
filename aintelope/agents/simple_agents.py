@@ -10,15 +10,12 @@ Collection of simple (rule based) agents, e.g. a completely random agent
 """
 
 import logging
-import random
-
-import numpy as np
 
 from aintelope.agents.q_agent import QAgent
 
 logger = logging.getLogger("aintelope.agents.simple_agents")
 
-class RandomWalkAgent(QAgent):
+class RandomAgent(QAgent):
     def get_action(self, *args, **kwargs) -> int:
         action_space = self.trainer.action_spaces[self.id]
         return action_space.sample()
