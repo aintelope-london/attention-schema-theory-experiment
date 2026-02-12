@@ -30,7 +30,6 @@ def run_experiment(
     cfg: DictConfig,
     experiment_name: str = "",  # TODO: remove this argument and read it from cfg.experiment_name
     score_dimensions: list = [],
-    test_mode: bool = True,
     i_trial: int = 0,
     reporter=None,
 ) -> None:
@@ -39,6 +38,7 @@ def run_experiment(
     if "eps_last_env_layout_seed" in cfg:  # backwards compatibility
         cfg.eps_last_env_layout_seed = cfg.eps_last_env_layout_seed
 
+    test_mode = cfg.run_params.test_mode # TODO remove this eventually
     logger = logging.getLogger("aintelope.experiment")
 
     is_sb3 = cfg.hparams.agent_class.startswith("sb3_")
@@ -198,9 +198,9 @@ def run_experiment(
     model_needs_saving = (
         False  # if no training episodes are specified then do not save models
     )
-    reporter.set_total("episode", cfg.hparams.num_episodes)
+    #reporter.set_total("episode", cfg.hparams.num_episodes)
     for i_episode in range(cfg.hparams.num_episodes):
-        reporter.update("episode", i_episode + 1)
+        #reporter.update("episode", i_episode + 1)
         events.flush()
 
         env_layout_seed = (
