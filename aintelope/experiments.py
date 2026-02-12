@@ -198,8 +198,8 @@ def run_experiment(
     model_needs_saving = (
         False  # if no training episodes are specified then do not save models
     )
-    #reporter.set_total("episode", cfg.hparams.num_episodes)
-    for i_episode in range(cfg.hparams.num_episodes):
+    #reporter.set_total("episode", cfg.hparams.episodes)
+    for i_episode in range(cfg.hparams.episodes):
         #reporter.update("episode", i_episode + 1)
         events.flush()
 
@@ -246,7 +246,7 @@ def run_experiment(
                 infos,
             ) = env.reset(
                 env_layout_seed=env_layout_seed
-            )  # if not test_mode else -(env_layout_seed - cfg.hparams.num_episodes + 1))
+            )  # if not test_mode else -(env_layout_seed - cfg.hparams.episodes + 1))
             for agent in agents:
                 agent.reset(observations[agent.id], infos[agent.id], type(env))
                 # trainer.reset_agent(agent.id)	# TODO: configuration flag
@@ -255,7 +255,7 @@ def run_experiment(
         elif isinstance(env, AECEnv):
             env.reset(  # TODO: actually savanna_safetygrid wrapper provides observations and infos as a return value, so need for branching here
                 env_layout_seed=env_layout_seed
-            )  # if not test_mode else -(env_layout_seed - cfg.hparams.num_episodes + 1))
+            )  # if not test_mode else -(env_layout_seed - cfg.hparams.episodes + 1))
             for agent in agents:
                 agent.reset(
                     env.observe(agent.id), env.observe_info(agent.id), type(env)
@@ -446,7 +446,7 @@ def run_experiment(
 
         if (
             model_needs_saving
-        ):  # happens when num_episodes is not divisible by save frequency
+        ):  # happens when episodes is not divisible by save frequency
             os.makedirs(dir_cp, exist_ok=True)
             for agent in agents:
                 agent.save_model(
@@ -470,7 +470,7 @@ def run_baseline_training(
     # https://pettingzoo.farama.org/tutorials/sb3/waterworld/
 
     # num_total_steps = cfg.hparams.env_params.num_iters * 1
-    num_total_steps = cfg.hparams.env_params.num_iters * cfg.hparams.num_episodes
+    num_total_steps = cfg.hparams.env_params.num_iters * cfg.hparams.episodes
 
     # During multi-agent multi-model training the actual agents will run in threads/subprocesses because SB3 requires Gym interface. Agent[0] will be used just as an interface to call train(), the SB3BaseAgent base class will automatically set up the actual agents.
     # In case of multi-agent weight-shared model training it is partially similar: Agent[0] will be used just as an interface to call train(), the SB3 weight-shared model will handle the actual agents present in the environment.

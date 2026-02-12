@@ -25,8 +25,7 @@ def test_agent_learns(base_test_config):
     # Minimal learning scenario overrides
     learning_overrides = {
         "agent_class": "sb3_ppo_agent",
-        "num_episodes": 500,
-        "test_episodes": 10,
+        "episodes": 500,
         "do_not_enforce_checkpoint_file_existence_during_test": True,
         "env_layout_seed_repeat_sequence_length": 1,
         "model_params": {

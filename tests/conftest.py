@@ -33,7 +33,7 @@ def base_test_config():
     return OmegaConf.create(
         {
             "unit_test_mode": True,
-            "num_episodes": 1,
+            "episodes": 1,
             "env_params": {
                 "num_iters": 10,
                 "map_max": 5,
@@ -54,8 +54,7 @@ def learning_config(base_test_config):
     return OmegaConf.merge(
         base_test_config,
         {
-            "num_episodes": 50,
-            "test_episodes": 30,
+            "episodes": 50,
             "env_params": {"num_iters": 100},
         },
     )

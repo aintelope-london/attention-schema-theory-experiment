@@ -12,7 +12,7 @@ import json
 import torch
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import OmegaConf
 
 # this one is cross-platform
 from filelock import FileLock
@@ -154,7 +154,7 @@ def analytics(
     log_dir = os.path.normpath(cfg.log_dir)
     experiment_dir = os.path.normpath(cfg.experiment_dir)
     events_fname = cfg.events_fname
-    num_train_episodes = cfg.hparams.num_episodes
+    num_train_episodes = cfg.hparams.episodes
     num_train_trials = cfg.hparams.trials
 
     savepath = os.path.join(log_dir, "plot_" + experiment_name)

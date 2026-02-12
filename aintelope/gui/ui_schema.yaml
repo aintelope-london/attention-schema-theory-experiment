@@ -13,7 +13,6 @@ trainer_params:
   verbose: [null, "bool"]
 
 hparams:
-  gridsearch_trial_no: [[0, 1000], "int"]
   params_set_title: [null, "str"]
   do_not_enforce_checkpoint_file_existence_during_test: [null, "bool"]
   env: [["savanna-safetygrid-parallel-v1", "savanna-safetygrid-sequential-v1"], "str"]
@@ -38,9 +37,8 @@ hparams:
   
   env_layout_seed_repeat_sequence_length: [[-1, 1000], "int"]
   env_layout_seed_modulo: [[0, 1000], "int"]
-  num_trials: [[0, 100], "int"]
-  num_episodes: [[1, 10000], "int"]
-  test_episodes: [[1, 1000], "int"]
+  trials: [[0, 100], "int"]
+  episodes: [[1, 10000], "int"]
   
   env_params:
     combine_interoception_and_vision: [null, "bool"]

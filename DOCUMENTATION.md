@@ -60,7 +60,7 @@ Loads `config_experiment.yaml` and applies minimal overrides for fast test execu
 
 **Overrides applied:**
 - `unit_test_mode = True`
-- `num_episodes` capped at 5
+- `episodes` capped at 5
 - `num_iters` capped at 50
 - `warm_start_steps` capped at 10
 
