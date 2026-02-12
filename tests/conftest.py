@@ -32,7 +32,8 @@ def base_test_config():
     """
     return OmegaConf.create(
         {
-            "episodes": 1,
+            "unit_test_mode": True,
+            "num_episodes": 1,
             "env_params": {
                 "num_iters": 10,
                 "map_max": 5,
@@ -42,9 +43,27 @@ def base_test_config():
 
 
 @pytest.fixture
-def base_env_params(base_test_config):
-    """Flat env_params dict for tests that construct environments directly."""
-    return dict(base_test_config.env_params)
+def base_env_cfg():
+    """Full cfg for direct environment construction in tests.
+    Loads default_config.yaml with minimal test overrides.
+    """
+    cfg = OmegaConf.load(
+        os.path.join("aintelope", "config", "default_config.yaml")
+    )
+    return OmegaConf.merge(cfg, {
+        "hparams": {
+            "env_params": {
+                "num_iters": 10,
+                "map_max": 5,
+            },
+        },
+    })
+
+
+@pytest.fixture
+def base_env_params(base_env_cfg):
+    """Flat env_params dict for tests that need raw params."""
+    return dict(base_env_cfg.hparams.env_params)
 
 
 @pytest.fixture
@@ -53,7 +72,8 @@ def learning_config(base_test_config):
     return OmegaConf.merge(
         base_test_config,
         {
-            "episodes": 50,
+            "num_episodes": 50,
+            "test_episodes": 30,
             "env_params": {"num_iters": 100},
         },
     )

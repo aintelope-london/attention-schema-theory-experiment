@@ -11,6 +11,7 @@ import traceback
 import numpy as np
 import numpy.testing as npt
 import pytest
+from omegaconf import OmegaConf
 
 from aintelope.environments import savanna_safetygrid as safetygrid
 from aintelope.environments.savanna_safetygrid import SavannaGridworldSequentialEnv
@@ -37,12 +38,12 @@ from stable_baselines3.common.env_checker import check_env
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_api_sequential_scalarized_rewards(execution_number):
+def test_gridworlds_api_sequential_scalarized_rewards(execution_number, base_env_cfg):
     # TODO: refactor these values out to a test-params file
     # seed = int(time.time()) & 0xFFFFFFFF
     # np.random.seed(seed)
     # print(seed)
-    env_params = {
+    cfg = OmegaConf.merge(base_env_cfg, {"hparams": {"env_params": {
         "num_iters": 500,  # duration of the game
         "map_min": 0,
         "map_max": 100,
@@ -51,8 +52,8 @@ def test_gridworlds_api_sequential_scalarized_rewards(execution_number):
         "amount_grass_patches": 2,
         "amount_water_holes": 2,
         "scalarize_rewards": True,  # Zoo does not handle dictionary rewards well in sequential env test
-    }
-    env = safetygrid.SavannaGridworldSequentialEnv(env_params=env_params)
+    }}})
+    env = safetygrid.SavannaGridworldSequentialEnv(cfg=cfg)
     env.seed(execution_number)
 
     # env = parallel_to_aec(parallel_env)
@@ -60,7 +61,7 @@ def test_gridworlds_api_sequential_scalarized_rewards(execution_number):
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_api_sequential_with_death_scalarized_rewards(execution_number):
+def test_gridworlds_api_sequential_with_death_scalarized_rewards(execution_number, base_env_cfg):
     # TODO: refactor these values out to a test-params file
     # seed = int(time.time()) & 0xFFFFFFFF
     # np.random.seed(seed)
@@ -68,7 +69,7 @@ def test_gridworlds_api_sequential_with_death_scalarized_rewards(execution_numbe
 
     # for Gridworlds, the seed needs to be specified during environment construction
     # since it affects map randomisation, while seed called later does not change map
-    env_params = {
+    cfg = OmegaConf.merge(base_env_cfg, {"hparams": {"env_params": {
         "num_iters": 500,  # duration of the game
         "map_min": 0,
         "map_max": 100,
@@ -79,26 +80,26 @@ def test_gridworlds_api_sequential_with_death_scalarized_rewards(execution_numbe
         "test_death": False,
         "seed": execution_number,
         "scalarize_rewards": True,  # Zoo does not handle dictionary rewards well in sequential env test
-    }
-    env = safetygrid.SavannaGridworldSequentialEnv(env_params=env_params)
+    }}})
+    env = safetygrid.SavannaGridworldSequentialEnv(cfg=cfg)
 
     # env = parallel_to_aec(parallel_env)
     api_test(env, num_cycles=10, verbose_progress=True)
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_seed(execution_number):
+def test_gridworlds_seed(execution_number, base_env_cfg):
     # override_infos: Zoo seed_test is unable to compare infos unless they have simple structure.
     # seed: for Gridworlds, the seed needs to be specified during environment construction
     # since it affects map randomisation, while seed called later does not change map
-    env_params = {
+    cfg = OmegaConf.merge(base_env_cfg, {"hparams": {"env_params": {
         "override_infos": True,
         "seed": execution_number,
-    }
+    }}})
 
     def get_env_instance() -> safetygrid.SavannaGridworldSequentialEnv:
         """Method for seed_test"""
-        return safetygrid.SavannaGridworldSequentialEnv(env_params=env_params)
+        return safetygrid.SavannaGridworldSequentialEnv(cfg=cfg)
 
     try:
         seed_test(get_env_instance, num_cycles=10)
@@ -109,15 +110,14 @@ def test_gridworlds_seed(execution_number):
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_step_result(execution_number):
+def test_gridworlds_step_result(execution_number, base_env_cfg):
     # default is 1 iter which means that the env is done after 1 step below and the
     # test will fail
-    env = safetygrid.SavannaGridworldSequentialEnv(
-        env_params={
-            "num_iters": 2,
-            "seed": execution_number,
-        }
-    )
+    cfg = OmegaConf.merge(base_env_cfg, {"hparams": {"env_params": {
+        "num_iters": 2,
+        "seed": execution_number,
+    }}})
+    env = safetygrid.SavannaGridworldSequentialEnv(cfg=cfg)
     num_agents = len(env.possible_agents)
     assert num_agents, f"expected 1 agent, got: {num_agents}"
     env.reset()
@@ -155,13 +155,12 @@ def test_gridworlds_step_result(execution_number):
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_done_step(execution_number):
-    env = safetygrid.SavannaGridworldSequentialEnv(
-        env_params={
-            "amount_agents": 1,
-            "seed": execution_number,
-        }
-    )
+def test_gridworlds_done_step(execution_number, base_env_cfg):
+    cfg = OmegaConf.merge(base_env_cfg, {"hparams": {"env_params": {
+        "amount_agents": 1,
+        "seed": execution_number,
+    }}})
+    env = safetygrid.SavannaGridworldSequentialEnv(cfg=cfg)
     assert len(env.possible_agents) == 1
     env.reset()
 
@@ -181,8 +180,8 @@ def test_gridworlds_done_step(execution_number):
         env.step(action)
 
 
-def test_gridworlds_agents():
-    env = safetygrid.SavannaGridworldSequentialEnv()
+def test_gridworlds_agents(base_env_cfg):
+    env = safetygrid.SavannaGridworldSequentialEnv(cfg=base_env_cfg)
 
     # assert len(env.possible_agents) == env.metadata["amount_agents"]  # TODO: this is now determined by the environment, not by config
     assert isinstance(env.possible_agents, list)
@@ -193,8 +192,8 @@ def test_gridworlds_agents():
     )
 
 
-def test_gridworlds_action_spaces():
-    env = safetygrid.SavannaGridworldSequentialEnv()
+def test_gridworlds_action_spaces(base_env_cfg):
+    env = safetygrid.SavannaGridworldSequentialEnv(cfg=base_env_cfg)
 
     for agent in env.possible_agents:
         assert isinstance(env.action_space(agent), Discrete)
@@ -202,12 +201,12 @@ def test_gridworlds_action_spaces():
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_singleagent_zoo_to_gym_wrapper_scalarized_rewards(execution_number):
+def test_singleagent_zoo_to_gym_wrapper_scalarized_rewards(execution_number, base_env_cfg):
     # TODO: refactor these values out to a test-params file
     # seed = int(time.time()) & 0xFFFFFFFF
     # np.random.seed(seed)
     # print(seed)
-    env_params = {
+    cfg = OmegaConf.merge(base_env_cfg, {"hparams": {"env_params": {
         "num_iters": 500,  # duration of the game
         "map_min": 0,
         "map_max": 100,
@@ -217,8 +216,8 @@ def test_singleagent_zoo_to_gym_wrapper_scalarized_rewards(execution_number):
         "amount_water_holes": 2,
         "scalarize_rewards": True,  # Gym test requires scalarised rewards
         "combine_interoception_and_vision": True,  # SB3 does not support complex observation spaces
-    }
-    env = safetygrid.SavannaGridworldSequentialEnv(env_params=env_params)
+    }}})
+    env = safetygrid.SavannaGridworldSequentialEnv(cfg=cfg)
     env.seed(execution_number)
 
     env = SingleAgentZooToGymAdapter(env, "agent_0")

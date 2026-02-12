@@ -6,7 +6,6 @@
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
 import glob
-import logging
 import os
 import gc
 
@@ -38,18 +37,12 @@ def run_experiment(
     if "eps_last_env_layout_seed" in cfg:  # backwards compatibility
         cfg.eps_last_env_layout_seed = cfg.eps_last_env_layout_seed
 
-    test_mode = cfg.run_params.test_mode # TODO remove this eventually
-    logger = logging.getLogger("aintelope.experiment")
+    test_mode = cfg.run_params.test_mode 
 
     is_sb3 = cfg.hparams.agent_class.startswith("sb3_")
 
     # Environment
-    env = get_env_class(cfg.hparams.env)(
-        env_params=cfg.hparams.env_params,
-        ignore_num_iters=not is_sb3
-        or test_mode,  # NB! this file implements its own iterations bookkeeping in order to allow the agent to learn from the last step
-        scalarize_rewards=is_sb3 and not test_mode,
-    )
+    env = get_env_class(cfg.hparams.env)(cfg=cfg)
 
     # This reset here does not increment episode number since no steps are played before one more reset in the main episode loop takes place
     if isinstance(env, ParallelEnv):
@@ -87,9 +80,6 @@ def run_experiment(
     checkpoint_dir = os.path.normpath(cfg.checkpoint_dir)
     dir_cp = os.path.join(dir_out, checkpoint_dir)
 
-    unit_test_mode = (
-        cfg.hparams.unit_test_mode
-    )  # is set during tests in order to speed up RL computations
     use_separate_models_for_each_experiment = (
         cfg.hparams.use_separate_models_for_each_experiment
     )
@@ -170,14 +160,12 @@ def run_experiment(
             agent.init_model(
                 (observation[0].shape, observation[1].shape),
                 env.action_space,
-                unit_test_mode=unit_test_mode,
                 checkpoint=checkpoint,
             )
         else:
             agent.init_model(
                 observation.shape,
                 env.action_space,
-                unit_test_mode=unit_test_mode,
                 checkpoint=checkpoint,
             )
         dones[agent_id] = False

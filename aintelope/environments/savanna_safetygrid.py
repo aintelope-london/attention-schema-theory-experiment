@@ -161,14 +161,22 @@ class GridworldZooBaseEnv:
         ],  # used only when interoception_transformation_mode is 3 or 4
     }
 
-    def __init__(
-        self, env_params: Optional[Dict] = None, ignore_num_iters=False, **kwargs
-    ):
+    def __init__(self, cfg: Optional[Dict] = None):
+        env_params = dict(cfg.hparams.env_params)
+        is_sb3 = cfg.hparams.agent_class.startswith("sb3_")
+        test_mode = cfg.hparams.test_mode
+
+        # SB3 training owns the iteration loop — env must enforce truncation.
+        # All other cases: the manual loop handles episodes, env runs unbounded.
+        if not (is_sb3 and not test_mode):
+            env_params["num_iters"] = sys.maxsize
+
+        # SB3 training requires scalar rewards
+        if is_sb3 and not test_mode:
+            env_params["scalarize_rewards"] = True
         if env_params is None:
             env_params = {}
-        env_params = dict(env_params)  # NB! make a copy before updating with kwargs
-        env_params.update(kwargs)
-
+        
         self.render_mode = None  # Some libraries require this field to be present. The actual value seems to be unimportant.
 
         # NB! Need to clone in order to not modify the default dict.
@@ -851,11 +859,11 @@ class GridworldZooBaseEnv:
 
 class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
     def __init__(
-        self, env_params: Optional[Dict] = None, ignore_num_iters=False, **kwargs
-    ):
+        self, cfg: Optional[Dict] = None):
+        env_params = cfg.env_params
         if env_params is None:
             env_params = {}
-        GridworldZooBaseEnv.__init__(self, env_params, ignore_num_iters, **kwargs)
+        GridworldZooBaseEnv.__init__(self, cfg)
         GridworldZooParallelEnv.__init__(self, **self.super_initargs)
         parent_observation_spaces = GridworldZooParallelEnv.observation_spaces.fget(
             self
@@ -1008,15 +1016,15 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
 
 class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
     def __init__(
-        self, env_params: Optional[Dict] = None, ignore_num_iters=False, **kwargs
-    ):
+        self, cfg: Optional[Dict] = None):
+        env_params = cfg.env_params
         if env_params is None:
             env_params = {}
         self.observe_immediately_after_agent_action = env_params.get(
             "observe_immediately_after_agent_action", False
         )  # TODO: configure
 
-        GridworldZooBaseEnv.__init__(self, env_params, ignore_num_iters, **kwargs)
+        GridworldZooBaseEnv.__init__(self, cfg)
         GridworldZooAecEnv.__init__(self, **self.super_initargs)
         parent_observation_spaces = GridworldZooAecEnv.observation_spaces.fget(self)
 

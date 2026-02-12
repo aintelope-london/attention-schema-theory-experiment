@@ -17,6 +17,7 @@ train:
 
 test:
   run_params:
+    test_mode: True
     episodes: 10
 
 

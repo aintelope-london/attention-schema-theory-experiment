@@ -11,6 +11,7 @@ import traceback
 import numpy as np
 import numpy.testing as npt
 import pytest
+from omegaconf import OmegaConf
 
 from aintelope.environments import savanna_safetygrid as safetygrid
 from aintelope.environments.savanna_safetygrid import SavannaGridworldParallelEnv
@@ -33,9 +34,9 @@ from stable_baselines3.common.env_checker import check_env
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_api_parallel_scalarized_rewards(execution_number):
+def test_gridworlds_api_parallel_scalarized_rewards(execution_number, base_env_cfg):
     # TODO: refactor these values out to a test-params file
-    env_params = {
+    cfg = OmegaConf.merge(base_env_cfg, {"hparams": {"env_params": {
         "num_iters": 500,  # duration of the game
         "map_min": 0,
         "map_max": 100,
@@ -44,8 +45,8 @@ def test_gridworlds_api_parallel_scalarized_rewards(execution_number):
         "amount_grass_patches": 2,
         "amount_water_holes": 2,
         "scalarize_rewards": True,  # Zoo parallel API tests work with multidimensional rewards as well, but Zoo sequential API tests do not. So just for consistency, test Zoo parallel API both with scalarized and multidimensional rewards. The tests for multidimensional rewars are below.
-    }
-    env = safetygrid.SavannaGridworldParallelEnv(env_params=env_params)
+    }}})
+    env = safetygrid.SavannaGridworldParallelEnv(cfg=cfg)
     env.seed(execution_number)
 
     # sequential_env = parallel_to_aec(env)
@@ -53,11 +54,11 @@ def test_gridworlds_api_parallel_scalarized_rewards(execution_number):
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_api_parallel_with_death_scalarized_rewards(execution_number):
+def test_gridworlds_api_parallel_with_death_scalarized_rewards(execution_number, base_env_cfg):
     # TODO: refactor these values out to a test-params file
     # for Gridworlds, the seed needs to be specified during environment construction
     # since it affects map randomisation, while seed called later does not change map
-    env_params = {
+    cfg = OmegaConf.merge(base_env_cfg, {"hparams": {"env_params": {
         "num_iters": 500,  # duration of the game
         "map_min": 0,
         "map_max": 100,
@@ -67,18 +68,18 @@ def test_gridworlds_api_parallel_with_death_scalarized_rewards(execution_number)
         "amount_water_holes": 2,
         "test_death": True,
         "seed": execution_number,
-        "scalarize_rewards": True,  # Zoo parallel API tests work with multidimensional rewards as well, but Zoo sequential API tests do not. So just for consistency, test Zoo parallel API both with scalarized and multidimensional rewards. The tests for multidimensional rewars are below.
-    }
-    env = safetygrid.SavannaGridworldParallelEnv(env_params=env_params)
+        "scalarize_rewards": True,  # Zoo parallel API tests work with multidimensional rewards as well, but Zoo sequential API tests do not.
+    }}})
+    env = safetygrid.SavannaGridworldParallelEnv(cfg=cfg)
 
     # sequential_env = parallel_to_aec(env)
     parallel_api_test(env, num_cycles=10)
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_api_parallel(execution_number):
+def test_gridworlds_api_parallel(execution_number, base_env_cfg):
     # TODO: refactor these values out to a test-params file
-    env_params = {
+    cfg = OmegaConf.merge(base_env_cfg, {"hparams": {"env_params": {
         "num_iters": 500,  # duration of the game
         "map_min": 0,
         "map_max": 100,
@@ -86,8 +87,8 @@ def test_gridworlds_api_parallel(execution_number):
         "amount_agents": 1,  # for now only one agent
         "amount_grass_patches": 2,
         "amount_water_holes": 2,
-    }
-    env = safetygrid.SavannaGridworldParallelEnv(env_params=env_params)
+    }}})
+    env = safetygrid.SavannaGridworldParallelEnv(cfg=cfg)
     env.seed(execution_number)
 
     # sequential_env = parallel_to_aec(env)
@@ -95,11 +96,11 @@ def test_gridworlds_api_parallel(execution_number):
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_api_parallel_with_death(execution_number):
+def test_gridworlds_api_parallel_with_death(execution_number, base_env_cfg):
     # TODO: refactor these values out to a test-params file
     # for Gridworlds, the seed needs to be specified during environment construction
     # since it affects map randomisation, while seed called later does not change map
-    env_params = {
+    cfg = OmegaConf.merge(base_env_cfg, {"hparams": {"env_params": {
         "num_iters": 500,  # duration of the game
         "map_min": 0,
         "map_max": 100,
@@ -109,27 +110,27 @@ def test_gridworlds_api_parallel_with_death(execution_number):
         "amount_water_holes": 2,
         "test_death": True,
         "seed": execution_number,
-    }
-    env = safetygrid.SavannaGridworldParallelEnv(env_params=env_params)
+    }}})
+    env = safetygrid.SavannaGridworldParallelEnv(cfg=cfg)
 
     # sequential_env = parallel_to_aec(env)
     parallel_api_test(env, num_cycles=10)
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_seed(execution_number):
+def test_gridworlds_seed(execution_number, base_env_cfg):
     # override_infos: Zoo parallel_seed_test is unable to compare infos unless they have simple
     # structure.
     # seed: for Gridworlds, the seed needs to be specified during environment construction
     # since it affects map randomisation, while seed called later does not change map
-    env_params = {
+    cfg = OmegaConf.merge(base_env_cfg, {"hparams": {"env_params": {
         "override_infos": True,
         "seed": execution_number,
-    }
+    }}})
 
     def get_env_instance() -> safetygrid.SavannaGridworldParallelEnv:
         """Method for seed_test"""
-        return safetygrid.SavannaGridworldParallelEnv(env_params=env_params)
+        return safetygrid.SavannaGridworldParallelEnv(cfg=cfg)
 
     try:
         parallel_seed_test(get_env_instance, num_cycles=10)
@@ -140,15 +141,14 @@ def test_gridworlds_seed(execution_number):
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_step_result(execution_number):
+def test_gridworlds_step_result(execution_number, base_env_cfg):
     # default is 1 iter which means that the env is done after 1 step below and the
     # test will fail
-    env = safetygrid.SavannaGridworldParallelEnv(
-        env_params={
-            "num_iters": 2,
-            "seed": execution_number,
-        }
-    )
+    cfg = OmegaConf.merge(base_env_cfg, {"hparams": {"env_params": {
+        "num_iters": 2,
+        "seed": execution_number,
+    }}})
+    env = safetygrid.SavannaGridworldParallelEnv(cfg=cfg)
     num_agents = len(env.possible_agents)
     assert num_agents, f"expected 1 agent, got: {num_agents}"
     env.reset()
@@ -174,13 +174,12 @@ def test_gridworlds_step_result(execution_number):
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_done_step(execution_number):
-    env = safetygrid.SavannaGridworldParallelEnv(
-        env_params={
-            "amount_agents": 1,
-            "seed": execution_number,
-        }
-    )
+def test_gridworlds_done_step(execution_number, base_env_cfg):
+    cfg = OmegaConf.merge(base_env_cfg, {"hparams": {"env_params": {
+        "amount_agents": 1,
+        "seed": execution_number,
+    }}})
+    env = safetygrid.SavannaGridworldParallelEnv(cfg=cfg)
     assert len(env.possible_agents) == 1
     env.reset()
 
@@ -199,8 +198,8 @@ def test_gridworlds_done_step(execution_number):
         env.step(action)
 
 
-def test_gridworlds_agents():
-    env = safetygrid.SavannaGridworldParallelEnv()
+def test_gridworlds_agents(base_env_cfg):
+    env = safetygrid.SavannaGridworldParallelEnv(cfg=base_env_cfg)
 
     # assert len(env.possible_agents) == env.metadata["amount_agents"]  # TODO: this is now determined by the environment, not by config
     assert isinstance(env.possible_agents, list)
@@ -211,8 +210,8 @@ def test_gridworlds_agents():
     )
 
 
-def test_gridworlds_action_spaces():
-    env = safetygrid.SavannaGridworldParallelEnv()
+def test_gridworlds_action_spaces(base_env_cfg):
+    env = safetygrid.SavannaGridworldParallelEnv(cfg=base_env_cfg)
 
     for agent in env.possible_agents:
         assert isinstance(env.action_space(agent), Discrete)
@@ -220,9 +219,9 @@ def test_gridworlds_action_spaces():
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_singleagent_zoo_to_gym_wrapper_scalarized_rewards(execution_number):
+def test_singleagent_zoo_to_gym_wrapper_scalarized_rewards(execution_number, base_env_cfg):
     # TODO: refactor these values out to a test-params file
-    env_params = {
+    cfg = OmegaConf.merge(base_env_cfg, {"hparams": {"env_params": {
         "num_iters": 500,  # duration of the game
         "map_min": 0,
         "map_max": 100,
@@ -232,8 +231,8 @@ def test_singleagent_zoo_to_gym_wrapper_scalarized_rewards(execution_number):
         "amount_water_holes": 2,
         "scalarize_rewards": True,  # Gym test requires scalarised rewards
         "combine_interoception_and_vision": True,  # SB3 does not support complex observation spaces
-    }
-    env = safetygrid.SavannaGridworldParallelEnv(env_params=env_params)
+    }}})
+    env = safetygrid.SavannaGridworldParallelEnv(cfg=cfg)
     env.seed(execution_number)
 
     env = SingleAgentZooToGymAdapter(env, "agent_0")
@@ -278,9 +277,9 @@ def sb3_gym_test_thread_entry_point(
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_multiagent_zoo_to_gym_wrapper_scalarized_rewards(execution_number):
+def test_multiagent_zoo_to_gym_wrapper_scalarized_rewards(execution_number, base_env_cfg):
     # TODO: refactor these values out to a test-params file
-    env_params = {
+    cfg = OmegaConf.merge(base_env_cfg, {"hparams": {"env_params": {
         "num_iters": 500,  # duration of the game
         "map_min": 0,
         "map_max": 100,
@@ -290,8 +289,8 @@ def test_multiagent_zoo_to_gym_wrapper_scalarized_rewards(execution_number):
         "amount_water_holes": 2,
         "scalarize_rewards": True,  # Gym test requires scalarised rewards
         "combine_interoception_and_vision": True,  # SB3 does not support complex observation spaces
-    }
-    env = safetygrid.SavannaGridworldParallelEnv(env_params=env_params)
+    }}})
+    env = safetygrid.SavannaGridworldParallelEnv(cfg=cfg)
     env.seed(execution_number)
 
     env_wrapper = MultiAgentZooToGymAdapterZooSide(

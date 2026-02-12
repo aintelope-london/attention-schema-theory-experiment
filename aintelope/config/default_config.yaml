@@ -32,9 +32,8 @@ hparams:
   trials: 1
   episodes: 1
   steps: 10
-  optimize: True 
+  test_mode: False
   save_checkpoints: True 
-  checkpoint_load_path: Null
   params_set_title: "main config"
   do_not_enforce_checkpoint_file_existence_during_test: False
   aggregated_results_file: outputs/${hparams.params_set_title}.jsonl
