@@ -24,6 +24,7 @@ trainer_params:
 hparams:
   run_params:
     seed: 0
+    concurrent: False
     event_columns: [
       Run_id, Trial, Episode, Env layout seed, Step, IsTest,
       Agent_id, State, Action, Reward, Done, Next_state,]

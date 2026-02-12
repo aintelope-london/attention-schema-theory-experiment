@@ -74,7 +74,9 @@ def run_experiments(main_config):
 
             # Training
             params_set_title = experiment_cfg.hparams.params_set_title
-            logger.info(f"params_set: {params_set_title}, experiment: {experiment_name}")
+            logger.info(
+                f"params_set: {params_set_title}, experiment: {experiment_name}"
+            )
 
             score_dimensions = get_score_dimensions(experiment_cfg)
 
