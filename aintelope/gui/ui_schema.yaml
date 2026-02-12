@@ -17,7 +17,6 @@ hparams:
   do_not_enforce_checkpoint_file_existence_during_test: [null, "bool"]
   env: [["savanna-safetygrid-parallel-v1", "savanna-safetygrid-sequential-v1"], "str"]
   env_type: [["zoo"], "str"]
-  unit_test_mode: [null, "bool"]
   agent_class: [["example_agent", "random_agent", "handwritten_rules_agent", "ppo_agent", "dqn_agent", "a2c_agent", "llm_agent"], "str"]
   warm_start_steps: [[0, 10000], "int"]
   use_separate_models_for_each_experiment: [null, "bool"]

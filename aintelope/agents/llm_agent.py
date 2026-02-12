@@ -483,7 +483,6 @@ class LLMAgent(Agent):
         self,
         observation_shape,
         action_space,
-        unit_test_mode: bool,
         checkpoint: Optional[str] = None,
     ):
         if checkpoint:
