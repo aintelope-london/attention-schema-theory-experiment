@@ -59,7 +59,6 @@ Loads `config_experiment.yaml` and applies minimal overrides for fast test execu
 **Why not hardcoded?** The external `ai_safety_gridworlds` environment expects certain parameters (e.g., `warm_start_steps`) to exist. Using the full config as a base avoids duplicating legacy params across test files.
 
 **Overrides applied:**
-- `unit_test_mode = True`
 - `episodes` capped at 5
 - `num_iters` capped at 50
 - `warm_start_steps` capped at 10

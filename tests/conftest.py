@@ -32,7 +32,6 @@ def base_test_config():
     """
     return OmegaConf.create(
         {
-            "unit_test_mode": True,
             "episodes": 1,
             "env_params": {
                 "num_iters": 10,
