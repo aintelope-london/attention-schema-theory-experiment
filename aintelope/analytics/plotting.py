@@ -174,10 +174,10 @@ def aggregate_scores(
     sfella_scores = sfellas[score_subdimensions].sum(axis=1)  # sum over cols
 
     # aggregate over iterations
-    sfella_score_total = sfella_scores.sum(axis=0).item()  # sum over rows
-    sfella_score_average = sfella_scores.mean(axis=0).item()
+    sfella_score_total = float(sfella_scores.sum(axis=0))  # sum over rows
+    sfella_score_average = float(sfella_scores.mean(axis=0)) 
     # If, however, ddof is specified, the divisor N - ddof is used instead. In standard statistical practice, ddof=1 provides an unbiased estimator of the variance of a hypothetical infinite population. ddof=0 provides a maximum likelihood estimate of the variance for normally distributed variables.
-    sfella_score_variance = sfella_scores.var(axis=0, ddof=0).item()
+    sfella_score_variance = float(sfella_scores.var(axis=0, ddof=0))
 
     return (
         totals,

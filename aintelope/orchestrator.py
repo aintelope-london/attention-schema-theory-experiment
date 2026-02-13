@@ -117,7 +117,7 @@ def run_experiments(main_config):
             executor.submit(run_trial, cfg_dict, main_config_dict, i_trial): i_trial
             for i_trial in range(cfg.hparams.trials)
         }
-
+        # Add gc here somewhere garbacecollector?
         for future in as_completed(futures):
             result = future.result()
             summaries.extend(result["summaries"])

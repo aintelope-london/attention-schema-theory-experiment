@@ -190,14 +190,6 @@ class GridworldZooBaseEnv:
             )  # move scores to same metadata level with other parameters
         logger.info(f"initializing savanna env with params: {self.metadata}")
 
-        # TODO: get rid of this override and just ignore truncation flag from the environment?
-        if ignore_num_iters:
-            self.metadata[
-                "num_iters"
-            ] = (
-                sys.maxsize
-            )  # allow learning from last step when the agent does not die on its own
-
         metadata_to_super_initargs_dict = {
             "level": "level",
             "map_width": "map_width",
@@ -860,9 +852,6 @@ class GridworldZooBaseEnv:
 class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
     def __init__(
         self, cfg: Optional[Dict] = None):
-        env_params = cfg.env_params
-        if env_params is None:
-            env_params = {}
         GridworldZooBaseEnv.__init__(self, cfg)
         GridworldZooParallelEnv.__init__(self, **self.super_initargs)
         parent_observation_spaces = GridworldZooParallelEnv.observation_spaces.fget(
@@ -1017,10 +1006,7 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
 class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
     def __init__(
         self, cfg: Optional[Dict] = None):
-        env_params = cfg.env_params
-        if env_params is None:
-            env_params = {}
-        self.observe_immediately_after_agent_action = env_params.get(
+        self.observe_immediately_after_agent_action = cfg.hparams.env_params.get(
             "observe_immediately_after_agent_action", False
         )  # TODO: configure
 

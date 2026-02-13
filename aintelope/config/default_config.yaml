@@ -33,9 +33,8 @@ hparams:
   episodes: 1
   steps: 10
   test_mode: False
-  save_checkpoints: True 
+  save_checkpoints: True # Path instead
   params_set_title: "main config"
-  do_not_enforce_checkpoint_file_existence_during_test: False
   aggregated_results_file: outputs/${hparams.params_set_title}.jsonl
   env: savanna-safetygrid-parallel-v1
   env_entry_point: "aintelope.environments.savanna_safetygrid:SavannaGridworldParallelEnv"

@@ -14,7 +14,6 @@ trainer_params:
 
 hparams:
   params_set_title: [null, "str"]
-  do_not_enforce_checkpoint_file_existence_during_test: [null, "bool"]
   env: [["savanna-safetygrid-parallel-v1", "savanna-safetygrid-sequential-v1"], "str"]
   env_type: [["zoo"], "str"]
   agent_class: [["example_agent", "random_agent", "handwritten_rules_agent", "ppo_agent", "dqn_agent", "a2c_agent", "llm_agent"], "str"]

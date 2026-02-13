@@ -37,8 +37,6 @@ def run_experiment(
     if "eps_last_env_layout_seed" in cfg:  # backwards compatibility
         cfg.eps_last_env_layout_seed = cfg.eps_last_env_layout_seed
 
-    test_mode = cfg.run_params.test_mode 
-
     is_sb3 = cfg.hparams.agent_class.startswith("sb3_")
 
     # Environment
@@ -95,7 +93,6 @@ def run_experiment(
             trainer=trainer,
             env=env,
             cfg=cfg,
-            test_mode=test_mode,
             **cfg.hparams.agent_params,
         )
         agents.append(agent)
@@ -149,12 +146,7 @@ def run_experiment(
                 prev_agent_checkpoint is not None
             ):  # later experiments may have more agents    # TODO: configuration option for determining whether new agents can copy the checkpoints of earlier agents, and if so then specifically which agent's checkpoint to use
                 checkpoint = prev_agent_checkpoint
-            elif (
-                test_mode
-                and not cfg.hparams.do_not_enforce_checkpoint_file_existence_during_test
-            ):
-                raise Exception("No trained model found, cannot run test!")
-
+            
         # Add agent, with potential checkpoint
         if not cfg.hparams.env_params.combine_interoception_and_vision:
             agent.init_model(
@@ -170,17 +162,12 @@ def run_experiment(
             )
         dones[agent_id] = False
 
-    # Warmup not yet implemented
-    # for _ in range(hparams.warm_start_steps):
-    #    agents.play_step(self.net, epsilon=1.0)
-
     # Main loop
 
-    # SB3 training has its own loop
-    if is_sb3 and not test_mode:
+    # SB3 training has its own loop, hijack process here for this special case
+    if is_sb3 and not cfg.hparams.test_mode:
         run_baseline_training(cfg, i_trial, env, agents)
         events.close()
-        gc.collect()
         return events
 
     model_needs_saving = (
@@ -202,13 +189,13 @@ def run_experiment(
             env_layout_seed = env_layout_seed % cfg.hparams.env_layout_seed_modulo
 
         print(
-            f"\ni_trial: {i_trial} experiment: {experiment_name} episode: {i_episode} env_layout_seed: {env_layout_seed} test_mode: {test_mode}"
+            f"\ni_trial: {i_trial} experiment: {experiment_name} episode: {i_episode} env_layout_seed: {env_layout_seed}"
         )
 
         # TODO: refactor these checks into separate function        # Save models
         # https://pytorch.org/tutorials/recipes/recipes/
         # saving_and_loading_a_general_checkpoint.html
-        if not test_mode:
+        if not cfg.hparams.test_mode:
             if (
                 i_episode > 0 and cfg.hparams.save_frequency != 0
             ):  # cfg.hparams.save_frequency == 0 means that the model is saved only at the end, improving training performance
@@ -266,7 +253,6 @@ def run_experiment(
                         env_layout_seed=env_layout_seed,
                         episode=i_episode,
                         trial=i_trial,
-                        test_mode=test_mode,
                     )
 
                 # call: send actions and get observations
@@ -303,7 +289,6 @@ def run_experiment(
                         if isinstance(score, dict)
                         else score,  # TODO: make a function to handle obs->rew in Q-agent too, remove this
                         done=done,  # TODO: should it be "terminated" in place of "done" here?
-                        test_mode=test_mode,
                     )
 
                     # Record what just happened
@@ -320,7 +305,7 @@ def run_experiment(
                             i_episode,
                             env_layout_seed,
                             step,
-                            test_mode,
+                            cfg.hparams.test_mode,
                         ]
                         + agent_step_info
                         + env_step_info
@@ -349,7 +334,6 @@ def run_experiment(
                             env_layout_seed=env_layout_seed,
                             episode=i_episode,
                             trial=i_trial,
-                            test_mode=test_mode,
                         )
 
                     # Env step
@@ -388,7 +372,6 @@ def run_experiment(
                             if isinstance(score, dict)
                             else score,
                             done=done,  # TODO: should it be "terminated" in place of "done" here?
-                            test_mode=test_mode,
                         )  # note that score is used ONLY by baseline
 
                         # Record what just happened
@@ -405,7 +388,7 @@ def run_experiment(
                                 i_episode,
                                 env_layout_seed,
                                 step,
-                                test_mode,
+                                cfg.hparams.test_mode,
                             ]
                             + agent_step_info
                             + env_step_info
@@ -425,7 +408,7 @@ def run_experiment(
                 raise NotImplementedError(f"Unknown environment type {type(env)}")
 
             # Perform one step of the optimization (on the policy network)
-            if not test_mode:
+            if not cfg.hparams.test_mode:
                 trainer.optimize_models()
 
             # Break when all agents are done
@@ -445,8 +428,6 @@ def run_experiment(
                 )
 
     events.close()
-
-    gc.collect()
 
     return events
 

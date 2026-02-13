@@ -11,25 +11,21 @@ from aintelope.analytics.analytics import (
 )
 from aintelope.analytics.recording import read_events
 from aintelope.__main__ import run
-from tests.conftest import as_orchestrator
 
 
-def test_agent_completes_orchestrator(learning_config):
-    """Agent runs full train + test cycle without errors."""
-    run(as_orchestrator(learning_config))
+def test_integration(learning_config):
+    """Run full train + test cycle."""
+    run(learning_config)
 
 
 def test_agent_learns(base_test_config):
     """Learning agent achieves reward threshold on simple gridworld."""
 
-    # Minimal learning scenario overrides
-    learning_overrides = {
+    shared_overrides = {
         "agent_class": "sb3_ppo_agent",
-        "episodes": 500,
-        "do_not_enforce_checkpoint_file_existence_during_test": True,
         "env_layout_seed_repeat_sequence_length": 1,
         "model_params": {
-            "num_conv_layers": 0,  # use MLP, not CNN
+            "num_conv_layers": 0,
             "learning_rate": 0.001,
             "ppo_n_steps": 32,
         },
@@ -39,24 +35,24 @@ def test_agent_learns(base_test_config):
             "combine_interoception_and_vision": True,
         },
     }
-    cfg = OmegaConf.merge(base_test_config, OmegaConf.create(learning_overrides))
 
-    result = run(as_orchestrator(cfg))
+    train_block = OmegaConf.merge(
+        base_test_config, shared_overrides, {"num_episodes": 500}
+    )
+    test_block = OmegaConf.merge(
+        base_test_config, shared_overrides, {"num_episodes": 10, "test_mode": True}
+    )
 
-    # Get config and summary for first experiment
+    result = run(OmegaConf.create({"train": train_block, "test": test_block}))
+
     exp_cfg = result["configs"][0]
-    summary = result["summaries"][0]
-
-    # Build paths to events file
-    experiment_dir = exp_cfg.experiment_dir
-    events_fname = exp_cfg.events_fname
 
     # Read events and filter to training episodes
-    events = read_events(experiment_dir, events_fname)
+    events = read_events(exp_cfg.experiment_dir, exp_cfg.events_fname)
     events_combined = pd.concat(events, ignore_index=True)
     train_events = events_combined[~events_combined["IsTest"]]
 
-    # Assert learning improvement from early to late training
+    #assert_learning_threshold(train_events)
     assert_learning_improvement(train_events)
 
 
