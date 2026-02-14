@@ -30,7 +30,6 @@ def load_checkpoint(
     path,
     obs_size,
     action_space_size,
-    unit_test_mode,
     hidden_sizes,
     num_conv_layers,
     conv_size,
@@ -51,11 +50,10 @@ def load_checkpoint(
 
     model = None  # TODO
 
-    if not unit_test_mode:
-        checkpoint = torch.load(path)
-        model.load_state_dict(checkpoint["model_state_dict"])
+    checkpoint = torch.load(path)
+    model.load_state_dict(checkpoint["model_state_dict"])
 
-        model.eval()
+    model.eval()
 
     return model
 
@@ -88,7 +86,6 @@ class Trainer:
         agent_id,
         observation_shape,
         action_space,
-        unit_test_mode: bool,
         checkpoint: Optional[str] = None,
     ):
         """

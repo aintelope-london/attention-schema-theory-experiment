@@ -13,6 +13,7 @@ Tests verify:
 
 import numpy as np
 import pytest
+from omegaconf import OmegaConf
 
 from aintelope.environments.savanna_safetygrid import (
     SavannaGridworldParallelEnv,
@@ -25,11 +26,20 @@ from aintelope.environments.savanna_safetygrid import (
 # =============================================================================
 
 
-def test_reward_dict_parallel(base_env_params):
+def test_reward_dict_parallel(base_env_cfg):
     """scalarize_rewards=False returns dict reward."""
-    env_params = {**base_env_params, "scalarize_rewards": False}
+    cfg = OmegaConf.merge(
+        base_env_cfg,
+        {
+            "hparams": {
+                "env_params": {
+                    "scalarize_rewards": False,
+                }
+            }
+        },
+    )
 
-    env = SavannaGridworldParallelEnv(env_params=env_params)
+    env = SavannaGridworldParallelEnv(cfg=cfg)
     obs, _ = env.reset()
     agent = next(iter(env.agents))
     actions = {agent: env.action_space(agent).sample()}
@@ -38,11 +48,20 @@ def test_reward_dict_parallel(base_env_params):
     assert isinstance(rewards[agent], dict)
 
 
-def test_reward_dict_sequential(base_env_params):
+def test_reward_dict_sequential(base_env_cfg):
     """scalarize_rewards=False returns dict reward."""
-    env_params = {**base_env_params, "scalarize_rewards": False}
+    cfg = OmegaConf.merge(
+        base_env_cfg,
+        {
+            "hparams": {
+                "env_params": {
+                    "scalarize_rewards": False,
+                }
+            }
+        },
+    )
 
-    env = SavannaGridworldSequentialEnv(env_params=env_params)
+    env = SavannaGridworldSequentialEnv(cfg=cfg)
     env.reset()
     agent = env.agent_selection
     action = env.action_space(agent).sample()
@@ -52,11 +71,20 @@ def test_reward_dict_sequential(base_env_params):
     assert isinstance(reward, dict)
 
 
-def test_reward_scalar_parallel(base_env_params):
+def test_reward_scalar_parallel(base_env_cfg):
     """scalarize_rewards=True returns numeric reward."""
-    env_params = {**base_env_params, "scalarize_rewards": True}
+    cfg = OmegaConf.merge(
+        base_env_cfg,
+        {
+            "hparams": {
+                "env_params": {
+                    "scalarize_rewards": True,
+                }
+            }
+        },
+    )
 
-    env = SavannaGridworldParallelEnv(env_params=env_params)
+    env = SavannaGridworldParallelEnv(cfg=cfg)
     obs, _ = env.reset()
     agent = next(iter(env.agents))
     actions = {agent: env.action_space(agent).sample()}
@@ -65,11 +93,20 @@ def test_reward_scalar_parallel(base_env_params):
     assert isinstance(rewards[agent], (int, float, np.number))
 
 
-def test_reward_scalar_sequential(base_env_params):
+def test_reward_scalar_sequential(base_env_cfg):
     """scalarize_rewards=True returns numeric reward."""
-    env_params = {**base_env_params, "scalarize_rewards": True}
+    cfg = OmegaConf.merge(
+        base_env_cfg,
+        {
+            "hparams": {
+                "env_params": {
+                    "scalarize_rewards": True,
+                }
+            }
+        },
+    )
 
-    env = SavannaGridworldSequentialEnv(env_params=env_params)
+    env = SavannaGridworldSequentialEnv(cfg=cfg)
     env.reset()
     agent = env.agent_selection
     action = env.action_space(agent).sample()
@@ -84,11 +121,20 @@ def test_reward_scalar_sequential(base_env_params):
 # =============================================================================
 
 
-def test_obs_tuple_parallel(base_env_params):
+def test_obs_tuple_parallel(base_env_cfg):
     """combine_interoception_and_vision=False returns (vision, interoception) tuple."""
-    env_params = {**base_env_params, "combine_interoception_and_vision": False}
+    cfg = OmegaConf.merge(
+        base_env_cfg,
+        {
+            "hparams": {
+                "env_params": {
+                    "combine_interoception_and_vision": False,
+                }
+            }
+        },
+    )
 
-    env = SavannaGridworldParallelEnv(env_params=env_params)
+    env = SavannaGridworldParallelEnv(cfg=cfg)
     obs, _ = env.reset()
     agent = next(iter(env.agents))
 
@@ -98,11 +144,20 @@ def test_obs_tuple_parallel(base_env_params):
     assert isinstance(obs[agent][1], np.ndarray)
 
 
-def test_obs_tuple_sequential(base_env_params):
+def test_obs_tuple_sequential(base_env_cfg):
     """combine_interoception_and_vision=False returns (vision, interoception) tuple."""
-    env_params = {**base_env_params, "combine_interoception_and_vision": False}
+    cfg = OmegaConf.merge(
+        base_env_cfg,
+        {
+            "hparams": {
+                "env_params": {
+                    "combine_interoception_and_vision": False,
+                }
+            }
+        },
+    )
 
-    env = SavannaGridworldSequentialEnv(env_params=env_params)
+    env = SavannaGridworldSequentialEnv(cfg=cfg)
     env.reset()
     agent = env.agent_selection
     obs = env.observe(agent)
@@ -113,11 +168,20 @@ def test_obs_tuple_sequential(base_env_params):
     assert isinstance(obs[1], np.ndarray)
 
 
-def test_obs_array_parallel(base_env_params):
+def test_obs_array_parallel(base_env_cfg):
     """combine_interoception_and_vision=True returns single array."""
-    env_params = {**base_env_params, "combine_interoception_and_vision": True}
+    cfg = OmegaConf.merge(
+        base_env_cfg,
+        {
+            "hparams": {
+                "env_params": {
+                    "combine_interoception_and_vision": True,
+                }
+            }
+        },
+    )
 
-    env = SavannaGridworldParallelEnv(env_params=env_params)
+    env = SavannaGridworldParallelEnv(cfg=cfg)
     obs, _ = env.reset()
     agent = next(iter(env.agents))
 
@@ -125,11 +189,20 @@ def test_obs_array_parallel(base_env_params):
     assert not isinstance(obs[agent], tuple)
 
 
-def test_obs_array_sequential(base_env_params):
+def test_obs_array_sequential(base_env_cfg):
     """combine_interoception_and_vision=True returns single array."""
-    env_params = {**base_env_params, "combine_interoception_and_vision": True}
+    cfg = OmegaConf.merge(
+        base_env_cfg,
+        {
+            "hparams": {
+                "env_params": {
+                    "combine_interoception_and_vision": True,
+                }
+            }
+        },
+    )
 
-    env = SavannaGridworldSequentialEnv(env_params=env_params)
+    env = SavannaGridworldSequentialEnv(cfg=cfg)
     env.reset()
     agent = env.agent_selection
     obs = env.observe(agent)
@@ -143,7 +216,7 @@ def test_obs_array_sequential(base_env_params):
 # =============================================================================
 
 
-def test_interoception_length(base_env_params):
+def test_interoception_length(base_env_cfg):
     """
     Interoception vector has expected length.
 
@@ -151,9 +224,18 @@ def test_interoception_length(base_env_params):
     defines interoception modalities list, this should verify:
         len(interoception) == len(config.interoception_modalities)
     """
-    env_params = {**base_env_params, "combine_interoception_and_vision": False}
+    cfg = OmegaConf.merge(
+        base_env_cfg,
+        {
+            "hparams": {
+                "env_params": {
+                    "combine_interoception_and_vision": False,
+                }
+            }
+        },
+    )
 
-    env = SavannaGridworldParallelEnv(env_params=env_params)
+    env = SavannaGridworldParallelEnv(cfg=cfg)
     obs, _ = env.reset()
     agent = next(iter(env.agents))
     interoception = obs[agent][1]

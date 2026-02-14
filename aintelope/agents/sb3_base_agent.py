@@ -228,7 +228,6 @@ class SB3BaseAgent(Agent):
         trainer: Trainer,
         env: Environment,
         cfg: DictConfig,
-        test_mode: bool = False,
         i_trial: int = 0,
         events: pd.DataFrame = None,  # TODO: this is no longer a DataFrame, but an EventLog
         score_dimensions: list = [],
@@ -242,7 +241,7 @@ class SB3BaseAgent(Agent):
             + "."
             + env.__class__.__bases__[0].__qualname__
         )
-        self.test_mode = test_mode
+        self.test_mode = self.cfg.hparams.test_mode
         self.i_trial = i_trial
         self.next_episode_no = 0
         self.total_steps_across_episodes = 0
@@ -286,7 +285,6 @@ class SB3BaseAgent(Agent):
         env_layout_seed: int = 0,
         episode: int = 0,
         trial: int = 0,
-        test_mode: bool = False,
         *args,
         **kwargs,
     ) -> Optional[int]:
@@ -306,7 +304,7 @@ class SB3BaseAgent(Agent):
         self.info[INFO_EPISODE] = episode
         self.info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
         self.info[INFO_STEP] = step
-        self.info[INFO_TEST_MODE] = test_mode
+        self.info[INFO_TEST_MODE] = self.cfg.hparams.test_mode
 
         self.infos[self.id] = self.info
 
@@ -335,8 +333,6 @@ class SB3BaseAgent(Agent):
 
     def env_pre_reset_callback(self, seed, options, *args, **kwargs):
         assert seed is None
-
-        self.events.flush()
 
         i_episode = (
             self.next_episode_no
@@ -383,7 +379,7 @@ class SB3BaseAgent(Agent):
             info[INFO_EPISODE] = i_episode
             info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
             info[INFO_STEP] = 0
-            info[INFO_TEST_MODE] = test_mode
+            info[INFO_TEST_MODE] = self.cfg.hparams.test_mode
 
         if self.model:
             if hasattr(self.model.policy, "my_reset"):
@@ -440,7 +436,7 @@ class SB3BaseAgent(Agent):
             info[INFO_EPISODE] = i_episode
             info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
             info[INFO_STEP] = step
-            info[INFO_TEST_MODE] = test_mode
+            info[INFO_TEST_MODE] = self.cfg.hparams.test_mode
 
             agent_step_info = [
                 agent,
@@ -464,7 +460,7 @@ class SB3BaseAgent(Agent):
                     i_episode,
                     env_layout_seed,
                     step,
-                    test_mode,
+                    self.cfg.hparams.test_mode,
                 ]
                 + agent_step_info
                 + env_step_info
@@ -540,7 +536,7 @@ class SB3BaseAgent(Agent):
         self.info[INFO_EPISODE] = i_episode
         self.info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
         self.info[INFO_STEP] = step
-        self.info[INFO_TEST_MODE] = test_mode
+        self.info[INFO_TEST_MODE] = self.cfg.hparams.test_mode
 
         self.infos[self.id] = self.info
 
@@ -554,7 +550,7 @@ class SB3BaseAgent(Agent):
                 i_episode,
                 env_layout_seed,
                 step,
-                test_mode,
+                self.cfg.hparams.test_mode,
             ]
             + agent_step_info
             + env_step_info
@@ -569,7 +565,6 @@ class SB3BaseAgent(Agent):
         info: dict = {},
         score: float = 0.0,
         done: bool = False,
-        test_mode: bool = False,
     ) -> list:
         """
         Takes observations and updates trainer on perceived experiences.
@@ -701,7 +696,6 @@ class SB3BaseAgent(Agent):
         self,
         observation_shape,
         action_space,
-        unit_test_mode: bool,
         checkpoint: Optional[str] = None,
     ):
         if checkpoint:

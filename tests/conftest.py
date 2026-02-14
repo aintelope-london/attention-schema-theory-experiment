@@ -32,8 +32,10 @@ def base_test_config():
     """
     return OmegaConf.create(
         {
-            "unit_test_mode": True,
-            "num_episodes": 1,
+            "episodes": 1,
+            "run_params": {
+                "save_logs": False,
+            },
             "env_params": {
                 "num_iters": 10,
                 "map_max": 5,
@@ -43,24 +45,38 @@ def base_test_config():
 
 
 @pytest.fixture
-def base_env_params(base_test_config):
-    """Flat env_params dict for tests that construct environments directly."""
-    return dict(base_test_config.env_params)
-
-
-@pytest.fixture
-def learning_config(base_test_config):
-    """Longer runs for verifying that agent actually learns."""
+def base_env_cfg():
+    """Full cfg for direct environment construction in tests.
+    Loads default_config.yaml with minimal test overrides.
+    """
+    cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
     return OmegaConf.merge(
-        base_test_config,
+        cfg,
         {
-            "num_episodes": 50,
-            "test_episodes": 30,
-            "env_params": {"num_iters": 100},
+            "hparams": {
+                "env_params": {
+                    "num_iters": 10,
+                    "map_max": 5,
+                },
+            },
         },
     )
 
 
-def as_orchestrator(config, experiment_name="test_experiment"):
-    """Wrap a flat hparams diff into orchestrator shape for run()."""
-    return OmegaConf.create({experiment_name: config})
+@pytest.fixture
+def base_env_params(base_env_cfg):
+    """Flat env_params dict for tests that need raw params."""
+    return dict(base_env_cfg.hparams.env_params)
+
+
+@pytest.fixture
+def learning_config(base_test_config):
+    """Two-block config: train then test."""
+    train_block = OmegaConf.merge(
+        base_test_config, {"num_episodes": 50, "env_params": {"num_iters": 100}}
+    )
+    test_block = OmegaConf.merge(
+        base_test_config,
+        {"num_episodes": 10, "test_mode": True, "env_params": {"num_iters": 100}},
+    )
+    return OmegaConf.create({"train": train_block, "test": test_block})

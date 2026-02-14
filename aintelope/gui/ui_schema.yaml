@@ -13,12 +13,9 @@ trainer_params:
   verbose: [null, "bool"]
 
 hparams:
-  gridsearch_trial_no: [[0, 1000], "int"]
   params_set_title: [null, "str"]
-  do_not_enforce_checkpoint_file_existence_during_test: [null, "bool"]
   env: [["savanna-safetygrid-parallel-v1", "savanna-safetygrid-sequential-v1"], "str"]
   env_type: [["zoo"], "str"]
-  unit_test_mode: [null, "bool"]
   agent_class: [["example_agent", "random_agent", "handwritten_rules_agent", "ppo_agent", "dqn_agent", "a2c_agent", "llm_agent"], "str"]
   warm_start_steps: [[0, 10000], "int"]
   use_separate_models_for_each_experiment: [null, "bool"]
@@ -38,9 +35,8 @@ hparams:
   
   env_layout_seed_repeat_sequence_length: [[-1, 1000], "int"]
   env_layout_seed_modulo: [[0, 1000], "int"]
-  num_trials: [[0, 100], "int"]
-  num_episodes: [[1, 10000], "int"]
-  test_episodes: [[1, 1000], "int"]
+  trials: [[0, 100], "int"]
+  episodes: [[1, 10000], "int"]
   
   env_params:
     combine_interoception_and_vision: [null, "bool"]

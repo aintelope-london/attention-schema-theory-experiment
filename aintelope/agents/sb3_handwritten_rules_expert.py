@@ -101,7 +101,7 @@ class SB3HandWrittenRulesExpert(object):
     ) -> int:
         _random = np.random
 
-        if self.hparams.num_episodes == 0:  # there is no training
+        if self.hparams.episodes == 0:  # there is no training
             # detected pure handwritten rules agent test without training - if that config is detected then test mode will use the handwritten rules
             return 1, _random  # handwritten rules mode
         elif test_mode:

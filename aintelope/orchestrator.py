@@ -9,8 +9,10 @@ import os
 import copy
 import logging
 import json
+import torch
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import OmegaConf
 
 # this one is cross-platform
 from filelock import FileLock
@@ -22,16 +24,86 @@ from aintelope.config.config_utils import (
     set_console_title,
 )
 from aintelope.experiments import run_experiment
-from aintelope.utils.progress import ProgressReporter
 from aintelope.utils.seeding import set_global_seeds
+from aintelope.utils.progress import ProgressReporter
 
 logger = logging.getLogger("aintelope.__main__")
 
 
+def find_workers() -> int:
+    """Return max available workers (GPUs if available, else CPUs)."""
+    gpu_count = torch.cuda.device_count()
+    return gpu_count if gpu_count > 0 else os.cpu_count()
+
+
+def run_trial(cfg_dict, main_config_dict, i_trial):
+    """Run all experiments for a single trial.
+
+    Args must be dicts (not OmegaConf) for multiprocessing pickling.
+    Returns dict with summaries, configs, and events lists.
+    """
+    # Reconstruct OmegaConf objects
+    cfg = OmegaConf.create(cfg_dict)
+    main_config = OmegaConf.create(main_config_dict)
+
+    trial_seed = cfg.hparams.run_params.seed + i_trial
+    set_global_seeds(trial_seed)
+
+    summaries = []
+    configs = []
+    all_events = []
+
+    timestamp = str(cfg.timestamp)
+
+    for _, experiment_name in enumerate(main_config):
+        experiment_cfg = copy.deepcopy(cfg)
+        # need to deepcopy in order to not accumulate keys that were present in previous experiment and are not present in next experiment
+
+        experiment_cfg.hparams = OmegaConf.merge(
+            experiment_cfg.hparams, main_config[experiment_name]
+        )
+        OmegaConf.update(experiment_cfg.hparams, "seed", trial_seed, force_add=True)
+
+        logger.info("Running training with the following configuration")
+        logger.info(os.linesep + str(OmegaConf.to_yaml(experiment_cfg, resolve=True)))
+
+        params_set_title = experiment_cfg.hparams.params_set_title
+        logger.info(f"params_set: {params_set_title}, experiment: {experiment_name}")
+
+        score_dimensions = get_score_dimensions(experiment_cfg)
+        reporter = ProgressReporter(["episode"], on_update=None)
+
+        events = run_experiment(
+            experiment_cfg,
+            experiment_name=experiment_name,
+            score_dimensions=score_dimensions,
+            i_trial=i_trial,
+            reporter=reporter,
+        )
+
+        if cfg.hparams.run_params.save_logs:
+            events.write(os.path.normpath(experiment_cfg.experiment_dir))
+
+        all_events.append(events.to_dataframe())
+
+        # Not using timestamp_pid_uuid here since it would make the title too long. In case of manual execution with plots, the pid-uuid is probably not needed anyway.
+        title = timestamp + " : " + params_set_title + " : " + experiment_name
+        summary = analytics(
+            experiment_cfg,
+            score_dimensions,
+            title=title,
+            experiment_name=experiment_name,
+            group_by_trial=cfg.hparams.trials >= 1,
+            events=all_events,
+        )
+        summaries.append(summary)
+        configs.append(experiment_cfg)
+
+    return {"summaries": summaries, "configs": configs, "events": all_events}
+
+
 def run_experiments(main_config):
-    """
-    extra_cfg: filename, DictConfig or nothing
-    """
+    """Main orchestrator entry point."""
     cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
     timestamp = str(cfg.timestamp)
     timestamp_pid_uuid = str(cfg.timestamp_pid_uuid)
@@ -42,75 +114,25 @@ def run_experiments(main_config):
 
     summaries = []
     configs = []
+    all_events = []
 
-    reporter = ProgressReporter(
-        ["trial", "episode"],
-        on_update=print_progress,
-    )
-    reporter.set_total("trial", cfg.hparams.trials)
-    for i_trial in range(0, cfg.hparams.trials):
-        trial_seed = cfg.hparams.run_params.seed + i_trial
-        set_global_seeds(trial_seed)
-        reporter.update("trial", i_trial + 1)
-        # In case of (num_trials == 0), each environment has its own model. In this case run training and testing inside the same cycle immediately after each other.
-        # In case of (num_trials > 0), train a SHARED model over all environments in the orchestrator steps for num_trials. Then test that shared model for one additional cycle
-        train_mode = i_trial < cfg.hparams.num_trials or cfg.hparams.num_trials == 0
-        test_mode = i_trial == cfg.hparams.num_trials
+    workers = find_workers()
 
-        for _, experiment_name in enumerate(main_config):
-            experiment_cfg = copy.deepcopy(
-                cfg
-            )  # need to deepcopy in order to not accumulate keys that were present in previous experiment and are not present in next experiment
+    # Convert to dicts for pickling
+    cfg_dict = OmegaConf.to_container(cfg, resolve=True)
+    main_config_dict = OmegaConf.to_container(main_config, resolve=True)
 
-            experiment_cfg.hparams = OmegaConf.merge(
-                experiment_cfg.hparams, main_config[experiment_name]
-            )
-            OmegaConf.update(experiment_cfg.hparams, "seed", trial_seed, force_add=True)
-
-            logger.info("Running training with the following configuration")
-            logger.info(
-                os.linesep + str(OmegaConf.to_yaml(experiment_cfg, resolve=True))
-            )
-
-            # Training
-            params_set_title = experiment_cfg.hparams.params_set_title
-            logger.info(
-                f"params_set: {params_set_title}, experiment: {experiment_name}"
-            )
-
-            score_dimensions = get_score_dimensions(experiment_cfg)
-
-            if train_mode:
-                run_experiment(
-                    experiment_cfg,
-                    experiment_name=experiment_name,
-                    score_dimensions=score_dimensions,
-                    test_mode=False,
-                    i_trial=i_trial,
-                    reporter=reporter,
-                )
-
-            if test_mode:
-                run_experiment(
-                    experiment_cfg,
-                    experiment_name=experiment_name,
-                    score_dimensions=score_dimensions,
-                    test_mode=True,
-                    i_trial=i_trial,
-                    reporter=reporter,
-                )
-
-                # Not using timestamp_pid_uuid here since it would make the title too long. In case of manual execution with plots, the pid-uuid is probably not needed anyway.
-                title = timestamp + " : " + params_set_title + " : " + experiment_name
-                summary = analytics(
-                    experiment_cfg,
-                    score_dimensions,
-                    title=title,
-                    experiment_name=experiment_name,
-                    group_by_trial=cfg.hparams.num_trials >= 1,
-                )
-                summaries.append(summary)
-                configs.append(experiment_cfg)
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        futures = {
+            executor.submit(run_trial, cfg_dict, main_config_dict, i_trial): i_trial
+            for i_trial in range(cfg.hparams.trials)
+        }
+        # Add gc here somewhere garbacecollector?
+        for future in as_completed(futures):
+            result = future.result()
+            summaries.extend(result["summaries"])
+            configs.extend(result["configs"])
+            all_events.extend(result["events"])
 
     # Write the orchestrator results to file only when entire orchestrator has run. Else crashing the program during orchestrator run will cause the aggregated results file to contain partial data which will be later duplicated by re-run.
     # TODO: alternatively, cache the results of each experiment separately
@@ -129,7 +151,7 @@ def run_experiments(main_config):
 
     archive_code(cfg)
 
-    return {"summaries": summaries, "configs": configs}
+    return {"summaries": summaries, "configs": configs, "events": all_events}
 
 
 def analytics(
@@ -138,16 +160,14 @@ def analytics(
     title,
     experiment_name,
     group_by_trial,
+    events,
 ):
     # normalise slashes in paths. This is not mandatory, but will be cleaner to debug
     log_dir = os.path.normpath(cfg.log_dir)
-    experiment_dir = os.path.normpath(cfg.experiment_dir)
-    events_fname = cfg.events_fname
-    num_train_episodes = cfg.hparams.num_episodes
-    num_train_trials = cfg.hparams.num_trials
+    num_train_episodes = cfg.hparams.episodes
+    num_train_trials = cfg.hparams.trials
 
     savepath = os.path.join(log_dir, "plot_" + experiment_name)
-    events = recording.read_events(experiment_dir, events_fname)
 
     (
         test_totals,
@@ -203,14 +223,6 @@ def analytics(
     )
 
     return test_summary
-
-
-def print_progress(reporter):
-    parts = [
-        f"{level} {reporter.state[level]['current']}/{reporter.state[level]['total']}"
-        for level in reporter.levels
-    ]
-    print(f"\r{' | '.join(parts)}", end="", flush=True)
 
 
 # if __name__ == "__main__":

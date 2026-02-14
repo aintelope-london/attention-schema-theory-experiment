@@ -7,8 +7,7 @@
 
 timestamp: ${now:%Y%m%d%H%M%S}      # TODO: currently this applies only to log_dir name, not to checkpoint filename. Checkpoint filename timestamp format is hardcoded in dqn_training.py
 timestamp_pid_uuid: ${append_pid_and_uuid:${timestamp}}
-experiment_name: experiment
-events_fname: events.csv         
+experiment_name: experiment       
 checkpoint_dir: checkpoints/
 log_dir_root: outputs
 log_dir: ${log_dir_root}/${timestamp_pid_uuid}/
@@ -30,9 +29,11 @@ hparams:
       Agent_id, State, Action, Reward, Done, Next_state,]
     save_logs: True
   trials: 1
-  gridsearch_trial_no: 0        # is set by gridsearch config file
+  episodes: 1
+  steps: 10
+  test_mode: False
+  save_checkpoints: True # Path instead
   params_set_title: "main config"
-  do_not_enforce_checkpoint_file_existence_during_test: False
   aggregated_results_file: outputs/${hparams.params_set_title}.jsonl
   env: savanna-safetygrid-parallel-v1
   env_entry_point: "aintelope.environments.savanna_safetygrid:SavannaGridworldParallelEnv"
@@ -40,10 +41,9 @@ hparams:
   #env: savanna-safetygrid-sequential-v1
   #env_entry_point: "aintelope.environments.savanna_safetygrid:SavannaGridworldSequentialEnv"
   #env_type: zoo
-  unit_test_mode: False      # is set during tests in order to speed up DQN computations
   agent_class: example_agent 
   warm_start_steps: 0       # not used at the moment, except for the unit tests
-  save_frequency: ${muldiv:${hparams.num_episodes},${hparams.env_params.num_iters},10} # how often to save a model
+  save_frequency: ${muldiv:${hparams.episodes},${hparams.env_params.num_iters},10} # how often to save a model
   use_separate_models_for_each_experiment: True
   agent_params:
     target_handwritten_rules: [food,drink,gold,silver,danger,predator,collision,antimovement]    
@@ -59,9 +59,6 @@ hparams:
     eps_last_frame: ${hparams.env_params.num_iters}       # use -1 when iteration counting for eps is disabled
   env_layout_seed_repeat_sequence_length: -1 # 10
   env_layout_seed_modulo: 0   # How many different layout seeds there should be overall? After given amount of seeds has been used, the seed will loop over to zero and repeat the seed sequence. Zero or negative modulo parameter value disables the modulo feature.
-  num_trials: 0
-  num_episodes: 10 # how long to train. # TODO: move num_episodes to model_params
-  test_episodes: 10 # will be added to train episodes
   env_params:
     combine_interoception_and_vision: False  # needs to be set to True for OpenAI baselines learning algorithms
     interoception_transformation_mode: 0    # 0 - do not normalise or transform interoception channels; 1 - transform using 1 - x / 100 + 0.5 then clamp to range [0, 1]; 2 - normalise to range [0, 1] by considering oversatiation_limit and deficiency_limit of the environment (raises error if these are not set); 3 - create embedding using a set of gaussians (parameters provided in interoception_gaussian_centers and interoception_gaussian_scales); 4 - create embedding using a set of cumulative density functions (underlying gaussian parameters provided in interoception_gaussian_centers and interoception_gaussian_scales).

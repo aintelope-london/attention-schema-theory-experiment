@@ -26,10 +26,11 @@ from ai_safety_gridworlds.helpers.gridworld_zoo_parallel_env import (
 
 
 class SavannaGridworldDemoEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
-    def __init__(self, env_params: Optional[Dict] = None):
+    def __init__(self, cfg: Optional[Dict] = None):
+        env_params = cfg.env_params
         if env_params is None:
             env_params = {}
-        GridworldZooBaseEnv.__init__(self, env_params)
+        GridworldZooBaseEnv.__init__(self, cfg)
         GridworldZooParallelEnv.__init__(self, **self.super_initargs)
 
 
@@ -57,7 +58,7 @@ def main(orchestrator_env_conf_name):
             )
 
         FLAGS = define_flags()
-        zoo_env = SavannaGridworldDemoEnv(experiment_cfg.hparams.env_params)
+        zoo_env = SavannaGridworldDemoEnv(experiment_cfg)
         gridworlds_env = zoo_env._env
 
         for episode_no in range(0, 1000):

@@ -31,7 +31,6 @@ class Agent(ABC):
         env_layout_seed: int = 0,
         episode: int = 0,
         trial: int = 0,
-        test_mode: bool = False,
         *args,
         **kwargs,
     ) -> Optional[int]:
@@ -47,7 +46,6 @@ class Agent(ABC):
         info: dict = {},
         score: float = 0.0,
         done: bool = False,
-        test_mode: bool = False,
     ) -> list:
         ...
 
@@ -56,7 +54,6 @@ class Agent(ABC):
         self,
         observation_shape,
         action_space,
-        unit_test_mode: bool,
         checkpoint: Optional[str] = None,
     ) -> None:
         ...
