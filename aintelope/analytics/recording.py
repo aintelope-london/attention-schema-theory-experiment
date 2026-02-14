@@ -6,7 +6,6 @@
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
 import base64
-import csv
 import logging
 import os
 import zlib
@@ -16,13 +15,7 @@ import numpy as np
 import pandas as pd
 import pickle
 
-from filelock import FileLock
-
 logger = logging.getLogger("aintelope.analytics.recording")
-
-"""
-
-"""
 
 
 def serialize_state(state):
@@ -39,9 +32,8 @@ def deserialize_state(cell):
 class EventLog:
     SERIALIZABLE_COLUMNS = ("State", "Next_state")
 
-    def __init__(self, columns, block_name):
+    def __init__(self, columns):
         self.columns = columns
-        self.block_name = block_name
         self._rows = []
 
     def log_event(self, event):
@@ -50,8 +42,9 @@ class EventLog:
     def to_dataframe(self):
         return pd.DataFrame(self._rows, columns=self.columns)
 
-    def write(self, experiment_dir):
-        path = Path(experiment_dir) / f"{self.block_name}.csv"
+    def write(self, output_dir):
+        """Write events.csv to the given directory."""
+        path = Path(output_dir) / "events.csv"
         path.parent.mkdir(exist_ok=True, parents=True)
         df = self.to_dataframe()
         for col in self.SERIALIZABLE_COLUMNS:

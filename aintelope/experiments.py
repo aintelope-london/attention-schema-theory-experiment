@@ -61,10 +61,7 @@ def run_experiment(
         score_dimensions if isinstance(env, GridworldZooBaseEnv) else ["Score"]
     )
 
-    events = recording.EventLog(
-        events_columns,
-        experiment_name,
-    )
+    events = recording.EventLog(events_columns)
 
     # Common trainer for each agent's models
     if is_sb3:

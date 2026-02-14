@@ -18,9 +18,14 @@ from aintelope.config.config_utils import (
     set_priorities,
 )
 from aintelope.orchestrator import run_experiments
+from aintelope.gui.results_window import run_results
 
 
-def run(config: Union[str, DictConfig] = "default_config.yaml", gui: bool = False):
+def run(
+    config: Union[str, DictConfig] = "default_config.yaml",
+    gui: bool = False,
+    results: bool = False,
+):
     """Single entrypoint for the whole project.
 
     Args:
@@ -55,12 +60,22 @@ def run(config: Union[str, DictConfig] = "default_config.yaml", gui: bool = Fals
             print("GUI cancelled.")
             return
 
-    return run_experiments(config)
+    result = run_experiments(config)
+
+    if results:
+        run_results()
+
+    return result
 
 
 def gui_main():
     """Entry point for aintelope-gui console script."""
     run(gui=True)
+
+
+def results_main():
+    """Entry point for aintelope-results console script."""
+    run(results=True)
 
 
 if __name__ == "__main__":
@@ -78,5 +93,10 @@ if __name__ == "__main__":
         action="store_true",
         help="Launch GUI for orchestrator configuration",
     )
+    parser.add_argument(
+        "--results",
+        action="store_true",
+        help="Launch results viewer",
+    )
     args = parser.parse_args()
-    run(args.config, gui=args.gui)
+    run(args.config, gui=args.gui, results=args.results)
