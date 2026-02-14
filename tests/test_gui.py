@@ -5,10 +5,11 @@
 # Repository:
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
-"""Unit tests for GUI components: ui_schema_manager and widgets."""
+"""Unit tests for GUI components: ui_schema_manager and gui."""
 
 import os
 import tkinter as tk
+from tkinter import ttk
 
 import pytest
 
@@ -117,8 +118,6 @@ class TestCreateWidget:
 
     def test_string_choices_returns_combobox(self, tk_root):
         """String choices spec returns Combobox."""
-        from tkinter import ttk
-
         parent = tk.Frame(tk_root)
         spec = [["option_a", "option_b"], "str"]
         widget, refresh = create_widget(
@@ -149,5 +148,5 @@ class TestCreateWidget:
         assert isinstance(widget, tk.Entry)
 
 
-if __name__ == "__main__":  # and os.name == "nt":
+if __name__ == "__main__":
     pytest.main([__file__])
