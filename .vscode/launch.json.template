@@ -18,6 +18,19 @@
             }
         },
         {
+            "name": "Results Viewer",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "aintelope",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "showUncaughtExceptions": true,
+            "args": [ "--results" ],
+            "env": {
+                //"PYTHONPATH": "your_path_here"
+            }
+        },
+        {
             "name": "Python: Current File",
             "type": "debugpy",
             "request": "launch",
