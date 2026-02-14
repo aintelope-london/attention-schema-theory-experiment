@@ -60,6 +60,7 @@ class EventLog:
                 df[col] = df[col].apply(deserialize_state)
         return df
 
+
 def list_runs(outputs_dir):
     """Return run directory names under outputs_dir, newest first."""
     outputs_path = Path(outputs_dir)
@@ -72,9 +73,8 @@ def list_runs(outputs_dir):
 def list_blocks(run_dir):
     """Return block names within a run that contain events.csv."""
     run_path = Path(run_dir)
-    return sorted(
-        d.name for d in run_path.iterdir() if (d / "events.csv").exists()
-    )
+    return sorted(d.name for d in run_path.iterdir() if (d / "events.csv").exists())
+
 
 def read_checkpoints(checkpoint_dir):
     """

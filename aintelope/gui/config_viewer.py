@@ -1,247 +1,315 @@
 """Config editor GUI for creating/editing experiment configs."""
 
-import tkinter as tk
-from tkinter import ttk
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 from omegaconf import DictConfig, OmegaConf
 
 from aintelope.gui.gui import (
+    Frame,
+    Label,
+    Separator,
     ScrollableFrame,
     SelectorBar,
+    ActionBar,
     StatusBar,
+    Notebook,
+    Button,
+    Entry,
+    StringVar,
     launch_window,
     create_widget,
     get_range_display,
+    ask_yes_no,
+    W,
+    X,
+    LEFT,
+    BOTH,
+    HORIZONTAL,
 )
 from aintelope.gui.ui_schema_manager import load_ui_schema, get_field_spec
-
-CONFIG_DIR = Path("aintelope") / "config"
+from aintelope.config.config_utils import (
+    list_loadable_configs,
+    load_experiment_config,
+    save_experiment_config,
+)
 
 
 class ConfigGUI:
-    def __init__(self, root: tk.Tk, default_cfg: DictConfig):
+    def __init__(self, root, default_cfg: DictConfig):
         self.root = root
         self.root.title("Config Editor")
         self.root.geometry("1000x700")
 
         self.default_cfg = default_cfg
+        self.default_hparams = OmegaConf.to_container(default_cfg.hparams, resolve=True)
         self.ui_schema = load_ui_schema()
-
-        self.current_config = OmegaConf.to_container(default_cfg, resolve=True)
-        self.diff_config = {}
         self.result = None
-        self.widgets = {}
+        self.tabs = []
 
         self._create_ui()
+        self._load_config("example_config.yaml")
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
-    def _get_default_value(self, keys: list) -> Any:
-        """Get value from default config by key path."""
-        current = self.default_cfg
-        for key in keys:
-            current = current[key]
-        return current
-
-    def _set_nested_diff(self, keys: list, value: Any):
-        """Set value in diff_config, creating nested dicts as needed."""
-        current = self.diff_config
-        for key in keys[:-1]:
-            if key not in current:
-                current[key] = {}
-            current = current[key]
-        current[keys[-1]] = value
-
     def _create_ui(self):
-        # Top bar — config selector
         self.selector = SelectorBar(
             self.root,
             label="Config",
-            values=self._list_configs(),
+            values=list_loadable_configs(),
             on_select=self._load_config,
         )
-        self.selector.pack(fill=tk.X)
+        self.selector.pack(fill=X)
 
-        # Main editor area
-        self.editor = ScrollableFrame(self.root, text="Configuration", padding=10)
-        self.editor.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-
-        self._build_param_tree(self.editor.content, self.default_cfg)
-
-        # Bottom actions
-        action_frame = ttk.Frame(self.root, padding=10)
-        action_frame.pack(fill=tk.X)
-
-        ttk.Label(action_frame, text="Save As:").pack(side=tk.LEFT, padx=5)
-        self.output_var = tk.StringVar(value=self._generate_filename())
-        ttk.Entry(action_frame, textvariable=self.output_var, width=40).pack(
-            side=tk.LEFT, padx=5
+        tab_controls = Frame(self.root, padding=(10, 5))
+        tab_controls.pack(fill=X)
+        Button(tab_controls, text="Add Experiment", command=self._add_tab).pack(
+            side=LEFT, padx=5
+        )
+        Button(tab_controls, text="Delete Experiment", command=self._delete_tab).pack(
+            side=LEFT, padx=5
         )
 
-        ttk.Button(action_frame, text="Save Config", command=self._save_config).pack(
-            side=tk.LEFT, padx=5
-        )
-        ttk.Button(action_frame, text="Run", command=self._run).pack(
-            side=tk.LEFT, padx=20
-        )
-        ttk.Button(action_frame, text="Cancel", command=self._on_close).pack(
-            side=tk.LEFT, padx=5
-        )
+        self.notebook = Notebook(self.root)
+        self.notebook.pack(fill=BOTH, expand=True, padx=10, pady=5)
 
-        # Status bar
+        self.actions = ActionBar(
+            self.root,
+            inputs=[("Save As", "my_config.yaml")],
+            buttons=[
+                ("Save Config", self._save_config),
+                ("Run", self._run),
+                ("Cancel", self._on_close),
+            ],
+        )
+        self.actions.pack(fill=X)
+
         self.status = StatusBar(
             self.root, "Ready. Edit parameters or load existing config."
         )
-        self.status.pack(fill=tk.X, padx=10, pady=(0, 10))
+        self.status.pack(fill=X, padx=10, pady=(0, 10))
 
-    def _build_param_tree(self, parent, config, path="", level=0):
-        """Recursively build parameter tree from config."""
-        row = 0
+    # =========================================================================
+    # Tab management
+    # =========================================================================
+
+    def _create_tab(self, block_name, overrides=None):
+        """Create a tab for one experiment block."""
+        if overrides is None:
+            overrides = {}
+
+        merged = OmegaConf.to_container(
+            OmegaConf.merge(self.default_cfg.hparams, overrides), resolve=True
+        )
+
+        tab = {
+            "diff": dict(overrides),
+            "current": merged,
+            "widgets": {},
+        }
+
+        frame = ScrollableFrame(self.notebook, padding=5)
+        tab["frame"] = frame
+
+        # Block name field
+        name_frame = Frame(frame.content)
+        name_frame.grid(row=0, column=0, columnspan=3, sticky=W, pady=(5, 10))
+        Label(name_frame, text="Experiment name:", width=25, anchor=W).pack(
+            side=LEFT, padx=(0, 10)
+        )
+        name_var = StringVar(value=block_name)
+        Entry(name_frame, textvariable=name_var, width=30).pack(side=LEFT, padx=5)
+        name_var.trace_add("write", lambda *_: self._update_tab_label(tab))
+        tab["name_var"] = name_var
+
+        Separator(frame.content, orient=HORIZONTAL).grid(
+            row=1, column=0, columnspan=3, sticky="ew", pady=(0, 5)
+        )
+
+        self._build_param_tree(frame.content, merged, tab, row_offset=2)
+
+        self.notebook.add(frame, text=block_name)
+        self.tabs.append(tab)
+        self.notebook.select(frame)
+
+    def _update_tab_label(self, tab):
+        """Sync notebook tab text with the name field."""
+        self.notebook.tab(tab["frame"], text=tab["name_var"].get())
+
+    def _add_tab(self):
+        """Add tab copying current tab's overrides."""
+        name = f"experiment_{len(self.tabs)}"
+        overrides = {}
+        if self.tabs:
+            current_idx = self.notebook.index(self.notebook.select())
+            overrides = dict(self.tabs[current_idx]["diff"])
+        self._create_tab(name, overrides)
+        self.status.set(f"Added: {name}")
+
+    def _delete_tab(self):
+        """Delete current tab with confirmation. Minimum 1 tab."""
+        if len(self.tabs) <= 1:
+            self.status.set("Cannot delete the last experiment.")
+            return
+
+        current_idx = self.notebook.index(self.notebook.select())
+        tab = self.tabs[current_idx]
+        name = tab["name_var"].get()
+
+        if not ask_yes_no("Delete Experiment", f"Delete '{name}'?"):
+            return
+
+        self.notebook.forget(tab["frame"])
+        self.tabs.pop(current_idx)
+        self.status.set(f"Deleted: {name}")
+
+    # =========================================================================
+    # Parameter tree
+    # =========================================================================
+
+    def _build_param_tree(self, parent, config, tab, path="", level=0, row_offset=0):
+        """Recursively build parameter tree for one tab."""
+        row = row_offset
 
         for key, value in config.items():
             current_path = f"{path}.{key}" if path else key
 
-            if isinstance(value, (dict, DictConfig)):
-                frame = ttk.Frame(parent)
+            if isinstance(value, dict):
+                frame = Frame(parent)
                 frame.grid(
                     row=row,
                     column=0,
                     columnspan=3,
-                    sticky=tk.W,
+                    sticky=W,
                     pady=(10 if level == 0 else 5, 2),
                 )
-
-                label = ttk.Label(
+                Label(
                     frame,
                     text=key.replace("_", " ").title(),
                     font=("Arial", 10 if level == 0 else 9, "bold"),
-                )
-                label.pack(side=tk.LEFT, padx=(level * 20, 0))
+                ).pack(side=LEFT, padx=(level * 20, 0))
 
                 if level == 0:
-                    sep = ttk.Separator(parent, orient=tk.HORIZONTAL)
-                    sep.grid(
-                        row=row + 1, column=0, columnspan=3, sticky="ew", pady=(0, 5)
+                    Separator(parent, orient=HORIZONTAL).grid(
+                        row=row + 1,
+                        column=0,
+                        columnspan=3,
+                        sticky="ew",
+                        pady=(0, 5),
                     )
                     row += 2
                 else:
                     row += 1
 
-                nested_frame = ttk.Frame(parent)
-                nested_frame.grid(row=row, column=0, columnspan=3, sticky=tk.W)
-                self._build_param_tree(nested_frame, value, current_path, level + 1)
+                nested = Frame(parent)
+                nested.grid(row=row, column=0, columnspan=3, sticky=W)
+                self._build_param_tree(nested, value, tab, current_path, level + 1)
                 row += 1
             else:
-                param_frame = ttk.Frame(parent)
-                param_frame.grid(row=row, column=0, columnspan=3, sticky=tk.W, pady=2)
+                param_frame = Frame(parent)
+                param_frame.grid(row=row, column=0, columnspan=3, sticky=W, pady=2)
 
-                label = ttk.Label(param_frame, text=f"{key}:", width=25, anchor=tk.W)
-                label.pack(side=tk.LEFT, padx=(level * 20, 10))
+                Label(param_frame, text=f"{key}:", width=25, anchor=W).pack(
+                    side=LEFT, padx=(level * 20, 10)
+                )
 
-                spec = get_field_spec(self.ui_schema, current_path)
+                schema_path = f"hparams.{current_path}"
+                spec = get_field_spec(self.ui_schema, schema_path)
 
                 widget, refresher = create_widget(
                     param_frame,
                     key,
                     value,
                     spec,
-                    lambda v, p=current_path: self._update_value(p, v),
+                    lambda v, p=current_path, t=tab: self._update_value(t, p, v),
                 )
-                widget.pack(side=tk.LEFT, padx=5)
+                widget.pack(side=LEFT, padx=5)
 
                 range_display = get_range_display(spec)
                 if range_display:
-                    info_label = ttk.Label(
-                        param_frame, text=range_display, foreground="gray"
+                    Label(param_frame, text=range_display, foreground="gray").pack(
+                        side=LEFT, padx=10
                     )
-                    info_label.pack(side=tk.LEFT, padx=10)
 
-                self.widgets[current_path] = (widget, refresher)
+                tab["widgets"][current_path] = (widget, refresher)
                 row += 1
 
-    def _update_value(self, path: str, value: Any):
-        """Update config when a value changes."""
+    # =========================================================================
+    # Value tracking
+    # =========================================================================
+
+    def _update_value(self, tab, path, value):
+        """Update a value in a specific tab's config."""
         keys = path.split(".")
 
-        spec = get_field_spec(self.ui_schema, path)
+        spec = get_field_spec(self.ui_schema, f"hparams.{path}")
         if spec:
-            value_type = spec[1]
-            if value_type == "bool":
+            vtype = spec[1]
+            if vtype == "bool":
                 value = bool(value)
-            elif value_type == "int":
+            elif vtype == "int":
                 value = int(float(value))
-            elif value_type == "float":
+            elif vtype == "float":
                 value = float(value)
 
-        current = self.current_config
+        # Update display config
+        current = tab["current"]
         for key in keys[:-1]:
             current = current[key]
         current[keys[-1]] = value
 
-        default_value = self._get_default_value(keys)
-        if value != default_value:
-            self._set_nested_diff(keys, value)
+        # Track diff against defaults
+        default = self.default_hparams
+        for key in keys:
+            default = default[key]
+
+        if value != default:
+            self._set_nested(tab["diff"], keys, value)
 
         self.status.set(f"Modified: {path}")
 
-    def _generate_filename(self) -> str:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return f"config_{timestamp}.yaml"
+    def _set_nested(self, d, keys, value):
+        """Set a value in a nested dict, creating intermediates."""
+        for key in keys[:-1]:
+            if key not in d:
+                d[key] = {}
+            d = d[key]
+        d[keys[-1]] = value
 
-    def _list_configs(self) -> list:
-        return sorted([f.name for f in CONFIG_DIR.glob("config_*.yaml")])
+    # =========================================================================
+    # Load / Save / Run
+    # =========================================================================
 
-    def _load_config(self, config_name: str):
-        """Load config file (a diff), applying it over default."""
-        config_path = CONFIG_DIR / config_name
+    def _load_config(self, config_name):
+        """Load config file, creating one tab per block."""
+        blocks = load_experiment_config(config_name)
 
-        self.diff_config = OmegaConf.to_container(OmegaConf.load(config_path))
+        for tab in self.tabs:
+            self.notebook.forget(tab["frame"])
+        self.tabs = []
 
-        merged = OmegaConf.merge(self.default_cfg, self.diff_config)
-        self.current_config = OmegaConf.to_container(merged, resolve=True)
+        for block_name, overrides in blocks.items():
+            self._create_tab(block_name, overrides)
 
-        self._refresh_widgets()
         self.status.set(f"Loaded: {config_name}")
 
+    def _collect_blocks(self):
+        """Gather all tabs into {name: overrides} dict."""
+        return {tab["name_var"].get(): tab["diff"] for tab in self.tabs}
+
     def _save_config(self):
-        """Save diff config."""
-        output_name = self.output_var.get()
-        if not output_name.endswith(".yaml"):
-            output_name += ".yaml"
-
-        output_path = CONFIG_DIR / output_name
-        OmegaConf.save(OmegaConf.create(self.diff_config), output_path)
-
-        self.status.set(f"Saved: {output_name}")
+        """Save all tabs as a multi-block config."""
+        filename = self.actions.get_input("Save As")
+        save_experiment_config(self._collect_blocks(), filename)
+        self.status.set(f"Saved: {filename}")
 
     def _run(self):
-        """Return diff config as orchestrator config and close GUI."""
-        hparams_diff = self.diff_config.get("hparams", {})
-        self.result = OmegaConf.create({"gui_run": hparams_diff})
+        """Return blocks dict and close."""
+        self.result = OmegaConf.create(self._collect_blocks())
         self.root.quit()
 
     def _on_close(self):
-        """Handle window close (cancel)."""
         self.result = None
         self.root.quit()
 
-    def _refresh_widgets(self):
-        """Update widget values based on current config."""
-
-        def update_widgets(config, path=""):
-            for key, value in config.items():
-                current_path = f"{path}.{key}" if path else key
-
-                if isinstance(value, dict):
-                    update_widgets(value, current_path)
-                elif current_path in self.widgets:
-                    _, refresher = self.widgets[current_path]
-                    refresher(value)
-
-        update_widgets(self.current_config)
-
 
 def run_gui(default_cfg: DictConfig) -> Optional[DictConfig]:
-    """Launch config editor GUI. Returns diff config or None if cancelled."""
+    """Launch config editor GUI. Returns multi-block config or None."""
     return launch_window(ConfigGUI, default_cfg)

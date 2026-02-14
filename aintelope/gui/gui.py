@@ -5,7 +5,7 @@ Viewers import all GUI primitives from here.
 """
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 from typing import Any, Callable, Optional, Tuple
 
 
@@ -15,6 +15,11 @@ from typing import Any, Callable, Optional, Tuple
 Frame = ttk.Frame
 Label = ttk.Label
 Separator = ttk.Separator
+Notebook = ttk.Notebook
+Combobox = ttk.Combobox
+Button = ttk.Button
+Entry = ttk.Entry
+StringVar = tk.StringVar
 
 # Layout constants
 W = tk.W
@@ -102,9 +107,9 @@ class SelectorBar(_PackGridMixin):
         self._combo["values"] = values
         self._combo.pack(side=tk.LEFT, padx=5)
 
-        ttk.Button(
-            self.frame, text=button_text, command=self._trigger
-        ).pack(side=tk.LEFT, padx=5)
+        ttk.Button(self.frame, text=button_text, command=self._trigger).pack(
+            side=tk.LEFT, padx=5
+        )
 
     def _trigger(self):
         self._on_select(self._var.get())
@@ -369,3 +374,8 @@ def get_range_display(spec: Optional[list]) -> str:
             return f"Choices: {', '.join(map(str, range_or_choices))}"
 
     return ""
+
+
+def ask_yes_no(title, message):
+    """Prompt user with a yes/no dialog."""
+    return messagebox.askyesno(title, message)

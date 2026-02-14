@@ -99,4 +99,3 @@ if __name__ == "__main__":
         results_main()
     else:
         run(args.config, gui=args.gui)
-        

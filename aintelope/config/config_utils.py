@@ -19,6 +19,35 @@ import time
 from omegaconf import DictConfig, OmegaConf
 
 
+CONFIG_DIR = Path("aintelope") / "config"
+DEFAULT_CONFIG = "default_config.yaml"
+PROTECTED_CONFIGS = {DEFAULT_CONFIG, "example_config.yaml"}
+
+
+def list_loadable_configs():
+    """List configs available for loading (excludes default)."""
+    return sorted(f.name for f in CONFIG_DIR.glob("*.yaml") if f.name != DEFAULT_CONFIG)
+
+
+def load_experiment_config(filename):
+    """Load a multi-block experiment config. Returns {block_name: overrides}."""
+    return OmegaConf.to_container(OmegaConf.load(CONFIG_DIR / filename), resolve=False)
+
+
+def save_experiment_config(blocks, filename):
+    """Save {block_name: overrides} to config file.
+
+    Args:
+        blocks: Dict of block_name -> override dict.
+        filename: Target filename (will be placed in CONFIG_DIR).
+    """
+    if filename in PROTECTED_CONFIGS:
+        raise ValueError(f"Cannot overwrite protected config: {filename}")
+    if not filename.endswith(".yaml"):
+        filename += ".yaml"
+    OmegaConf.save(OmegaConf.create(blocks), CONFIG_DIR / filename)
+
+
 def set_console_title(title):
     # see also https://en.wikipedia.org/wiki/ANSI_escape_code#OSC
     # and https://gist.github.com/fdncred/c649b8ab3577a0e2873a8f229730e939#supported-oscs

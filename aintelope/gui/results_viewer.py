@@ -14,7 +14,9 @@ from aintelope.gui.gui import (
     StatusBar,
     StringVar,
     launch_window,
-    X, LEFT, BOTH,
+    X,
+    LEFT,
+    BOTH,
 )
 
 

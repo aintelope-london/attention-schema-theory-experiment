@@ -9,6 +9,11 @@
 checkpoints/
 *.ckpt
 
+# User-created experiment configs (keep default and example)
+aintelope/config/*.yaml
+!aintelope/config/default_config.yaml
+!aintelope/config/example_config.yaml
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
