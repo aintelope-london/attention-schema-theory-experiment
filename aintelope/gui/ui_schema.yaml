@@ -41,7 +41,6 @@ hparams:
   env_params:
     combine_interoception_and_vision: [null, "bool"]
     interoception_transformation_mode: [[0, 4], "int"]
-    scalarize_rewards: [null, "bool"]
     num_iters: [[1, 10000], "int"]
     level: [[0, 10], "int"]
     map_max: [[5, 50], "int"]

@@ -163,19 +163,9 @@ class GridworldZooBaseEnv:
 
     def __init__(self, cfg: Optional[Dict] = None):
         env_params = dict(cfg.hparams.env_params)
-        is_sb3 = cfg.hparams.agent_class.startswith("sb3_")
-        test_mode = cfg.hparams.test_mode
-
-        # SB3 training owns the iteration loop — env must enforce truncation.
-        # All other cases: the manual loop handles episodes, env runs unbounded.
-        if not (is_sb3 and not test_mode):
-            env_params["num_iters"] = sys.maxsize
-
-        # SB3 training requires scalar rewards
-        if is_sb3 and not test_mode:
+        env_params.setdefault("scalarize_rewards", False)
+        if cfg.hparams.agent_class.startswith("sb3_") and not cfg.hparams.test_mode:
             env_params["scalarize_rewards"] = True
-        if env_params is None:
-            env_params = {}
 
         self.render_mode = None  # Some libraries require this field to be present. The actual value seems to be unimportant.
 
