@@ -13,7 +13,7 @@ import tkinter as tk
 import pytest
 
 from aintelope.gui.ui_schema_manager import load_ui_schema, get_field_spec
-from aintelope.gui.widgets import create_widget, get_range_display
+from aintelope.gui.gui import create_widget, get_range_display
 
 
 # =============================================================================

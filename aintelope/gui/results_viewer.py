@@ -1,238 +1,172 @@
-"""Config editor GUI for creating/editing experiment configs."""
+"""Results viewer GUI for inspecting experiment outputs."""
 
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
-from omegaconf import DictConfig, OmegaConf
 
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+from aintelope.analytics.plotting import create_figure, plot_line, save_figure
+from aintelope.analytics.recording import list_runs, list_blocks, EventLog
 from aintelope.gui.gui import (
     Frame,
     Label,
-    Separator,
-    ScrollableFrame,
-    SelectorBar,
+    Combobox,
     ActionBar,
     StatusBar,
+    StringVar,
     launch_window,
-    create_widget,
-    get_range_display,
-    W, X, LEFT, HORIZONTAL,
+    X, LEFT, BOTH,
 )
-from aintelope.gui.ui_schema_manager import load_ui_schema, get_field_spec
-
-CONFIG_DIR = Path("aintelope") / "config"
 
 
-class ConfigGUI:
-    def __init__(self, root, default_cfg: DictConfig):
+class ResultsViewer:
+    def __init__(self, root, outputs_dir):
         self.root = root
-        self.root.title("Config Editor")
-        self.root.geometry("1000x700")
-
-        self.default_cfg = default_cfg
-        self.ui_schema = load_ui_schema()
-
-        self.current_config = OmegaConf.to_container(default_cfg, resolve=True)
-        self.diff_config = {}
+        self.root.title("Results Viewer")
+        self.root.geometry("1200x800")
+        self.outputs_dir = outputs_dir
+        self.df = None
         self.result = None
-        self.widgets = {}
 
         self._create_ui()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
-    def _get_default_value(self, keys: list) -> Any:
-        """Get value from default config by key path."""
-        current = self.default_cfg
-        for key in keys:
-            current = current[key]
-        return current
-
-    def _set_nested_diff(self, keys: list, value: Any):
-        """Set value in diff_config, creating nested dicts as needed."""
-        current = self.diff_config
-        for key in keys[:-1]:
-            if key not in current:
-                current[key] = {}
-            current = current[key]
-        current[keys[-1]] = value
-
     def _create_ui(self):
-        self.selector = SelectorBar(
-            self.root,
-            label="Config",
-            values=self._list_configs(),
-            on_select=self._load_config,
+        # Top bar — run and block selectors
+        selector_frame = Frame(self.root, padding=10)
+        selector_frame.pack(fill=X)
+
+        Label(selector_frame, text="Run:").pack(side=LEFT, padx=5)
+        self.run_var = StringVar()
+        self.run_combo = Combobox(
+            selector_frame, textvariable=self.run_var, width=40, state="readonly"
         )
-        self.selector.pack(fill=X)
+        self.run_combo.pack(side=LEFT, padx=5)
+        self.run_combo.bind("<<ComboboxSelected>>", self._on_run_selected)
 
-        self.editor = ScrollableFrame(self.root, text="Configuration", padding=10)
-        self.editor.pack(fill="both", expand=True, padx=10, pady=5)
+        Label(selector_frame, text="Block:").pack(side=LEFT, padx=(20, 5))
+        self.block_var = StringVar()
+        self.block_combo = Combobox(
+            selector_frame, textvariable=self.block_var, width=20, state="readonly"
+        )
+        self.block_combo.pack(side=LEFT, padx=5)
+        self.block_combo.bind("<<ComboboxSelected>>", self._on_block_selected)
 
-        self._build_param_tree(self.editor.content, self.default_cfg)
+        # Plot controls — axis column selectors
+        controls_frame = Frame(self.root, padding=(10, 0))
+        controls_frame.pack(fill=X)
 
+        Label(controls_frame, text="X:").pack(side=LEFT, padx=5)
+        self.x_var = StringVar()
+        self.x_combo = Combobox(
+            controls_frame, textvariable=self.x_var, width=20, state="readonly"
+        )
+        self.x_combo.pack(side=LEFT, padx=5)
+        self.x_combo.bind("<<ComboboxSelected>>", self._on_axis_changed)
+
+        Label(controls_frame, text="Y:").pack(side=LEFT, padx=(20, 5))
+        self.y_var = StringVar()
+        self.y_combo = Combobox(
+            controls_frame, textvariable=self.y_var, width=20, state="readonly"
+        )
+        self.y_combo.pack(side=LEFT, padx=5)
+        self.y_combo.bind("<<ComboboxSelected>>", self._on_axis_changed)
+
+        # Matplotlib canvas
+        canvas_frame = Frame(self.root)
+        canvas_frame.pack(fill=BOTH, expand=True, padx=10, pady=5)
+
+        self.figure, self.ax = create_figure()
+        self.canvas = FigureCanvasTkAgg(self.figure, master=canvas_frame)
+        self.canvas.get_tk_widget().pack(fill=BOTH, expand=True)
+
+        # Actions
         self.actions = ActionBar(
             self.root,
-            inputs=[("Save As", self._generate_filename())],
+            inputs=[("Save As", "plot.png")],
             buttons=[
-                ("Save Config", self._save_config),
-                ("Run", self._run),
-                ("Cancel", self._on_close),
+                ("Export Plot", self._export_plot),
+                ("Close", self._on_close),
             ],
         )
         self.actions.pack(fill=X)
 
-        self.status = StatusBar(
-            self.root, "Ready. Edit parameters or load existing config."
-        )
+        # Status bar
+        self.status = StatusBar(self.root, "Select a run to begin.")
         self.status.pack(fill=X, padx=10, pady=(0, 10))
 
-    def _build_param_tree(self, parent, config, path="", level=0):
-        """Recursively build parameter tree from config."""
-        row = 0
+        self._refresh_runs()
 
-        for key, value in config.items():
-            current_path = f"{path}.{key}" if path else key
+    def _refresh_runs(self):
+        runs = list_runs(self.outputs_dir)
+        self.run_combo["values"] = runs
+        if runs:
+            self.run_combo.current(0)
+            self._on_run_selected()
 
-            if isinstance(value, (dict, DictConfig)):
-                frame = Frame(parent)
-                frame.grid(
-                    row=row,
-                    column=0,
-                    columnspan=3,
-                    sticky=W,
-                    pady=(10 if level == 0 else 5, 2),
-                )
+    def _on_run_selected(self, event=None):
+        run_name = self.run_var.get()
+        run_dir = str(Path(self.outputs_dir) / run_name)
+        blocks = list_blocks(run_dir)
+        self.block_combo["values"] = blocks
+        if blocks:
+            self.block_combo.current(0)
+            self._on_block_selected()
+        self.status.set(f"Run: {run_name} ({len(blocks)} blocks)")
 
-                label = Label(
-                    frame,
-                    text=key.replace("_", " ").title(),
-                    font=("Arial", 10 if level == 0 else 9, "bold"),
-                )
-                label.pack(side=LEFT, padx=(level * 20, 0))
+    def _on_block_selected(self, event=None):
+        run_name = self.run_var.get()
+        block_name = self.block_var.get()
+        filepath = Path(self.outputs_dir) / run_name / block_name / "events.csv"
+        self.df = EventLog.read(str(filepath))
 
-                if level == 0:
-                    sep = Separator(parent, orient=HORIZONTAL)
-                    sep.grid(
-                        row=row + 1, column=0, columnspan=3, sticky="ew", pady=(0, 5)
-                    )
-                    row += 2
-                else:
-                    row += 1
+        numeric_cols = list(self.df.select_dtypes(include="number").columns)
+        self.x_combo["values"] = numeric_cols
+        self.y_combo["values"] = numeric_cols
 
-                nested_frame = Frame(parent)
-                nested_frame.grid(row=row, column=0, columnspan=3, sticky=W)
-                self._build_param_tree(nested_frame, value, current_path, level + 1)
-                row += 1
-            else:
-                param_frame = Frame(parent)
-                param_frame.grid(row=row, column=0, columnspan=3, sticky=W, pady=2)
+        if "Episode" in numeric_cols:
+            self.x_var.set("Episode")
+        elif numeric_cols:
+            self.x_combo.current(0)
 
-                label = Label(param_frame, text=f"{key}:", width=25, anchor=W)
-                label.pack(side=LEFT, padx=(level * 20, 10))
+        if "Reward" in numeric_cols:
+            self.y_var.set("Reward")
+        elif len(numeric_cols) > 1:
+            self.y_combo.current(1)
 
-                spec = get_field_spec(self.ui_schema, current_path)
+        self._redraw()
+        self.status.set(
+            f"Loaded {block_name}: {len(self.df)} rows, "
+            f"{len(numeric_cols)} numeric columns"
+        )
 
-                widget, refresher = create_widget(
-                    param_frame,
-                    key,
-                    value,
-                    spec,
-                    lambda v, p=current_path: self._update_value(p, v),
-                )
-                widget.pack(side=LEFT, padx=5)
+    def _on_axis_changed(self, event=None):
+        self._redraw()
 
-                range_display = get_range_display(spec)
-                if range_display:
-                    info_label = Label(
-                        param_frame, text=range_display, foreground="gray"
-                    )
-                    info_label.pack(side=LEFT, padx=10)
+    def _redraw(self):
+        if self.df is None:
+            return
+        x_col = self.x_var.get()
+        y_col = self.y_var.get()
+        if not x_col or not y_col:
+            return
 
-                self.widgets[current_path] = (widget, refresher)
-                row += 1
+        plot_line(self.ax, self.df, x_col, [y_col])
+        self.canvas.draw()
 
-    def _update_value(self, path: str, value: Any):
-        """Update config when a value changes."""
-        keys = path.split(".")
-
-        spec = get_field_spec(self.ui_schema, path)
-        if spec:
-            value_type = spec[1]
-            if value_type == "bool":
-                value = bool(value)
-            elif value_type == "int":
-                value = int(float(value))
-            elif value_type == "float":
-                value = float(value)
-
-        current = self.current_config
-        for key in keys[:-1]:
-            current = current[key]
-        current[keys[-1]] = value
-
-        default_value = self._get_default_value(keys)
-        if value != default_value:
-            self._set_nested_diff(keys, value)
-
-        self.status.set(f"Modified: {path}")
-
-    def _generate_filename(self) -> str:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return f"config_{timestamp}.yaml"
-
-    def _list_configs(self) -> list:
-        return sorted([f.name for f in CONFIG_DIR.glob("config_*.yaml")])
-
-    def _load_config(self, config_name: str):
-        """Load config file (a diff), applying it over default."""
-        config_path = CONFIG_DIR / config_name
-
-        self.diff_config = OmegaConf.to_container(OmegaConf.load(config_path))
-
-        merged = OmegaConf.merge(self.default_cfg, self.diff_config)
-        self.current_config = OmegaConf.to_container(merged, resolve=True)
-
-        self._refresh_widgets()
-        self.status.set(f"Loaded: {config_name}")
-
-    def _save_config(self):
-        """Save diff config."""
-        output_name = self.actions.get_input("Save As")
-        if not output_name.endswith(".yaml"):
-            output_name += ".yaml"
-
-        output_path = CONFIG_DIR / output_name
-        OmegaConf.save(OmegaConf.create(self.diff_config), output_path)
-
-        self.status.set(f"Saved: {output_name}")
-
-    def _run(self):
-        """Return diff config as orchestrator config and close GUI."""
-        hparams_diff = self.diff_config.get("hparams", {})
-        self.result = OmegaConf.create({"gui_run": hparams_diff})
-        self.root.quit()
+    def _export_plot(self):
+        filename = self.actions.get_input("Save As")
+        run_name = self.run_var.get()
+        block_name = self.block_var.get()
+        save_dir = Path(self.outputs_dir) / run_name / block_name
+        save_path = save_dir / filename
+        save_figure(self.figure, str(save_path))
+        self.status.set(f"Exported: {save_path}")
 
     def _on_close(self):
-        """Handle window close (cancel)."""
         self.result = None
         self.root.quit()
 
-    def _refresh_widgets(self):
-        """Update widget values based on current config."""
 
-        def update_widgets(config, path=""):
-            for key, value in config.items():
-                current_path = f"{path}.{key}" if path else key
-
-                if isinstance(value, dict):
-                    update_widgets(value, current_path)
-                elif current_path in self.widgets:
-                    _, refresher = self.widgets[current_path]
-                    refresher(value)
-
-        update_widgets(self.current_config)
-
-
-def run_gui(default_cfg: DictConfig) -> Optional[DictConfig]:
-    """Launch config editor GUI. Returns diff config or None if cancelled."""
-    return launch_window(ConfigGUI, default_cfg)
+def run_results_viewer(outputs_dir="outputs"):
+    """Launch results viewer GUI."""
+    return launch_window(ResultsViewer, outputs_dir)

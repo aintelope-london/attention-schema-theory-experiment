@@ -18,19 +18,14 @@ from aintelope.config.config_utils import (
     set_priorities,
 )
 from aintelope.orchestrator import run_experiments
-from aintelope.gui.results_window import run_results
 
 
-def run(
-    config: Union[str, DictConfig] = "default_config.yaml",
-    gui: bool = False,
-    results: bool = False,
-):
+def run(config: Union[str, DictConfig] = "default_config.yaml", gui: bool = False):
     """Single entrypoint for the whole project.
 
     Args:
         config: Either a filename (relative to aintelope/config/) or a DictConfig.
-        gui: If True, launch GUI for orchestrator configuration.
+        gui: If True, launch config GUI before run, and results viewer after.
 
     Usage:
         python -m aintelope --gui
@@ -39,21 +34,17 @@ def run(
     """
     register_resolvers()
 
-    # Do not set low priority while debugging.
-    # Unit tests also set sys.gettrace() to not-None.
     if sys.gettrace() is None:
         set_priorities()
 
     set_memory_limits()
-
-    # Need to choose GPU early before torch fully starts up.
     select_gpu()
 
     if isinstance(config, str):
         config = OmegaConf.load(os.path.join("aintelope", "config", config))
 
     if gui:
-        from aintelope.gui.main_window import run_gui
+        from aintelope.gui.config_viewer import run_gui
 
         config = run_gui(config)
         if config is None:
@@ -62,8 +53,10 @@ def run(
 
     result = run_experiments(config)
 
-    if results:
-        run_results()
+    if gui:
+        from aintelope.gui.results_viewer import run_results_viewer
+
+        run_results_viewer()
 
     return result
 
@@ -75,7 +68,9 @@ def gui_main():
 
 def results_main():
     """Entry point for aintelope-results console script."""
-    run(results=True)
+    from aintelope.gui.results_viewer import run_results_viewer
+
+    run_results_viewer()
 
 
 if __name__ == "__main__":
@@ -91,12 +86,17 @@ if __name__ == "__main__":
     parser.add_argument(
         "--gui",
         action="store_true",
-        help="Launch GUI for orchestrator configuration",
+        help="Launch GUI for config editing, then results after run",
     )
     parser.add_argument(
         "--results",
         action="store_true",
-        help="Launch results viewer",
+        help="Launch results viewer standalone",
     )
     args = parser.parse_args()
-    run(args.config, gui=args.gui, results=args.results)
+
+    if args.results:
+        results_main()
+    else:
+        run(args.config, gui=args.gui)
+        
