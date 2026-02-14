@@ -64,7 +64,6 @@ hparams:
     interoception_transformation_mode: 0    # 0 - do not normalise or transform interoception channels; 1 - transform using 1 - x / 100 + 0.5 then clamp to range [0, 1]; 2 - normalise to range [0, 1] by considering oversatiation_limit and deficiency_limit of the environment (raises error if these are not set); 3 - create embedding using a set of gaussians (parameters provided in interoception_gaussian_centers and interoception_gaussian_scales); 4 - create embedding using a set of cumulative density functions (underlying gaussian parameters provided in interoception_gaussian_centers and interoception_gaussian_scales).
     interoception_embedding_gaussian_centers: [-32, -16, -8, -4, -2, -1, 0, 1, 2, 4]   # used only when interoception_transformation_mode is 3 or 4
     interoception_embedding_gaussian_scales: [32, 16, 8, 4, 2, 1, 1, 1, 2, 4]   # used only when interoception_transformation_mode is 3 or 4
-    scalarize_rewards: False
     num_iters: 50 # duration of a single episode
     env_experiment: ai_safety_gridworlds.aintelope_savanna
     level: 0
