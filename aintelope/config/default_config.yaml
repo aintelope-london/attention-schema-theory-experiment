@@ -8,15 +8,14 @@
 timestamp: ${now:%Y%m%d%H%M%S}      # TODO: currently this applies only to log_dir name, not to checkpoint filename. Checkpoint filename timestamp format is hardcoded in dqn_training.py
 timestamp_pid_uuid: ${append_pid_and_uuid:${timestamp}}
 experiment_name: experiment       
-checkpoint_dir: checkpoints/
-log_dir_root: outputs
-log_dir: ${log_dir_root}/${timestamp_pid_uuid}/
-experiment_dir: ${log_dir}/${experiment_name}/
-tensorboard_dir: ${experiment_dir}/tensorboard/
+outputs_dir: outputs
+log_dir: ${outputs_dir}/${timestamp_pid_uuid}/
+checkpoint_dir: checkpoints
+tensorboard_dir: tensorboard
 
 trainer_params:
   num_workers: 1        # unused        # TODO
-  checkpoint: ${log_dir}/checkpoints/
+  checkpoint: ${log_dir}checkpoints/
   device: gpu        # unused        # TODO
   verbose: false
 
@@ -34,7 +33,6 @@ hparams:
   test_mode: False
   save_checkpoints: True # Path instead
   params_set_title: "main config"
-  aggregated_results_file: outputs/${hparams.params_set_title}.jsonl
   env: savanna-safetygrid-parallel-v1
   env_entry_point: "aintelope.environments.savanna_safetygrid:SavannaGridworldParallelEnv"
   env_type: zoo  

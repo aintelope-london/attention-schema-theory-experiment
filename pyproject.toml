@@ -62,6 +62,7 @@ dev = [
 
 [project.scripts]
 aintelope-gui = "aintelope.__main__:gui_main"
+aintelope-results = "aintelope.__main__:results_main"
 
 [build-system]
 requires = ["setuptools"]
