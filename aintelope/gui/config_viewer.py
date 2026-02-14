@@ -299,6 +299,7 @@ class ConfigGUI:
         filename = self.actions.get_input("Save As")
         save_experiment_config(self._collect_blocks(), filename)
         self.status.set(f"Saved: {filename}")
+        self.selector.set_values(list_loadable_configs())
 
     def _run(self):
         """Return blocks dict and close."""

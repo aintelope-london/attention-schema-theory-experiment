@@ -73,10 +73,10 @@ def base_env_params(base_env_cfg):
 def learning_config(base_test_config):
     """Two-block config: train then test."""
     train_block = OmegaConf.merge(
-        base_test_config, {"num_episodes": 50, "env_params": {"num_iters": 100}}
+        base_test_config, {"episodes": 50, "env_params": {"num_iters": 100}}
     )
     test_block = OmegaConf.merge(
         base_test_config,
-        {"num_episodes": 10, "test_mode": True, "env_params": {"num_iters": 100}},
+        {"episodes": 10, "test_mode": True, "env_params": {"num_iters": 100}},
     )
     return OmegaConf.create({"train": train_block, "test": test_block})
