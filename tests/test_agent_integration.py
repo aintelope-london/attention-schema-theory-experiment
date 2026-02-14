@@ -1,6 +1,5 @@
 """Integration test: agent completes full orchestrator without errors."""
 
-import os
 import pytest
 import pandas as pd
 from omegaconf import OmegaConf
@@ -9,7 +8,6 @@ from aintelope.analytics.analytics import (
     assert_learning_threshold,
     assert_learning_improvement,
 )
-from aintelope.analytics.recording import read_events
 from aintelope.__main__ import run
 
 
@@ -23,7 +21,7 @@ def test_agent_learns(base_test_config):
 
     shared_overrides = {
         "agent_class": "sb3_ppo_agent",
-        "env_layout_seed_repeat_sequence_length": 1,
+        "env_layout_seed_repeat_sequence_length": 5,
         "model_params": {
             "num_conv_layers": 0,
             "learning_rate": 0.001,
@@ -45,14 +43,11 @@ def test_agent_learns(base_test_config):
 
     result = run(OmegaConf.create({"train": train_block, "test": test_block}))
 
-    exp_cfg = result["configs"][0]
-
-    # Read events and filter to training episodes
-    events = read_events(exp_cfg.experiment_dir, exp_cfg.events_fname)
-    events_combined = pd.concat(events, ignore_index=True)
+    # Read events directly from result, filter to training episodes
+    events_combined = pd.concat(result["events"], ignore_index=True)
     train_events = events_combined[~events_combined["IsTest"]]
 
-    #assert_learning_threshold(train_events)
+    # assert_learning_threshold(train_events)
     assert_learning_improvement(train_events)
 
 

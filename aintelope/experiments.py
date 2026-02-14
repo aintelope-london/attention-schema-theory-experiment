@@ -6,6 +6,7 @@
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
 import glob
+import logging
 import os
 import gc
 
@@ -37,6 +38,8 @@ def run_experiment(
     if "eps_last_env_layout_seed" in cfg:  # backwards compatibility
         cfg.eps_last_env_layout_seed = cfg.eps_last_env_layout_seed
 
+    logger = logging.getLogger("aintelope.experiment")
+
     is_sb3 = cfg.hparams.agent_class.startswith("sb3_")
 
     # Environment
@@ -58,13 +61,9 @@ def run_experiment(
         score_dimensions if isinstance(env, GridworldZooBaseEnv) else ["Score"]
     )
 
-    experiment_dir = os.path.normpath(cfg.experiment_dir)
-    events_fname = cfg.events_fname
-
     events = recording.EventLog(
-        experiment_dir,
-        events_fname,
         events_columns,
+        experiment_name,
     )
 
     # Common trainer for each agent's models
@@ -127,26 +126,21 @@ def run_experiment(
         checkpoint = None
 
         if (
-            cfg.hparams.model_params.use_weight_sharing  # The reasoning for this condition is that even if the agents have similar roles, they still see each other on different observation layers. For example, the agent 0 is always on layer 0 and agent 1 is alwyas on layer 1, regardless of which agent is observing. Thus if they were trained on separate models then they need separate models also during test. When PPO weight sharing is enabled, then this is not an issue, because the shared model will learn to differentiate between the agents by looking at the agent currently visible in the center of the observation field. TODO: Swap the self-agent and other-agent layers in the environment side in such a manner that self-agent is always at same layer index for all agents and other-agent is also always at same layer index for all agents. Then we can enable this conditional branch for other models as well in scenarios where the agents have symmetric roles.
+            cfg.hparams.model_params.use_weight_sharing
             and prev_agent_checkpoint is not None
-            # and not use_separate_models_for_each_experiment   # if each experiment has separate models then the model of first agent will have same age as the model of second agent. In this case there is no reason to restrict the model of second agent to be equal of the first agent
-        ):  # later experiments may have more agents    # TODO: configuration option for determining whether new agents can copy the checkpoints of earlier agents, and if so then specifically which agent's checkpoint to use
+        ):
             checkpoint = prev_agent_checkpoint
         else:
             checkpoint_filename = agent_id
             if use_separate_models_for_each_experiment:
                 checkpoint_filename += "-" + experiment_name
-            checkpoints = glob.glob(
-                os.path.join(dir_cp, checkpoint_filename + "-*")
-            )  # NB! separate agent id from date explicitly in glob arguments using "-" since theoretically the agent id could be a two digit number and we do not want to match agent_10 while looking for agent_1
+            checkpoints = glob.glob(os.path.join(dir_cp, checkpoint_filename + "-*"))
             if len(checkpoints) > 0:
                 checkpoint = max(checkpoints, key=os.path.getctime)
                 prev_agent_checkpoint = checkpoint
-            elif (
-                prev_agent_checkpoint is not None
-            ):  # later experiments may have more agents    # TODO: configuration option for determining whether new agents can copy the checkpoints of earlier agents, and if so then specifically which agent's checkpoint to use
+            elif prev_agent_checkpoint is not None:
                 checkpoint = prev_agent_checkpoint
-            
+
         # Add agent, with potential checkpoint
         if not cfg.hparams.env_params.combine_interoception_and_vision:
             agent.init_model(
@@ -162,43 +156,42 @@ def run_experiment(
             )
         dones[agent_id] = False
 
+    # Warmup not yet implemented
+    # for _ in range(hparams.warm_start_steps):
+    #    agents.play_step(self.net, epsilon=1.0)
+
     # Main loop
 
-    # SB3 training has its own loop, hijack process here for this special case
+    # SB3 training has its own loop
     if is_sb3 and not cfg.hparams.test_mode:
         run_baseline_training(cfg, i_trial, env, agents)
-        events.close()
+        gc.collect()
         return events
 
     model_needs_saving = (
         False  # if no training episodes are specified then do not save models
     )
-    #reporter.set_total("episode", cfg.hparams.episodes)
-    for i_episode in range(cfg.hparams.episodes):
-        #reporter.update("episode", i_episode + 1)
-        events.flush()
+    reporter.set_total("episode", cfg.hparams.num_episodes)
+    for i_episode in range(cfg.hparams.num_episodes):
+        reporter.update("episode", i_episode + 1)
 
         env_layout_seed = (
             int(i_episode / cfg.hparams.env_layout_seed_repeat_sequence_length)
             if cfg.hparams.env_layout_seed_repeat_sequence_length > 0
-            else i_episode  # this ensures that during test episodes, env_layout_seed based map randomization seed is different from training seeds. The environment is re-constructed when testing starts. Without explicitly providing env_layout_seed, the map randomization seed would be automatically reset to env_layout_seed = 0, which would overlap with the training seeds.
+            else i_episode
         )
 
-        # How many different layout seeds there should be overall? After given amount of seeds has been used, the seed will loop over to zero and repeat the seed sequence. Zero or negative modulo parameter value disables the modulo feature.
         if cfg.hparams.env_layout_seed_modulo > 0:
             env_layout_seed = env_layout_seed % cfg.hparams.env_layout_seed_modulo
 
         print(
-            f"\ni_trial: {i_trial} experiment: {experiment_name} episode: {i_episode} env_layout_seed: {env_layout_seed}"
+            f"\ni_trial: {i_trial} experiment: {experiment_name} episode: {i_episode} env_layout_seed: {env_layout_seed} test_mode: {cfg.hparams.test_mode}"
         )
 
-        # TODO: refactor these checks into separate function        # Save models
-        # https://pytorch.org/tutorials/recipes/recipes/
-        # saving_and_loading_a_general_checkpoint.html
+        # TODO: refactor these checks into separate function
+        # Save models
         if not cfg.hparams.test_mode:
-            if (
-                i_episode > 0 and cfg.hparams.save_frequency != 0
-            ):  # cfg.hparams.save_frequency == 0 means that the model is saved only at the end, improving training performance
+            if i_episode > 0 and cfg.hparams.save_frequency != 0:
                 model_needs_saving = True
                 if i_episode % cfg.hparams.save_frequency == 0:
                     os.makedirs(dir_cp, exist_ok=True)
@@ -219,23 +212,17 @@ def run_experiment(
             (
                 observations,
                 infos,
-            ) = env.reset(
-                env_layout_seed=env_layout_seed
-            )  # if not test_mode else -(env_layout_seed - cfg.hparams.episodes + 1))
+            ) = env.reset(env_layout_seed=env_layout_seed)
             for agent in agents:
                 agent.reset(observations[agent.id], infos[agent.id], type(env))
-                # trainer.reset_agent(agent.id)	# TODO: configuration flag
                 dones[agent.id] = False
 
         elif isinstance(env, AECEnv):
-            env.reset(  # TODO: actually savanna_safetygrid wrapper provides observations and infos as a return value, so need for branching here
-                env_layout_seed=env_layout_seed
-            )  # if not test_mode else -(env_layout_seed - cfg.hparams.episodes + 1))
+            env.reset(env_layout_seed=env_layout_seed)
             for agent in agents:
                 agent.reset(
                     env.observe(agent.id), env.observe_info(agent.id), type(env)
                 )
-                # trainer.reset_agent(agent.id)	# TODO: configuration flag
                 dones[agent.id] = False
 
         # Iterations within the episode
@@ -263,8 +250,6 @@ def run_experiment(
                     truncateds,
                     infos,
                 ) = env.step(actions)
-                # call update since the list of terminateds will become smaller on
-                # second step after agents have died
                 dones.update(
                     {
                         key: terminated or truncateds[key]
@@ -285,10 +270,8 @@ def run_experiment(
                         env=env,
                         observation=observation,
                         info=info,
-                        score=sum(score.values())
-                        if isinstance(score, dict)
-                        else score,  # TODO: make a function to handle obs->rew in Q-agent too, remove this
-                        done=done,  # TODO: should it be "terminated" in place of "done" here?
+                        score=sum(score.values()) if isinstance(score, dict) else score,
+                        done=done,
                     )
 
                     # Record what just happened
@@ -312,97 +295,71 @@ def run_experiment(
                     )
 
             elif isinstance(env, AECEnv):
-                # loop: observe, collect action, send action, get observation, update
                 agents_dict = {agent.id: agent for agent in agents}
-                for agent_id in env.agent_iter(
-                    max_iter=env.num_agents
-                ):  # num_agents returns number of alive (non-done) agents
+                for agent_id in env.agent_iter(max_iter=env.num_agents):
                     agent = agents_dict[agent_id]
 
-                    # Per Zoo API, a dead agent must call .step(None) once more after
-                    # becoming dead. Only after that call will this dead agent be
-                    # removed from various dictionaries and from .agent_iter loop.
-                    if env.terminations[agent.id] or env.truncations[agent.id]:
-                        action = None
-                    else:
-                        observation = env.observe(agent.id)
-                        info = env.observe_info(agent.id)
-                        action = agent.get_action(
-                            observation=observation,
-                            info=info,
-                            step=step,
-                            env_layout_seed=env_layout_seed,
-                            episode=i_episode,
-                            trial=i_trial,
+                    if dones[agent_id]:
+                        env.step(None)
+                        continue
+
+                    observation = env.observe(agent_id)
+                    info = env.observe_info(agent_id)
+                    action = agent.get_action(
+                        observation=observation,
+                        info=info,
+                        step=step,
+                        env_layout_seed=env_layout_seed,
+                        episode=i_episode,
+                        trial=i_trial,
+                    )
+
+                    env.step(action)
+
+                    observation = env.observe(agent_id)
+                    info = env.observe_info(agent_id)
+                    score = env.rewards[agent_id]
+                    done = env.terminations[agent_id] or env.truncations[agent_id]
+
+                    if env.terminations[agent_id]:
+                        observation = None
+
+                    agent_step_info = agent.update(
+                        env=env,
+                        observation=observation,
+                        info=info,
+                        score=sum(score.values()) if isinstance(score, dict) else score,
+                        done=done,
+                    )
+
+                    # Record what just happened
+                    env_step_info = (
+                        [score.get(dimension, 0) for dimension in score_dimensions]
+                        if isinstance(score, dict)
+                        else [score]
+                    )
+
+                    events.log_event(
+                        [
+                            cfg.experiment_name,
+                            i_trial,
+                            i_episode,
+                            env_layout_seed,
+                            step,
+                            cfg.hparams.test_mode,
+                        ]
+                        + agent_step_info
+                        + env_step_info
+                    )
+
+                    # NB! any agent could die at any other agent's step
+                    for agent_id2 in env.agents:
+                        dones[agent_id2] = (
+                            env.terminations[agent_id2] or env.truncations[agent_id2]
                         )
-
-                    # Env step
-                    # NB! both AIntelope Zoo and Gridworlds Zoo wrapper in AIntelope
-                    # provide slightly modified Zoo API. Normal Zoo sequential API
-                    # step() method does not return values and is not allowed to return
-                    # values else Zoo API tests will fail.
-                    result = env.step_single_agent(action)
-
-                    if agent.id in env.agents:  # was not "dead step"
-                        # NB! This is only initial reward upon agent's own step.
-                        # When other agents take their turns then the reward of the
-                        # agent may change. If you need to learn an agent's accumulated
-                        # reward over other agents turns (plus its own step's reward)
-                        # then use env.last property.
-                        (
-                            observation,
-                            score,
-                            terminated,
-                            truncated,
-                            info,
-                        ) = result
-
-                        done = terminated or truncated
-
-                        # Agent is updated based on what the env shows.
-                        # All commented above included ^
-                        if terminated:
-                            observation = None  # TODO: why is this here?
-
-                        agent_step_info = agent.update(
-                            env=env,
-                            observation=observation,
-                            info=info,
-                            score=sum(score.values())
-                            if isinstance(score, dict)
-                            else score,
-                            done=done,  # TODO: should it be "terminated" in place of "done" here?
-                        )  # note that score is used ONLY by baseline
-
-                        # Record what just happened
-                        env_step_info = (
-                            [score.get(dimension, 0) for dimension in score_dimensions]
-                            if isinstance(score, dict)
-                            else [score]
-                        )
-
-                        events.log_event(
-                            [
-                                cfg.experiment_name,
-                                i_trial,
-                                i_episode,
-                                env_layout_seed,
-                                step,
-                                cfg.hparams.test_mode,
-                            ]
-                            + agent_step_info
-                            + env_step_info
-                        )
-
-                        # NB! any agent could die at any other agent's step
-                        for agent_id2 in env.agents:
-                            dones[agent_id2] = (
-                                env.terminations[agent_id2]
-                                or env.truncations[agent_id2]
-                            )
-                            # TODO: if the agent died during some other agents step,
-                            # should we call agent.update() on the dead agent,
-                            # else it will be never called?
+                        # TODO: if the agent died during some other agents step,
+                        # should we call agent.update() on the dead agent,
+                        # else it will be never called?
 
             else:
                 raise NotImplementedError(f"Unknown environment type {type(env)}")
@@ -417,7 +374,7 @@ def run_experiment(
 
         if (
             model_needs_saving
-        ):  # happens when episodes is not divisible by save frequency
+        ):  # happens when num_episodes is not divisible by save frequency
             os.makedirs(dir_cp, exist_ok=True)
             for agent in agents:
                 agent.save_model(
@@ -427,7 +384,7 @@ def run_experiment(
                     use_separate_models_for_each_experiment,
                 )
 
-    events.close()
+    gc.collect()
 
     return events
 
@@ -435,20 +392,10 @@ def run_experiment(
 def run_baseline_training(
     cfg: DictConfig, i_trial: int, env: Environment, agents: list
 ):
-    # SB3 models are designed for single-agent settings, we get around this by using the same model for every agent
-    # https://pettingzoo.farama.org/tutorials/sb3/waterworld/
-
-    # num_total_steps = cfg.hparams.env_params.num_iters * 1
-    num_total_steps = cfg.hparams.env_params.num_iters * cfg.hparams.episodes
-
-    # During multi-agent multi-model training the actual agents will run in threads/subprocesses because SB3 requires Gym interface. Agent[0] will be used just as an interface to call train(), the SB3BaseAgent base class will automatically set up the actual agents.
-    # In case of multi-agent weight-shared model training it is partially similar: Agent[0] will be used just as an interface to call train(), the SB3 weight-shared model will handle the actual agents present in the environment.
+    num_total_steps = cfg.hparams.env_params.num_iters * cfg.hparams.num_episodes
 
     agents[0].train(num_total_steps)
 
-    # Save models
-    # for agent in agents:
-    #    agent.save_model()
     agents[0].save_model()
 
 

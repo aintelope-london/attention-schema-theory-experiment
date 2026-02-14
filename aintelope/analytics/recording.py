@@ -36,79 +36,36 @@ def deserialize_state(cell):
     return pickle.loads(zlib.decompress(base64.b64decode(cell)))
 
 
-class EventLog(object):
-    def __init__(
-        self,
-        experiment_dir,
-        events_fname,
-        headers,
-    ):
-        self.record_path = Path(os.path.join(experiment_dir, events_fname))
-        logger.info(f"Saving training records to disk at {self.record_path}")
-        self.record_path.parent.mkdir(exist_ok=True, parents=True)
+class EventLog:
+    SERIALIZABLE_COLUMNS = ("State", "Next_state")
 
-        self.state_col_indices = {headers.index("State"), headers.index("Next_state")}
-
-        write_header = not os.path.exists(self.record_path)
-        self.file = open(
-            self.record_path,
-            mode="at",
-            buffering=1024 * 1024,
-            newline="",
-            encoding="utf-8",
-        )  # csv writer creates its own newlines therefore need to set newline to empty string here
-
-        self.writer = csv.writer(
-            self.file, quoting=csv.QUOTE_MINIMAL, delimiter=","
-        )  # TODO: use TSV format instead
-
-        if (
-            write_header
-        ):  # TODO: if the file already exists then assert that the header is same
-            self.writer.writerow(headers)
+    def __init__(self, columns, block_name):
+        self.columns = columns
+        self.block_name = block_name
+        self._rows = []
 
     def log_event(self, event):
-        transformed_cols = []
-        for index, col in enumerate(event):
-            if index in self.state_col_indices:
-                col = serialize_state(col)
-            elif isinstance(col, str):
-                col = (
-                    col.strip()
-                    .replace("\r", "\\r")
-                    .replace("\n", "\\n")
-                    .replace("\t", "\\t")
-                )  # CSV/TSV format does not support these characters
+        self._rows.append(event)
 
-            transformed_cols.append(col)
+    def to_dataframe(self):
+        return pd.DataFrame(self._rows, columns=self.columns)
 
-        self.writer.writerow(transformed_cols)
+    def write(self, experiment_dir):
+        path = Path(experiment_dir) / f"{self.block_name}.csv"
+        path.parent.mkdir(exist_ok=True, parents=True)
+        df = self.to_dataframe()
+        for col in self.SERIALIZABLE_COLUMNS:
+            if col in df.columns:
+                df[col] = df[col].apply(serialize_state)
+        df.to_csv(path, index=False)
 
-    def flush(self):
-        self.file.flush()
-
-    def close(self):
-        self.file.flush()
-        self.file.close()
-
-
-def read_events(record_path, events_filename):
-    """
-    Read the events saved in EventLog.
-    """
-    events = []
-
-    for path in Path(record_path).rglob(events_filename):
-        with FileLock(
-            str(path) + ".lock"
-        ):  # lock for better robustness against other processes writing to it concurrently
-            df = pd.read_csv(path)
-            for col in ("State", "Next_state"):
-                if col in df.columns:
-                    df[col] = df[col].apply(deserialize_state)
-            events.append(df)
-
-    return events
+    @staticmethod
+    def read(filepath):
+        df = pd.read_csv(filepath)
+        for col in EventLog.SERIALIZABLE_COLUMNS:
+            if col in df.columns:
+                df[col] = df[col].apply(deserialize_state)
+        return df
 
 
 def read_checkpoints(checkpoint_dir):

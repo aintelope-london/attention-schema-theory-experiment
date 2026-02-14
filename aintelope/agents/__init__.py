@@ -34,6 +34,7 @@ def get_agent_class(agent_id: str) -> Type[Agent]:
         raise ValueError(f"{agent_id} is not found in agent registry")
     return AGENT_REGISTRY[agent_id]
 
+
 register_agent_class("random_agent", RandomAgent)
 register_agent_class("q_agent", QAgent)
 register_agent_class("example_agent", ExampleAgent)

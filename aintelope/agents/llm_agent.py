@@ -95,7 +95,7 @@ class LLMAgent(Agent):
         self.last_action = None
 
         self.is_a_new_episode = True
-        self.test_mode = None # testmode removed, use cfg.include_rewards_in_prompt if you wish to fix this class
+        self.test_mode = None  # testmode removed, use cfg.include_rewards_in_prompt if you wish to fix this class
         self.messages = None
         self.full_message_history = None  # TODO
 

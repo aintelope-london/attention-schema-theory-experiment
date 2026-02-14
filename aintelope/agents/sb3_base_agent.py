@@ -334,8 +334,6 @@ class SB3BaseAgent(Agent):
     def env_pre_reset_callback(self, seed, options, *args, **kwargs):
         assert seed is None
 
-        self.events.flush()
-
         i_episode = (
             self.next_episode_no
         )  # cannot use env.get_next_episode_no() here since its counter is reset for each new env_layout_seed

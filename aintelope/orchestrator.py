@@ -25,6 +25,7 @@ from aintelope.config.config_utils import (
 )
 from aintelope.experiments import run_experiment
 from aintelope.utils.seeding import set_global_seeds
+from aintelope.utils.progress import ProgressReporter
 
 logger = logging.getLogger("aintelope.__main__")
 
@@ -39,7 +40,7 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
     """Run all experiments for a single trial.
 
     Args must be dicts (not OmegaConf) for multiprocessing pickling.
-    Returns dict with summaries and configs lists.
+    Returns dict with summaries, configs, and events lists.
     """
     # Reconstruct OmegaConf objects
     cfg = OmegaConf.create(cfg_dict)
@@ -50,11 +51,12 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
 
     summaries = []
     configs = []
+    all_events = []
 
     timestamp = str(cfg.timestamp)
 
     for _, experiment_name in enumerate(main_config):
-        experiment_cfg = copy.deepcopy(cfg)  
+        experiment_cfg = copy.deepcopy(cfg)
         # need to deepcopy in order to not accumulate keys that were present in previous experiment and are not present in next experiment
 
         experiment_cfg.hparams = OmegaConf.merge(
@@ -69,14 +71,20 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
         logger.info(f"params_set: {params_set_title}, experiment: {experiment_name}")
 
         score_dimensions = get_score_dimensions(experiment_cfg)
+        reporter = ProgressReporter(["episode"], on_update=None)
 
-        run_experiment(
+        events = run_experiment(
             experiment_cfg,
             experiment_name=experiment_name,
             score_dimensions=score_dimensions,
             i_trial=i_trial,
-            reporter=None,
+            reporter=reporter,
         )
+
+        if cfg.hparams.run_params.save_logs:
+            events.write(os.path.normpath(experiment_cfg.experiment_dir))
+
+        all_events.append(events.to_dataframe())
 
         # Not using timestamp_pid_uuid here since it would make the title too long. In case of manual execution with plots, the pid-uuid is probably not needed anyway.
         title = timestamp + " : " + params_set_title + " : " + experiment_name
@@ -86,11 +94,12 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
             title=title,
             experiment_name=experiment_name,
             group_by_trial=cfg.hparams.trials >= 1,
+            events=all_events,
         )
         summaries.append(summary)
         configs.append(experiment_cfg)
 
-    return {"summaries": summaries, "configs": configs}
+    return {"summaries": summaries, "configs": configs, "events": all_events}
 
 
 def run_experiments(main_config):
@@ -105,6 +114,7 @@ def run_experiments(main_config):
 
     summaries = []
     configs = []
+    all_events = []
 
     workers = find_workers()
 
@@ -122,6 +132,7 @@ def run_experiments(main_config):
             result = future.result()
             summaries.extend(result["summaries"])
             configs.extend(result["configs"])
+            all_events.extend(result["events"])
 
     # Write the orchestrator results to file only when entire orchestrator has run. Else crashing the program during orchestrator run will cause the aggregated results file to contain partial data which will be later duplicated by re-run.
     # TODO: alternatively, cache the results of each experiment separately
@@ -140,7 +151,7 @@ def run_experiments(main_config):
 
     archive_code(cfg)
 
-    return {"summaries": summaries, "configs": configs}
+    return {"summaries": summaries, "configs": configs, "events": all_events}
 
 
 def analytics(
@@ -149,16 +160,14 @@ def analytics(
     title,
     experiment_name,
     group_by_trial,
+    events,
 ):
     # normalise slashes in paths. This is not mandatory, but will be cleaner to debug
     log_dir = os.path.normpath(cfg.log_dir)
-    experiment_dir = os.path.normpath(cfg.experiment_dir)
-    events_fname = cfg.events_fname
     num_train_episodes = cfg.hparams.episodes
     num_train_trials = cfg.hparams.trials
 
     savepath = os.path.join(log_dir, "plot_" + experiment_name)
-    events = recording.read_events(experiment_dir, events_fname)
 
     (
         test_totals,

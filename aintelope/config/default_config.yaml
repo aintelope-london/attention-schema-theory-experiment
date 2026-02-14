@@ -7,8 +7,7 @@
 
 timestamp: ${now:%Y%m%d%H%M%S}      # TODO: currently this applies only to log_dir name, not to checkpoint filename. Checkpoint filename timestamp format is hardcoded in dqn_training.py
 timestamp_pid_uuid: ${append_pid_and_uuid:${timestamp}}
-experiment_name: experiment
-events_fname: events.csv         
+experiment_name: experiment       
 checkpoint_dir: checkpoints/
 log_dir_root: outputs
 log_dir: ${log_dir_root}/${timestamp_pid_uuid}/

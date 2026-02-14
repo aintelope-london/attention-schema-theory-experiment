@@ -176,7 +176,7 @@ class GridworldZooBaseEnv:
             env_params["scalarize_rewards"] = True
         if env_params is None:
             env_params = {}
-        
+
         self.render_mode = None  # Some libraries require this field to be present. The actual value seems to be unimportant.
 
         # NB! Need to clone in order to not modify the default dict.
@@ -850,8 +850,7 @@ class GridworldZooBaseEnv:
 
 
 class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
-    def __init__(
-        self, cfg: Optional[Dict] = None):
+    def __init__(self, cfg: Optional[Dict] = None):
         GridworldZooBaseEnv.__init__(self, cfg)
         GridworldZooParallelEnv.__init__(self, **self.super_initargs)
         parent_observation_spaces = GridworldZooParallelEnv.observation_spaces.fget(
@@ -1004,8 +1003,7 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
 
 
 class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
-    def __init__(
-        self, cfg: Optional[Dict] = None):
+    def __init__(self, cfg: Optional[Dict] = None):
         self.observe_immediately_after_agent_action = cfg.hparams.env_params.get(
             "observe_immediately_after_agent_action", False
         )  # TODO: configure

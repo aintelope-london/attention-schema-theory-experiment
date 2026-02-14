@@ -33,6 +33,9 @@ def base_test_config():
     return OmegaConf.create(
         {
             "episodes": 1,
+            "run_params": {
+                "save_logs": False,
+            },
             "env_params": {
                 "num_iters": 10,
                 "map_max": 5,
@@ -46,17 +49,18 @@ def base_env_cfg():
     """Full cfg for direct environment construction in tests.
     Loads default_config.yaml with minimal test overrides.
     """
-    cfg = OmegaConf.load(
-        os.path.join("aintelope", "config", "default_config.yaml")
-    )
-    return OmegaConf.merge(cfg, {
-        "hparams": {
-            "env_params": {
-                "num_iters": 10,
-                "map_max": 5,
+    cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
+    return OmegaConf.merge(
+        cfg,
+        {
+            "hparams": {
+                "env_params": {
+                    "num_iters": 10,
+                    "map_max": 5,
+                },
             },
         },
-    })
+    )
 
 
 @pytest.fixture
@@ -64,9 +68,15 @@ def base_env_params(base_env_cfg):
     """Flat env_params dict for tests that need raw params."""
     return dict(base_env_cfg.hparams.env_params)
 
+
 @pytest.fixture
 def learning_config(base_test_config):
     """Two-block config: train then test."""
-    train_block = OmegaConf.merge(base_test_config, {"num_episodes": 50, "env_params": {"num_iters": 100}})
-    test_block = OmegaConf.merge(base_test_config, {"num_episodes": 10, "test_mode": True, "env_params": {"num_iters": 100}})
+    train_block = OmegaConf.merge(
+        base_test_config, {"num_episodes": 50, "env_params": {"num_iters": 100}}
+    )
+    test_block = OmegaConf.merge(
+        base_test_config,
+        {"num_episodes": 10, "test_mode": True, "env_params": {"num_iters": 100}},
+    )
     return OmegaConf.create({"train": train_block, "test": test_block})
