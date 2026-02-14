@@ -34,11 +34,9 @@ def test_agent_learns(base_test_config):
         },
     }
 
-    train_block = OmegaConf.merge(
-        base_test_config, shared_overrides, {"num_episodes": 500}
-    )
+    train_block = OmegaConf.merge(base_test_config, shared_overrides, {"episodes": 500})
     test_block = OmegaConf.merge(
-        base_test_config, shared_overrides, {"num_episodes": 10, "test_mode": True}
+        base_test_config, shared_overrides, {"episodes": 10, "test_mode": True}
     )
 
     result = run(OmegaConf.create({"train": train_block, "test": test_block}))

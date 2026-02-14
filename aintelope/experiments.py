@@ -168,8 +168,8 @@ def run_experiment(
     model_needs_saving = (
         False  # if no training episodes are specified then do not save models
     )
-    reporter.set_total("episode", cfg.hparams.num_episodes)
-    for i_episode in range(cfg.hparams.num_episodes):
+    reporter.set_total("episode", cfg.hparams.episodes)
+    for i_episode in range(cfg.hparams.episodes):
         reporter.update("episode", i_episode + 1)
 
         env_layout_seed = (
@@ -371,7 +371,7 @@ def run_experiment(
 
         if (
             model_needs_saving
-        ):  # happens when num_episodes is not divisible by save frequency
+        ):  # happens when episodes is not divisible by save frequency
             os.makedirs(dir_cp, exist_ok=True)
             for agent in agents:
                 agent.save_model(
@@ -389,7 +389,7 @@ def run_experiment(
 def run_baseline_training(
     cfg: DictConfig, i_trial: int, env: Environment, agents: list
 ):
-    num_total_steps = cfg.hparams.env_params.num_iters * cfg.hparams.num_episodes
+    num_total_steps = cfg.hparams.env_params.num_iters * cfg.hparams.episodes
 
     agents[0].train(num_total_steps)
 

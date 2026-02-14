@@ -51,13 +51,16 @@ ENTRY_WIDTH = 30
 
 
 class _PackGridMixin:
-    """Delegates pack/grid to self.frame."""
+    """Delegates pack/grid/str to self.frame."""
 
     def pack(self, **kwargs):
         self.frame.pack(**kwargs)
 
     def grid(self, **kwargs):
         self.frame.grid(**kwargs)
+
+    def __str__(self):
+        return str(self.frame)
 
 
 class ScrollableFrame(_PackGridMixin):
