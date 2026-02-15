@@ -6,7 +6,7 @@
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
 import glob
-import logging
+
 import os
 import gc
 

@@ -6,7 +6,7 @@
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
 import csv
-import logging
+
 from typing import List, Optional, Tuple
 from collections import defaultdict
 from gymnasium.spaces import Discrete

@@ -5,7 +5,7 @@
 # Repository:
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
-import logging
+
 from typing import List, NamedTuple, Optional, Tuple
 from gymnasium.spaces import Discrete
 
@@ -49,7 +49,6 @@ from pettingzoo import AECEnv, ParallelEnv
 
 PettingZooEnv = Union[AECEnv, ParallelEnv]
 Environment = Union[gym.Env, PettingZooEnv]
-
 
 
 class ExpertOverrideMixin:  # TODO: merge with code from A2C agent (the code is identical)

@@ -7,7 +7,7 @@
 
 import os
 import copy
-import logging
+
 import torch
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -76,7 +76,7 @@ def run_experiments(main_config):
     """Main orchestrator entry point."""
     cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
     timestamp = str(cfg.timestamp)
-    
+
     set_console_title(cfg.hparams.params_set_title + " : " + timestamp)
 
     run_dir = os.path.join(cfg.outputs_dir, timestamp)

@@ -6,7 +6,7 @@
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
 import sys
-import logging
+
 from collections import OrderedDict, namedtuple
 from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
@@ -176,7 +176,7 @@ class GridworldZooBaseEnv:
             self.metadata.update(
                 scores
             )  # move scores to same metadata level with other parameters
-     
+
         metadata_to_super_initargs_dict = {
             "level": "level",
             "map_width": "map_width",
@@ -918,7 +918,7 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
         or generally:
             {<agent_name>: <agent_action or None if agent is done>}
         """
-       
+
         if self._pre_step_callback2 is not None:
             actions = self._pre_step_callback2(actions)
 
@@ -1174,7 +1174,7 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         - truncated
         - info
         """
-    
+
         agent = self.agent_selection
 
         if self._pre_step_callback2 is not None:

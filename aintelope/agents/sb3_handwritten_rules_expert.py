@@ -6,7 +6,7 @@
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
 import csv
-import logging
+
 import hashlib
 from typing import List, Optional, Tuple
 from collections import defaultdict

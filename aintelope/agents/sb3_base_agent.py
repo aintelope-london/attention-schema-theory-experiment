@@ -6,7 +6,7 @@
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
 import os
-import logging
+
 import traceback
 from typing import List, NamedTuple, Optional, Tuple
 from gymnasium.spaces import Discrete
@@ -54,7 +54,6 @@ INFO_TEST_MODE = "test_mode"
 
 PettingZooEnv = Union[AECEnv, ParallelEnv]
 Environment = Union[gym.Env, PettingZooEnv]
-
 
 
 class PolicyWithConfigFactory(object):

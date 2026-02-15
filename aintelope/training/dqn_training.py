@@ -6,7 +6,7 @@
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
 import datetime
-import logging
+
 import os
 from collections import namedtuple
 from typing import Optional, Tuple
@@ -19,6 +19,7 @@ import torch.optim as optim
 from torch import nn
 
 from aintelope.aintelope_typing import ObservationFloat
+
 Transition = namedtuple(
     "Transition", ("state", "action", "reward", "done", "next_state")
 )
@@ -150,7 +151,7 @@ class Trainer:
                 ),
                 torch.tensor(np.expand_dims(observation[1], 0)),  # interoception
             )
-           
+
             if str(self.device) not in ["cpu"]:
                 observation = (
                     observation[0].cuda(self.device),
@@ -162,7 +163,7 @@ class Trainer:
                     observation, 0
                 )  # vision     # call .flatten() in case you want to force 1D network even on 3D vision
             )
-          
+
             if str(self.device) not in ["cpu"]:
                 observation = observation.cuda(self.device)
 

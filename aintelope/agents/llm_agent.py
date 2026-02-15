@@ -12,7 +12,7 @@ import pickle
 import datetime
 
 import csv
-import logging
+
 from typing import List, Optional, Tuple
 from collections import defaultdict
 from gymnasium.spaces import Discrete
@@ -148,7 +148,6 @@ class LLMAgent(Agent):
             "COOPERATION": "Cooperation",  # "Cooperation reward",
         }
 
-        
     def reset(self, state, info, env_class) -> None:
         """Resets self and updates the state."""
         self.done = False

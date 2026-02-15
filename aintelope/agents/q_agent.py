@@ -5,7 +5,7 @@
 # Repository:
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
-import logging
+
 from typing import List, NamedTuple, Optional, Tuple
 from gymnasium.spaces import Discrete
 

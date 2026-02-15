@@ -9,7 +9,6 @@
 Collection of simple (rule based) agents, e.g. a completely random agent
 """
 
-import logging
 
 from aintelope.agents.q_agent import QAgent
 
