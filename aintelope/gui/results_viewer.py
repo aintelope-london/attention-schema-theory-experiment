@@ -10,7 +10,12 @@ from aintelope.analytics.plotting import (
     prepare_plot_data,
     PLOT_TYPES,
 )
-from aintelope.analytics.recording import list_runs, list_blocks, EventLog, frames_to_video
+from aintelope.analytics.recording import (
+    list_runs,
+    list_blocks,
+    EventLog,
+    frames_to_video,
+)
 from aintelope.gui.gui import (
     Button,
     Entry,
@@ -193,9 +198,7 @@ class ResultsViewer:
         )
         self.export_start_slider.pack(side=LEFT, fill=X, expand=True, padx=5)
 
-        self.export_end_slider = ValueSlider(
-            export_frame, label="To", from_=0, to=0
-        )
+        self.export_end_slider = ValueSlider(export_frame, label="To", from_=0, to=0)
         self.export_end_slider.pack(side=LEFT, fill=X, expand=True, padx=5)
 
         Label(export_frame, text="Duration (s):").pack(side=LEFT, padx=(10, 2))
