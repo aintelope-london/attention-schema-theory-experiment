@@ -29,7 +29,7 @@ def find_workers() -> int:
     return gpu_count if gpu_count > 0 else os.cpu_count()
 
 
-def run_trial(cfg_dict, main_config_dict, i_trial, run_dir):
+def run_trial(cfg_dict, main_config_dict, i_trial):
     """Run all experiments for a single trial.
 
     Args must be dicts (not OmegaConf) for multiprocessing pickling.
@@ -63,7 +63,7 @@ def run_trial(cfg_dict, main_config_dict, i_trial, run_dir):
         )
 
         if cfg.hparams.run_params.save_logs:
-            block_output_dir = os.path.join(run_dir, experiment_name)
+            block_output_dir = os.path.join(cfg.outputs_dir, experiment_name)
             events.write(block_output_dir)
 
         all_events.append(events.to_dataframe())
@@ -79,8 +79,6 @@ def run_experiments(main_config):
 
     set_console_title(cfg.hparams.params_set_title + " : " + timestamp)
 
-    run_dir = os.path.join(cfg.outputs_dir, timestamp)
-
     configs = []
     all_events = []
 
@@ -91,9 +89,7 @@ def run_experiments(main_config):
 
     with ProcessPoolExecutor(max_workers=workers) as executor:
         futures = {
-            executor.submit(
-                run_trial, cfg_dict, main_config_dict, i_trial, run_dir
-            ): i_trial
+            executor.submit(run_trial, cfg_dict, main_config_dict, i_trial): i_trial
             for i_trial in range(cfg.hparams.trials)
         }
         for future in as_completed(futures):
@@ -103,4 +99,4 @@ def run_experiments(main_config):
 
     archive_code(cfg)
 
-    return {"run_dir": run_dir, "configs": configs, "events": all_events}
+    return {"Outputs_dir": cfg.outputs_dir, "configs": configs, "events": all_events}
