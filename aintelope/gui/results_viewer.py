@@ -10,8 +10,10 @@ from aintelope.analytics.plotting import (
     prepare_plot_data,
     PLOT_TYPES,
 )
-from aintelope.analytics.recording import list_runs, list_blocks, EventLog
+from aintelope.analytics.recording import list_runs, list_blocks, EventLog, frames_to_video
 from aintelope.gui.gui import (
+    Button,
+    Entry,
     Frame,
     Label,
     Combobox,
@@ -182,6 +184,30 @@ class ResultsViewer:
         )
         self.state_display.pack(fill=BOTH, expand=True, padx=10, pady=5)
 
+        # Video export controls
+        export_frame = Frame(self.playback_tab, padding=(10, 5))
+        export_frame.pack(fill=X)
+
+        self.export_start_slider = ValueSlider(
+            export_frame, label="From", from_=0, to=0
+        )
+        self.export_start_slider.pack(side=LEFT, fill=X, expand=True, padx=5)
+
+        self.export_end_slider = ValueSlider(
+            export_frame, label="To", from_=0, to=0
+        )
+        self.export_end_slider.pack(side=LEFT, fill=X, expand=True, padx=5)
+
+        Label(export_frame, text="Duration (s):").pack(side=LEFT, padx=(10, 2))
+        self.export_duration_var = StringVar(value="0.7")
+        Entry(export_frame, textvariable=self.export_duration_var, width=5).pack(
+            side=LEFT, padx=2
+        )
+
+        Button(export_frame, text="Export Video", command=self._export_video).pack(
+            side=LEFT, padx=(10, 5)
+        )
+
     # =========================================================================
     # Data loading
     # =========================================================================
@@ -301,6 +327,20 @@ class ResultsViewer:
         max_step = int(filtered["Step"].max()) if len(filtered) > 0 else 0
         self.step_slider.set_range(0, max_step)
         self.step_slider.set(0)
+        self.export_start_slider.set_range(0, max_step)
+        self.export_start_slider.set(0)
+        self.export_end_slider.set_range(0, max_step)
+        self.export_end_slider.set(max_step)
+
+    def _get_frame_lines(self, step):
+        """Get rendered ASCII lines for a single step in current episode/agent."""
+        row = self.df[
+            (self.df["Episode"] == int(self.episode_var.get()))
+            & (self.df["Agent_id"] == self.playback_agent_var.get())
+            & (self.df["Step"] == step)
+        ]
+        state = row.iloc[0]["State"]
+        return self.renderer.render(*self.interpreter.interpret(state))
 
     def _render_state(self):
         if self.df is None or self.interpreter is None:
@@ -311,16 +351,7 @@ class ResultsViewer:
         if not episode or not agent:
             return
 
-        row = self.df[
-            (self.df["Episode"] == int(episode))
-            & (self.df["Agent_id"] == agent)
-            & (self.df["Step"] == step)
-        ]
-        if len(row) == 0:
-            return
-
-        state = row.iloc[0]["State"]
-        lines = self.renderer.render(*self.interpreter.interpret(state))
+        lines = self._get_frame_lines(step)
 
         self.state_display.configure(state="normal")
         self.state_display.delete("1.0", "end")
@@ -341,6 +372,21 @@ class ResultsViewer:
         save_path = save_dir / filename
         save_figure(self.figure, str(save_path))
         self.status.set(f"Exported: {save_path}")
+
+    def _export_video(self):
+        start = self.export_start_slider.get()
+        end = self.export_end_slider.get()
+        duration = float(self.export_duration_var.get())
+
+        frames = [self._get_frame_lines(step) for step in range(start, end + 1)]
+
+        run_name = self.run_var.get()
+        block_name = self.block_var.get()
+        save_dir = Path(self.outputs_dir) / run_name / block_name
+        output_path = save_dir / "playback.mp4"
+
+        frames_to_video(frames, str(output_path), frame_duration=duration)
+        self.status.set(f"Exported: {output_path}")
 
     def _on_close(self):
         self.result = None

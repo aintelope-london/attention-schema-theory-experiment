@@ -94,3 +94,34 @@ def read_checkpoints(checkpoint_dir):
     model_paths.sort(key=lambda x: os.path.getmtime(x))
 
     return model_paths
+
+def frames_to_video(frames, output_path, frame_duration=0.7, font_size=20):
+    """Render text frames as an mp4 video.
+
+    Args:
+        frames: List of frames, each a list of strings (one per grid row).
+        output_path: Output .mp4 file path.
+        frame_duration: Seconds each frame is displayed.
+        font_size: Font size for text rendering.
+    """
+    from PIL import Image, ImageDraw, ImageFont
+    import imageio
+
+    font = ImageFont.load_default(size=font_size)
+
+    # Measure dimensions from first frame
+    measure = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    bbox = measure.textbbox((0, 0), "\n".join(frames[0]), font=font)
+    padding = 10
+    size = (bbox[2] + 2 * padding, bbox[3] + 2 * padding)
+
+    # Render frames to images
+    images = []
+    for lines in frames:
+        img = Image.new("RGB", size, color="black")
+        ImageDraw.Draw(img).text(
+            (padding, padding), "\n".join(lines), fill="white", font=font
+        )
+        images.append(np.array(img))
+
+    imageio.mimwrite(output_path, images, fps=1.0 / frame_duration)
