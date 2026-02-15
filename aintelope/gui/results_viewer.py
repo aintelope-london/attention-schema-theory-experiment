@@ -7,9 +7,10 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from aintelope.analytics.plotting import (
     create_figure,
     save_figure,
-    prepare_plot_data,
     PLOT_TYPES,
 )
+import aintelope.analytics.plot_library  # noqa: F401 — registers plot types
+
 from aintelope.analytics.recording import (
     list_runs,
     list_blocks,
@@ -110,12 +111,20 @@ class ResultsViewer:
         Label(controls, text="Plot:").pack(side=LEFT, padx=5)
         self.plot_type_var = StringVar()
         self.plot_type_combo = Combobox(
-            controls, textvariable=self.plot_type_var, width=12, state="readonly"
+            controls, textvariable=self.plot_type_var, width=16, state="readonly"
         )
         self.plot_type_combo["values"] = list(PLOT_TYPES.keys())
         self.plot_type_combo.current(0)
         self.plot_type_combo.pack(side=LEFT, padx=5)
         self.plot_type_combo.bind("<<ComboboxSelected>>", self._on_plot_changed)
+
+        Label(controls, text="Metric:").pack(side=LEFT, padx=(15, 5))
+        self.metric_var = StringVar()
+        self.metric_combo = Combobox(
+            controls, textvariable=self.metric_var, width=15, state="readonly"
+        )
+        self.metric_combo.pack(side=LEFT, padx=5)
+        self.metric_combo.bind("<<ComboboxSelected>>", self._on_plot_changed)
 
         Label(controls, text="Agent:").pack(side=LEFT, padx=(15, 5))
         self.agent_var = StringVar(value="all")
@@ -124,22 +133,6 @@ class ResultsViewer:
         )
         self.agent_combo.pack(side=LEFT, padx=5)
         self.agent_combo.bind("<<ComboboxSelected>>", self._on_plot_changed)
-
-        Label(controls, text="X:").pack(side=LEFT, padx=(15, 5))
-        self.x_var = StringVar()
-        self.x_combo = Combobox(
-            controls, textvariable=self.x_var, width=15, state="readonly"
-        )
-        self.x_combo.pack(side=LEFT, padx=5)
-        self.x_combo.bind("<<ComboboxSelected>>", self._on_plot_changed)
-
-        Label(controls, text="Y:").pack(side=LEFT, padx=(15, 5))
-        self.y_var = StringVar()
-        self.y_combo = Combobox(
-            controls, textvariable=self.y_var, width=15, state="readonly"
-        )
-        self.y_combo.pack(side=LEFT, padx=5)
-        self.y_combo.bind("<<ComboboxSelected>>", self._on_plot_changed)
 
         # Matplotlib canvas
         self.figure, self.ax = create_figure()
@@ -242,23 +235,19 @@ class ResultsViewer:
         self.interpreter = SavannaInterpreter(self.metadata["layer_order"])
 
         # Populate plots tab controls
-        numeric_cols = list(self.df.select_dtypes(include="number").columns)
-        self.x_combo["values"] = numeric_cols
-        self.y_combo["values"] = numeric_cols
+        index_cols = {"Trial", "Episode", "Step", "Agent_id", "Experiment"}
+        numeric_cols = self.df.select_dtypes(include="number").columns
+        metric_cols = [c for c in numeric_cols if c not in index_cols]
+        self.metric_combo["values"] = metric_cols
 
         agents = sorted(self.df["Agent_id"].unique())
         self.agent_combo["values"] = ["all"] + list(agents)
         self.agent_var.set("all")
 
-        if "Episode" in numeric_cols:
-            self.x_var.set("Episode")
-        elif numeric_cols:
-            self.x_combo.current(0)
-
-        if "Reward" in numeric_cols:
-            self.y_var.set("Reward")
-        elif len(numeric_cols) > 1:
-            self.y_combo.current(1)
+        if "Reward" in metric_cols:
+            self.metric_var.set("Reward")
+        elif metric_cols:
+            self.metric_var.set(metric_cols[0])
 
         # Populate playback tab controls
         episodes = sorted(self.df["Episode"].unique())
@@ -276,7 +265,7 @@ class ResultsViewer:
 
         self.status.set(
             f"Loaded {block_name}: {len(self.df)} rows, "
-            f"{len(numeric_cols)} numeric columns"
+            f"{len(metric_cols)} metric columns"
         )
 
     # =========================================================================
@@ -289,19 +278,17 @@ class ResultsViewer:
     def _redraw(self):
         if self.df is None:
             return
-        x_col = self.x_var.get()
-        y_col = self.y_var.get()
         plot_type = self.plot_type_var.get()
-        if not x_col or not y_col or not plot_type:
+        metric = self.metric_var.get()
+        if not plot_type or not metric:
             return
 
-        filter_by = {}
         agent = self.agent_var.get()
+        agents = sorted(self.df["Agent_id"].unique())
         if agent != "all":
-            filter_by["Agent_id"] = agent
+            agents = [agent]
 
-        plot_df = prepare_plot_data(self.df, filter_by=filter_by)
-        PLOT_TYPES[plot_type](self.ax, plot_df, x_col=x_col, y_cols=[y_col])
+        PLOT_TYPES[plot_type](self.ax, self.df, metric, agents, "Agent_id")
         self.canvas.draw()
 
     # =========================================================================
