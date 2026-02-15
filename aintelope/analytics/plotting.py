@@ -1,4 +1,4 @@
-"""Plotting functions for experiment results visualization.
+"""Plotting toolkit for experiment results visualization.
 
 All matplotlib usage is centralized here. Consumers receive or pass
 figure/axes objects — they never import matplotlib directly.
@@ -24,29 +24,24 @@ def register_plot(name):
 
 
 # =============================================================================
-# Data preparation
+# Color palette
 # =============================================================================
 
+PALETTE = [
+    "#1f77b4",
+    "#ff7f0e",
+    "#2ca02c",
+    "#d62728",
+    "#9467bd",
+    "#8c564b",
+    "#e377c2",
+    "#7f7f7f",
+]
 
-def prepare_plot_data(df, filter_by=None, group_by=None, agg="mean"):
-    """Filter and aggregate a DataFrame for plotting.
 
-    Args:
-        df: Source DataFrame.
-        filter_by: Dict of {column: value} to filter rows.
-        group_by: List of columns to group by before aggregating.
-        agg: Aggregation function name (e.g. "mean", "sum", "median").
-
-    Returns:
-        Transformed DataFrame ready for plotting.
-    """
-    result = df
-    if filter_by:
-        for col, val in filter_by.items():
-            result = result[result[col] == val]
-    if group_by:
-        result = result.groupby(group_by, as_index=False).agg(agg)
-    return result
+def get_color(index):
+    """Return a color from the palette, cycling if needed."""
+    return PALETTE[index % len(PALETTE)]
 
 
 # =============================================================================
@@ -67,47 +62,80 @@ def save_figure(figure, path):
 
 
 # =============================================================================
-# Plot types
+# Data aggregation primitives
 # =============================================================================
 
 
-@register_plot("line")
-def plot_line(ax, df, **params):
-    """Line plot of one or more y columns against x.
+def collapse(df, group_cols, y_col, fn="sum"):
+    """Reduce rows by grouping and aggregating.
 
-    Params:
-        x_col: Column name for x axis.
-        y_cols: List of column names for y axis.
+    Args:
+        df: Source DataFrame.
+        group_cols: Columns to group by.
+        y_col: Column to aggregate.
+        fn: Aggregation function name.
+
+    Returns:
+        DataFrame with one row per group, y_col aggregated.
     """
-    x_col = params["x_col"]
-    y_cols = params["y_cols"]
+    return df.groupby(group_cols, as_index=False)[y_col].agg(fn)
 
+
+def aggregate_series(df, x_col, y_col):
+    """Compute mean and std of y_col grouped by x_col.
+
+    Args:
+        df: Source DataFrame.
+        x_col: Column for the x-axis.
+        y_col: Column to compute statistics on.
+
+    Returns:
+        (x, mean, std) as numpy arrays.
+    """
+    agg = df.groupby(x_col)[y_col].agg(["mean", "std"]).fillna(0)
+    return agg.index.values, agg["mean"].values, agg["std"].values
+
+
+# =============================================================================
+# Rendering primitives
+# =============================================================================
+
+
+def plot_band(ax, x, mean, std, label=None, color=None, alpha=0.2):
+    """Draw a line with shaded standard deviation region.
+
+    Args:
+        ax: Matplotlib axes.
+        x: X-axis values.
+        mean: Mean values.
+        std: Standard deviation values.
+        label: Legend label.
+        color: Line and fill color.
+        alpha: Fill transparency.
+    """
+    ax.plot(x, mean, linewidth=0.75, label=label, color=color)
+    ax.fill_between(x, mean - std, mean + std, alpha=alpha, color=color)
+
+
+def plot_grouped_bands(ax, df, metric, groups, group_col, series_fn, x_label):
+    """Render a band per group, each in its own color.
+
+    Args:
+        ax: Matplotlib axes.
+        df: Source DataFrame.
+        metric: Column name for the y-axis value.
+        groups: List of group values to iterate over.
+        group_col: Column name to filter by.
+        series_fn: Callable(df, metric) -> (x, mean, std).
+        x_label: Label for the x-axis.
+    """
     ax.clear()
-    for col in y_cols:
-        ax.plot(df[x_col], df[col], linewidth=0.75, label=col)
-    ax.set_xlabel(x_col)
-    ax.set_ylabel(y_cols[0] if len(y_cols) == 1 else "Value")
-    if len(y_cols) > 1:
+    for i, group in enumerate(groups):
+        group_df = df[df[group_col] == group]
+        x, mean, std = series_fn(group_df, metric)
+        plot_band(ax, x, mean, std, label=group, color=get_color(i))
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(metric)
+    if len(groups) > 1:
         ax.legend()
-    ax.figure.tight_layout()
-
-
-@register_plot("box")
-def plot_box(ax, df, **params):
-    """Box plot of a value column grouped by a category column.
-
-    Params:
-        x_col: Column name for category axis (groups).
-        y_cols: List with one column name for value axis.
-    """
-    x_col = params["x_col"]
-    y_col = params["y_cols"][0]
-
-    ax.clear()
-    groups = df.groupby(x_col)[y_col]
-    labels = sorted(groups.groups.keys())
-    data = [groups.get_group(label).values for label in labels]
-    ax.boxplot(data, labels=labels, showfliers=False)
-    ax.set_xlabel(x_col)
-    ax.set_ylabel(y_col)
     ax.figure.tight_layout()
