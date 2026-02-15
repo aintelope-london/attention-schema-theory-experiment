@@ -11,7 +11,7 @@ experiment_name: experiment
 outputs_dir: outputs
 log_dir: ${outputs_dir}/${timestamp_pid_uuid}/
 checkpoint_dir: checkpoints
-tensorboard_dir: tensorboard
+tensorboard_dir: null #tensorboard if you want to have this later
 
 trainer_params:
   num_workers: 1        # unused        # TODO
