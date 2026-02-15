@@ -56,8 +56,6 @@ PettingZooEnv = Union[AECEnv, ParallelEnv]
 Environment = Union[gym.Env, PettingZooEnv]
 
 
-logger = logging.getLogger("aintelope.agents.sb3_agent")
-
 
 class PolicyWithConfigFactory(object):
     def __init__(self, env_classname, agent_id, cfg, policy_constructor):

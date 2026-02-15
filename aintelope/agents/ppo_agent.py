@@ -51,8 +51,6 @@ PettingZooEnv = Union[AECEnv, ParallelEnv]
 Environment = Union[gym.Env, PettingZooEnv]
 
 
-logger = logging.getLogger("aintelope.agents.ppo_agent")
-
 
 class ExpertOverrideMixin:  # TODO: merge with code from A2C agent (the code is identical)
     def __init__(self, env_classname, agent_id, cfg, *args, **kwargs):

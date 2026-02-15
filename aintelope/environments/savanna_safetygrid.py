@@ -70,8 +70,6 @@ ACTION_RELATIVE_COORDINATE_MAP = (
 )
 ALL_AGENTS_LAYER = "all_agents"
 
-logger = logging.getLogger("aintelope.environments.savanna_safetygrid")
-
 # typing aliases
 Action = Actions  # int
 
@@ -178,8 +176,7 @@ class GridworldZooBaseEnv:
             self.metadata.update(
                 scores
             )  # move scores to same metadata level with other parameters
-        logger.info(f"initializing savanna env with params: {self.metadata}")
-
+     
         metadata_to_super_initargs_dict = {
             "level": "level",
             "map_width": "map_width",
@@ -921,8 +918,7 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
         or generally:
             {<agent_name>: <agent_action or None if agent is done>}
         """
-        logger.debug("debug actions", actions)
-
+       
         if self._pre_step_callback2 is not None:
             actions = self._pre_step_callback2(actions)
 
@@ -970,14 +966,6 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
             infos = {agent: {} for agent in infos.keys()}
 
         filtered_infos = self.filter_infos(infos)
-        logger.debug(
-            "debug return",
-            self.observations2,
-            rewards,
-            terminateds,
-            truncateds,
-            filtered_infos,
-        )
         result = (
             self.observations2,
             rewards2,
@@ -1186,8 +1174,7 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         - truncated
         - info
         """
-        logger.debug("debug action", action)
-
+    
         agent = self.agent_selection
 
         if self._pre_step_callback2 is not None:
@@ -1253,14 +1240,6 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
             step_agent_info = {}
 
         filtered_info = self.filter_info(agent, step_agent_info)
-        logger.debug(
-            "debug return",
-            observation2,
-            reward2,
-            terminated,
-            truncated,
-            filtered_info,
-        )
         result = (
             observation2,
             reward2,
@@ -1286,7 +1265,6 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         or generally:
             {<agent_name>: <agent_action or None if agent is done>}
         """
-        logger.debug("debug actions", actions)
         # If a user passes in actions with no agents,
         # then just return empty observations, etc.
         if not actions:
@@ -1386,14 +1364,6 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
             infos = {agent: {} for agent in infos.keys()}
 
         filtered_infos = self.filter_infos(infos)
-        logger.debug(
-            "debug return",
-            self.observations2,
-            rewards2,
-            terminateds,
-            truncateds,
-            filtered_infos,
-        )
         return (
             self.observations2,
             rewards2,

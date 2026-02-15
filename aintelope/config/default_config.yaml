@@ -5,11 +5,10 @@
 # Repository:
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
-timestamp: ${now:%Y%m%d%H%M%S}      # TODO: currently this applies only to log_dir name, not to checkpoint filename. Checkpoint filename timestamp format is hardcoded in dqn_training.py
-timestamp_pid_uuid: ${append_pid_and_uuid:${timestamp}}
-experiment_name: experiment       
+timestamp: ${now:%Y%m%d%H%M%S}      
+experiment_name: experiment
 outputs_dir: outputs
-log_dir: ${outputs_dir}/${timestamp_pid_uuid}/
+log_dir: ${outputs_dir}/${timestamp}/
 checkpoint_dir: checkpoints
 tensorboard_dir: null #tensorboard if you want to have this later
 

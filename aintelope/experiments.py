@@ -41,8 +41,6 @@ def run_experiment(
     if "eps_last_env_layout_seed" in cfg:  # backwards compatibility
         cfg.eps_last_env_layout_seed = cfg.eps_last_env_layout_seed
 
-    logger = logging.getLogger("aintelope.experiment")
-
     is_sb3 = cfg.hparams.agent_class.startswith("sb3_")
 
     # Environment
@@ -59,7 +57,6 @@ def run_experiment(
     else:
         raise NotImplementedError(f"Unknown environment type {type(env)}")
 
-    # NB! gridsearch_trial_no is NOT saved to output data files. Instead, the individual trials are identified by the timestamp_pid_uuid available in the experiment folder name. This enables running gridsearch on multiple computers concurrently without having to worry about unique gridsearch trial numbers allocation and potential collisions.
     events_columns = list(cfg.hparams.run_params.event_columns) + (
         score_dimensions if isinstance(env, GridworldZooBaseEnv) else ["Score"]
     )

@@ -11,8 +11,6 @@ import numpy as np
 import pandas as pd
 import pickle
 
-logger = logging.getLogger("aintelope.analytics.recording")
-
 
 def serialize_state(state):
     """Compress state for CSV storage."""

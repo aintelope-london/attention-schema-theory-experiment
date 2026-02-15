@@ -22,8 +22,6 @@ from aintelope.experiments import run_experiment
 from aintelope.utils.seeding import set_global_seeds
 from aintelope.utils.progress import ProgressReporter
 
-logger = logging.getLogger("aintelope.__main__")
-
 
 def find_workers() -> int:
     """Return max available workers (GPUs if available, else CPUs)."""
@@ -53,12 +51,6 @@ def run_trial(cfg_dict, main_config_dict, i_trial, run_dir):
         )
         OmegaConf.update(experiment_cfg.hparams, "seed", trial_seed, force_add=True)
 
-        logger.info("Running training with the following configuration")
-        logger.info(os.linesep + str(OmegaConf.to_yaml(experiment_cfg, resolve=True)))
-
-        params_set_title = experiment_cfg.hparams.params_set_title
-        logger.info(f"params_set: {params_set_title}, experiment: {experiment_name}")
-
         score_dimensions = get_score_dimensions(experiment_cfg)
         reporter = ProgressReporter(["episode"], on_update=None)
 
@@ -84,13 +76,10 @@ def run_experiments(main_config):
     """Main orchestrator entry point."""
     cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
     timestamp = str(cfg.timestamp)
-    timestamp_pid_uuid = str(cfg.timestamp_pid_uuid)
-    logger.info(f"timestamp: {timestamp}")
-    logger.info(f"timestamp_pid_uuid: {timestamp_pid_uuid}")
+    
+    set_console_title(cfg.hparams.params_set_title + " : " + timestamp)
 
-    set_console_title(cfg.hparams.params_set_title + " : " + timestamp_pid_uuid)
-
-    run_dir = os.path.join(cfg.outputs_dir, timestamp_pid_uuid)
+    run_dir = os.path.join(cfg.outputs_dir, timestamp)
 
     configs = []
     all_events = []

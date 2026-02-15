@@ -13,8 +13,6 @@ import logging
 
 from aintelope.agents.q_agent import QAgent
 
-logger = logging.getLogger("aintelope.agents.simple_agents")
-
 
 class RandomAgent(QAgent):
     def get_action(self, *args, **kwargs) -> int:

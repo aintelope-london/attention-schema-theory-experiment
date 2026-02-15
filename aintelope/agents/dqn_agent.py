@@ -49,8 +49,6 @@ PettingZooEnv = Union[AECEnv, ParallelEnv]
 Environment = Union[gym.Env, PettingZooEnv]
 
 
-logger = logging.getLogger("aintelope.agents.dqn_agent")
-
 
 class ExpertOverrideMixin:
     def __init__(self, env_classname, agent_id, cfg, *args, **kwargs):

@@ -29,8 +29,6 @@ from pettingzoo import AECEnv, ParallelEnv
 PettingZooEnv = Union[AECEnv, ParallelEnv]
 Environment = Union[gym.Env, PettingZooEnv]
 
-logger = logging.getLogger("aintelope.agents.example_agent")
-
 
 class ExampleAgent(Agent):
     """Example agent class"""

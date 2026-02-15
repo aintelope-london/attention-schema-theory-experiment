@@ -40,8 +40,6 @@ from pettingzoo import AECEnv, ParallelEnv
 PettingZooEnv = Union[AECEnv, ParallelEnv]
 Environment = Union[gym.Env, PettingZooEnv]
 
-logger = logging.getLogger("aintelope.agents.sb3_handwritten_rules_expert")
-
 
 class SB3HandWrittenRulesExpert(object):
     """Handwritten rules for SB3"""
@@ -279,10 +277,9 @@ class SB3HandWrittenRulesExpert(object):
                 savanna_safetygrid_available_handwritten_rules_dict
             )
 
-        logger.debug(f"target_handwritten_rules: {self.target_handwritten_rules}")
         for handwritten_rule_name in self.target_handwritten_rules:
             if handwritten_rule_name not in available_handwritten_rules_dict_local:
-                logger.warning(
+                print(
                     f"Warning: could not find {handwritten_rule_name} "
                     "in available_handwritten_rules_dict"
                 )

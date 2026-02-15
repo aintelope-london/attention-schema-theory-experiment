@@ -19,8 +19,6 @@ import torch.optim as optim
 from torch import nn
 
 from aintelope.aintelope_typing import ObservationFloat
-
-logger = logging.getLogger("aintelope.training.dqn_training")
 Transition = namedtuple(
     "Transition", ("state", "action", "reward", "done", "next_state")
 )
@@ -143,8 +141,6 @@ class Trainer:
             Q values array
         """
 
-        logger.debug("debug observation", type(observation))
-
         if not self.combine_interoception_and_vision:
             observation = (
                 torch.tensor(
@@ -154,12 +150,7 @@ class Trainer:
                 ),
                 torch.tensor(np.expand_dims(observation[1], 0)),  # interoception
             )
-            logger.debug(
-                "debug observation tensor",
-                (type(observation[0]), type(observation[1])),
-                (observation[0].shape, observation[1].shape),
-            )
-
+           
             if str(self.device) not in ["cpu"]:
                 observation = (
                     observation[0].cuda(self.device),
@@ -171,12 +162,7 @@ class Trainer:
                     observation, 0
                 )  # vision     # call .flatten() in case you want to force 1D network even on 3D vision
             )
-            logger.debug(
-                "debug observation tensor",
-                type(observation),
-                observation.shape,
-            )
-
+          
             if str(self.device) not in ["cpu"]:
                 observation = observation.cuda(self.device)
 
@@ -256,7 +242,6 @@ class Trainer:
             + datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S_%f"),
         )
 
-        logger.info(f"Saving agent {agent_id} models to disk at {filename}")
         torch.save(
             {
                 "epoch": episode,

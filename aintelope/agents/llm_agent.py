@@ -67,8 +67,6 @@ from aintelope.models.llm_utilities import (
 PettingZooEnv = Union[AECEnv, ParallelEnv]
 Environment = Union[gym.Env, PettingZooEnv]
 
-logger = logging.getLogger("aintelope.agents.example_agent")
-
 # https://stackoverflow.com/questions/28452429/does-gzip-compression-level-have-any-impact-on-decompression
 # there's no extra overhead for the client/browser to decompress more heavily compressed gzip files
 compresslevel = 6  # 6 is default level for gzip: https://linux.die.net/man/1/gzip
@@ -150,9 +148,7 @@ class LLMAgent(Agent):
             "COOPERATION": "Cooperation",  # "Cooperation reward",
         }
 
-        logging.getLogger("openai").setLevel(logging.ERROR)
-        logging.getLogger("httpx").setLevel(logging.ERROR)
-
+        
     def reset(self, state, info, env_class) -> None:
         """Resets self and updates the state."""
         self.done = False
@@ -552,8 +548,6 @@ Let's start the simulation!
             + "-"
             + datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S_%f"),
         )
-
-        logger.info(f"Saving agent {self.id} model to disk at {filename}")
 
         with open(filename + ".gz", "wb", 1024 * 1024) as fh:
             with gzip.GzipFile(

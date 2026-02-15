@@ -25,8 +25,6 @@ from pettingzoo import AECEnv, ParallelEnv
 PettingZooEnv = Union[AECEnv, ParallelEnv]
 Environment = Union[gym.Env, PettingZooEnv]
 
-logger = logging.getLogger("aintelope.agents.q_agent")
-
 
 class QAgent(Agent):
     """QAgent class, functioning as a base class for agents"""
