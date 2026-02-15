@@ -49,7 +49,7 @@ class TestGetFieldSpec:
 
     def test_top_level_key(self, ui_schema):
         """Top-level key returns correct spec."""
-        spec = get_field_spec(ui_schema, "experiment_name")
+        spec = get_field_spec(ui_schema, "outputs_dir")
         assert spec == [None, "str"]
 
     def test_deep_nested_key(self, ui_schema):

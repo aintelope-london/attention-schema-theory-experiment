@@ -82,14 +82,6 @@ def run_experiment(
     else:
         trainer = Trainer(cfg)
 
-    dir_out = os.path.normpath(cfg.outputs_dir)
-    checkpoint_dir = os.path.normpath(cfg.checkpoint_dir)
-    dir_cp = os.path.join(dir_out, checkpoint_dir)
-
-    use_separate_models_for_each_experiment = (
-        cfg.hparams.use_separate_models_for_each_experiment
-    )
-
     # Agents
     agents = []
     dones = {}
@@ -342,18 +334,6 @@ def run_experiment(
             # Break when all agents are done
             if all(dones.values()):
                 break
-
-        if (
-            model_needs_saving
-        ):  # happens when episodes is not divisible by save frequency
-            os.makedirs(dir_cp, exist_ok=True)
-            for agent in agents:
-                agent.save_model(
-                    i_episode,
-                    dir_cp,
-                    experiment_name,
-                    use_separate_models_for_each_experiment,
-                )
 
     gc.collect()
 

@@ -17,7 +17,6 @@ from omegaconf import DictConfig, OmegaConf
 
 import numpy as np
 import numpy.typing as npt
-import os
 import sys
 import datetime
 
@@ -270,8 +269,6 @@ class SB3BaseAgent(Agent):
         self.infos = {self.id: info}
 
         self.env_class = env_class
-        # if isinstance(self.state, tuple):
-        #    self.state = self.state[0]
 
     def get_action(
         self,
@@ -295,7 +292,6 @@ class SB3BaseAgent(Agent):
         if self.done:
             return None
 
-        # action_space = self.env.action_space(self.id)
         self.info = info
 
         self.info[INFO_trial] = trial
@@ -366,8 +362,6 @@ class SB3BaseAgent(Agent):
         env_layout_seed = (
             self.env.get_env_layout_seed()
         )  # no need to substract 1 here since env_layout_seed value is overridden in env_pre_reset_callback
-        step = 0
-        test_mode = False
 
         for (
             agent,
@@ -412,7 +406,6 @@ class SB3BaseAgent(Agent):
         step = (
             self.env.get_step_no() - 1
         )  # get_step_no() returned step indexes start with 1
-        test_mode = False
 
         for agent, next_state in next_states.items():
             state = self.states[agent]
@@ -463,8 +456,6 @@ class SB3BaseAgent(Agent):
                 + agent_step_info
                 + env_step_info
             )
-
-        # / for agent, next_state in next_states.items():
 
         self.states = next_states
         self.infos = infos
@@ -527,7 +518,6 @@ class SB3BaseAgent(Agent):
         step = (
             self.env.get_step_no() - 1
         )  # get_step_no() returned step indexes start with 1
-        test_mode = False
 
         # TODO: move this code to savanna_safetygrid.py
         self.info[INFO_trial] = i_trial
@@ -591,28 +581,23 @@ class SB3BaseAgent(Agent):
         return event
 
     def train(self, num_total_steps):
-        self.env._pre_reset_callback2 = (
-            self.env_pre_reset_callback
-        )  # pre-reset callback is same for both parallel and sequential environment
-        self.env._post_reset_callback2 = (
-            self.env_post_reset_callback
-        )  # post-reset callback is same for both parallel and sequential environment
+        self.env._pre_reset_callback2 = self.env_pre_reset_callback
+        self.env._post_reset_callback2 = self.env_post_reset_callback
         self.env._pre_step_callback2 = self.env_pre_step_callback
         if isinstance(self.env, ParallelEnv):
             self.env._post_step_callback2 = self.parallel_env_post_step_callback
         else:
             self.env._post_step_callback2 = self.sequential_env_post_step_callback
 
-        if self.model is not None:  # single-model scenario
-            checkpoint_filenames = self.get_checkpoint_filenames(include_timestamp=True)
-            filename_with_timestamp = checkpoint_filenames[self.id]
+        checkpoint_dir = Path(self.cfg.outputs_dir) / "checkpoints"
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-            # resulting filename looks like checkpointfilename_timestamp_100000_steps.zip next checkpointfilename_timestamp_200000_steps.zip etc
+        if self.model is not None:  # single-model scenario
             checkpoint_callback = (
                 CheckpointCallback(
-                    save_freq=self.cfg.hparams.save_frequency,  # save frequency in timesteps
-                    save_path=os.path.dirname(filename_with_timestamp),
-                    name_prefix=os.path.basename(filename_with_timestamp),
+                    save_freq=self.cfg.hparams.save_frequency,
+                    save_path=str(checkpoint_dir),
+                    name_prefix=self.id,
                 )
                 if self.cfg.hparams.save_frequency > 0
                 else None
@@ -622,13 +607,12 @@ class SB3BaseAgent(Agent):
                 total_timesteps=num_total_steps, callback=checkpoint_callback
             )
         else:
-            checkpoint_filenames = self.get_checkpoint_filenames(
-                include_timestamp=False
-            )
+            checkpoint_filenames = {
+                agent_id: str(checkpoint_dir / agent_id)
+                for agent_id in self.env.possible_agents
+            }
 
-            OmegaConf.resolve(
-                self.cfg
-            )  # need to resolve the conf before passing to subprocesses since OmegaConf resolvers do not seem to work well in subprocesses
+            OmegaConf.resolve(self.cfg)
 
             env_wrapper = MultiAgentZooToGymAdapterZooSide(
                 self.env, self.cfg, self.env_classname
@@ -647,37 +631,6 @@ class SB3BaseAgent(Agent):
 
         if self.exceptions:
             raise Exception(str(self.exceptions))
-
-    def get_checkpoint_filenames(self, include_timestamp=True):
-        checkpoint_filenames = {}
-
-        experiment_name = self.cfg.experiment_name
-        use_separate_models_for_each_experiment = (
-            self.cfg.hparams.use_separate_models_for_each_experiment
-        )
-        # if not use_separate_models_for_each_experiment:
-        #    raise NotImplementedError("sharing models over experiments is not implemented yet")
-
-        dir_out = os.path.normpath(self.cfg.outputs_dir)
-        checkpoint_dir = os.path.normpath(self.cfg.checkpoint_dir)
-        path = os.path.join(dir_out, checkpoint_dir)
-        os.makedirs(path, exist_ok=True)
-
-        for agent_id in self.env.possible_agents:
-            checkpoint_filename = agent_id
-            if use_separate_models_for_each_experiment:
-                checkpoint_filename += "-" + experiment_name
-
-            filename = os.path.join(path, checkpoint_filename)
-
-            if include_timestamp:
-                filename += "-" + datetime.datetime.now().strftime(
-                    "%Y_%m_%d_%H_%M_%S_%f"
-                )
-
-            checkpoint_filenames[agent_id] = filename
-
-        return checkpoint_filenames
 
     def save_model(self, path: Path):
         models = {self.id: self.model} if self.model is not None else self.models

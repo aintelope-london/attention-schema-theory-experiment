@@ -49,6 +49,9 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
         experiment_cfg.hparams = OmegaConf.merge(
             experiment_cfg.hparams, main_config[experiment_name]
         )
+        OmegaConf.update(
+            experiment_cfg, "experiment_name", experiment_name, force_add=True
+        )
         OmegaConf.update(experiment_cfg.hparams, "seed", trial_seed, force_add=True)
 
         score_dimensions = get_score_dimensions(experiment_cfg)
