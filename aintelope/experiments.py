@@ -15,7 +15,10 @@ from omegaconf import DictConfig
 from aintelope.agents import get_agent_class
 from aintelope.analytics import recording
 from aintelope.environments import get_env_class
-from aintelope.environments.savanna_safetygrid import GridworldZooBaseEnv
+from aintelope.environments.savanna_safetygrid import (
+    GridworldZooBaseEnv,
+    INFO_AGENT_OBSERVATION_LAYERS_ORDER,
+)
 from aintelope.training.dqn_training import Trainer
 
 from typing import Union
@@ -62,6 +65,16 @@ def run_experiment(
     )
 
     events = recording.EventLog(events_columns)
+
+    # Capture observation layer order for playback rendering
+    first_agent_info = (
+        infos["agent_0"]
+        if isinstance(env, ParallelEnv)
+        else env.observe_info("agent_0")
+    )
+    events.metadata["layer_order"] = first_agent_info[
+        INFO_AGENT_OBSERVATION_LAYERS_ORDER
+    ]
 
     # Common trainer for each agent's models
     if is_sb3:
@@ -152,10 +165,6 @@ def run_experiment(
                 checkpoint=checkpoint,
             )
         dones[agent_id] = False
-
-    # Warmup not yet implemented
-    # for _ in range(hparams.warm_start_steps):
-    #    agents.play_step(self.net, epsilon=1.0)
 
     # Main loop
 

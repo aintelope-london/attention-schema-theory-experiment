@@ -1,11 +1,7 @@
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
-#
-# Repository:
-# https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
+"""Event recording and run discovery for experiment outputs."""
 
 import base64
+import json
 import logging
 import os
 import zlib
@@ -35,6 +31,7 @@ class EventLog:
     def __init__(self, columns):
         self.columns = columns
         self._rows = []
+        self.metadata = {}
 
     def log_event(self, event):
         self._rows.append(event)
@@ -43,7 +40,7 @@ class EventLog:
         return pd.DataFrame(self._rows, columns=self.columns)
 
     def write(self, output_dir):
-        """Write events.csv to the given directory."""
+        """Write events.csv and meta.json to the given directory."""
         path = Path(output_dir) / "events.csv"
         path.parent.mkdir(exist_ok=True, parents=True)
         df = self.to_dataframe()
@@ -52,6 +49,10 @@ class EventLog:
                 df[col] = df[col].apply(serialize_state)
         df.to_csv(path, index=False)
 
+        meta_path = Path(output_dir) / "meta.json"
+        with open(meta_path, "w") as f:
+            json.dump(self.metadata, f, indent=2)
+
     @staticmethod
     def read(filepath):
         df = pd.read_csv(filepath)
@@ -59,6 +60,13 @@ class EventLog:
             if col in df.columns:
                 df[col] = df[col].apply(deserialize_state)
         return df
+
+    @staticmethod
+    def read_metadata(block_dir):
+        """Read meta.json from a block directory."""
+        meta_path = Path(block_dir) / "meta.json"
+        with open(meta_path) as f:
+            return json.load(f)
 
 
 def list_runs(outputs_dir):

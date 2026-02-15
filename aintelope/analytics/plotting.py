@@ -72,15 +72,16 @@ def save_figure(figure, path):
 
 
 @register_plot("line")
-def plot_line(ax, df, x_col, y_cols):
+def plot_line(ax, df, **params):
     """Line plot of one or more y columns against x.
 
-    Args:
-        ax: Matplotlib Axes to draw on.
-        df: DataFrame with the data.
+    Params:
         x_col: Column name for x axis.
         y_cols: List of column names for y axis.
     """
+    x_col = params["x_col"]
+    y_cols = params["y_cols"]
+
     ax.clear()
     for col in y_cols:
         ax.plot(df[x_col], df[col], linewidth=0.75, label=col)
@@ -88,4 +89,25 @@ def plot_line(ax, df, x_col, y_cols):
     ax.set_ylabel(y_cols[0] if len(y_cols) == 1 else "Value")
     if len(y_cols) > 1:
         ax.legend()
+    ax.figure.tight_layout()
+
+
+@register_plot("box")
+def plot_box(ax, df, **params):
+    """Box plot of a value column grouped by a category column.
+
+    Params:
+        x_col: Column name for category axis (groups).
+        y_cols: List with one column name for value axis.
+    """
+    x_col = params["x_col"]
+    y_col = params["y_cols"][0]
+
+    ax.clear()
+    groups = df.groupby(x_col)[y_col]
+    labels = sorted(groups.groups.keys())
+    data = [groups.get_group(label).values for label in labels]
+    ax.boxplot(data, labels=labels, showfliers=False)
+    ax.set_xlabel(x_col)
+    ax.set_ylabel(y_col)
     ax.figure.tight_layout()

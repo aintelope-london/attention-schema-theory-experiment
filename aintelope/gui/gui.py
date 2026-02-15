@@ -13,13 +13,16 @@ from typing import Any, Callable, Optional, Tuple
 # Re-exports for viewers (so they never import tkinter directly)
 # =============================================================================
 Frame = ttk.Frame
+Text = tk.Text
 Label = ttk.Label
 Separator = ttk.Separator
 Notebook = ttk.Notebook
 Combobox = ttk.Combobox
 Button = ttk.Button
 Entry = ttk.Entry
+Scale = ttk.Scale
 StringVar = tk.StringVar
+IntVar = tk.IntVar
 
 # Layout constants
 W = tk.W
@@ -51,7 +54,7 @@ ENTRY_WIDTH = 30
 
 
 class _PackGridMixin:
-    """Delegates pack/grid/str to self.frame."""
+    """Delegates pack/grid to self.frame."""
 
     def pack(self, **kwargs):
         self.frame.pack(**kwargs)
@@ -123,6 +126,75 @@ class SelectorBar(_PackGridMixin):
             self._var.set(values[0])
 
     def get(self) -> str:
+        return self._var.get()
+
+
+class ValueSlider(_PackGridMixin):
+    """Labeled slider with a synced numeric entry field.
+
+    The slider and entry stay in sync: dragging the slider updates the entry,
+    editing the entry updates the slider. Calls on_change with the new int value.
+
+    Usage:
+        slider = ValueSlider(parent, label="Step", from_=0, to=100,
+                             on_change=my_callback)
+        slider.set_range(0, 50)
+        slider.set(25)
+        current = slider.get()
+    """
+
+    def __init__(
+        self,
+        parent,
+        label: str,
+        from_: int = 0,
+        to: int = 100,
+        on_change: Callable[[int], None] = lambda v: None,
+    ):
+        self.frame = ttk.Frame(parent)
+        self._on_change = on_change
+        self._var = tk.IntVar(value=from_)
+
+        ttk.Label(self.frame, text=f"{label}:").pack(side=tk.LEFT, padx=5)
+
+        self._scale = ttk.Scale(
+            self.frame,
+            from_=from_,
+            to=to,
+            orient=tk.HORIZONTAL,
+            variable=self._var,
+            command=self._on_scale,
+        )
+        self._scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+
+        self._entry = ttk.Entry(self.frame, textvariable=self._var, width=8)
+        self._entry.pack(side=tk.LEFT, padx=5)
+        self._entry.bind("<Return>", self._on_entry)
+        self._entry.bind("<FocusOut>", self._on_entry)
+
+    def _on_scale(self, raw_value):
+        value = int(float(raw_value))
+        self._var.set(value)
+        self._on_change(value)
+
+    def _on_entry(self, event=None):
+        value = int(float(self._var.get()))
+        low = int(float(self._scale.cget("from")))
+        high = int(float(self._scale.cget("to")))
+        value = max(low, min(high, value))
+        self._var.set(value)
+        self._on_change(value)
+
+    def set_range(self, from_: int, to: int):
+        """Update slider range."""
+        self._scale.configure(from_=from_, to=to)
+
+    def set(self, value: int):
+        """Set current value."""
+        self._var.set(value)
+
+    def get(self) -> int:
+        """Get current value."""
         return self._var.get()
 
 
