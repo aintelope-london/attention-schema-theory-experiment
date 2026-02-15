@@ -5,6 +5,9 @@
 *.toml
 *.lock
 
+# Tensorboard
+tensorboard/
+
 # Model Checkpoints
 checkpoints/
 *.ckpt

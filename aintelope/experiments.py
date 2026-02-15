@@ -166,10 +166,6 @@ def run_experiment(
             )
         dones[agent_id] = False
 
-    # Warmup not yet implemented
-    # for _ in range(hparams.warm_start_steps):
-    #    agents.play_step(self.net, epsilon=1.0)
-
     # Main loop
 
     # SB3 training has its own loop
@@ -181,8 +177,8 @@ def run_experiment(
     model_needs_saving = (
         False  # if no training episodes are specified then do not save models
     )
-    reporter.set_total("episode", cfg.hparams.num_episodes)
-    for i_episode in range(cfg.hparams.num_episodes):
+    reporter.set_total("episode", cfg.hparams.episodes)
+    for i_episode in range(cfg.hparams.episodes):
         reporter.update("episode", i_episode + 1)
 
         env_layout_seed = (
@@ -253,3 +249,161 @@ def run_experiment(
                     )
 
                 # call: send actions and get observations
+                (
+                    observations,
+                    scores,
+                    terminateds,
+                    truncateds,
+                    infos,
+                ) = env.step(actions)
+                dones.update(
+                    {
+                        key: terminated or truncateds[key]
+                        for (key, terminated) in terminateds.items()
+                    }
+                )
+
+                # loop: update
+                for agent in agents:
+                    observation = observations[agent.id]
+                    info = infos[agent.id]
+                    score = scores[agent.id]
+                    done = dones[agent.id]
+                    terminated = terminateds[agent.id]
+                    if terminated:
+                        observation = None
+                    agent_step_info = agent.update(
+                        env=env,
+                        observation=observation,
+                        info=info,
+                        score=sum(score.values()) if isinstance(score, dict) else score,
+                        done=done,
+                    )
+
+                    # Record what just happened
+                    env_step_info = (
+                        [score.get(dimension, 0) for dimension in score_dimensions]
+                        if isinstance(score, dict)
+                        else [score]
+                    )
+
+                    events.log_event(
+                        [
+                            cfg.experiment_name,
+                            i_trial,
+                            i_episode,
+                            env_layout_seed,
+                            step,
+                            cfg.hparams.test_mode,
+                        ]
+                        + agent_step_info
+                        + env_step_info
+                    )
+
+            elif isinstance(env, AECEnv):
+                agents_dict = {agent.id: agent for agent in agents}
+                for agent_id in env.agent_iter(max_iter=env.num_agents):
+                    agent = agents_dict[agent_id]
+
+                    if dones[agent_id]:
+                        env.step(None)
+                        continue
+
+                    observation = env.observe(agent_id)
+                    info = env.observe_info(agent_id)
+                    action = agent.get_action(
+                        observation=observation,
+                        info=info,
+                        step=step,
+                        env_layout_seed=env_layout_seed,
+                        episode=i_episode,
+                        trial=i_trial,
+                    )
+
+                    env.step(action)
+
+                    observation = env.observe(agent_id)
+                    info = env.observe_info(agent_id)
+                    score = env.rewards[agent_id]
+                    done = env.terminations[agent_id] or env.truncations[agent_id]
+
+                    if env.terminations[agent_id]:
+                        observation = None
+
+                    agent_step_info = agent.update(
+                        env=env,
+                        observation=observation,
+                        info=info,
+                        score=sum(score.values()) if isinstance(score, dict) else score,
+                        done=done,
+                    )
+
+                    # Record what just happened
+                    env_step_info = (
+                        [score.get(dimension, 0) for dimension in score_dimensions]
+                        if isinstance(score, dict)
+                        else [score]
+                    )
+
+                    events.log_event(
+                        [
+                            cfg.experiment_name,
+                            i_trial,
+                            i_episode,
+                            env_layout_seed,
+                            step,
+                            cfg.hparams.test_mode,
+                        ]
+                        + agent_step_info
+                        + env_step_info
+                    )
+
+                    # NB! any agent could die at any other agent's step
+                    for agent_id2 in env.agents:
+                        dones[agent_id2] = (
+                            env.terminations[agent_id2] or env.truncations[agent_id2]
+                        )
+                        # TODO: if the agent died during some other agents step,
+                        # should we call agent.update() on the dead agent,
+                        # else it will be never called?
+
+            else:
+                raise NotImplementedError(f"Unknown environment type {type(env)}")
+
+            # Perform one step of the optimization (on the policy network)
+            if not cfg.hparams.test_mode:
+                trainer.optimize_models()
+
+            # Break when all agents are done
+            if all(dones.values()):
+                break
+
+        if (
+            model_needs_saving
+        ):  # happens when episodes is not divisible by save frequency
+            os.makedirs(dir_cp, exist_ok=True)
+            for agent in agents:
+                agent.save_model(
+                    i_episode,
+                    dir_cp,
+                    experiment_name,
+                    use_separate_models_for_each_experiment,
+                )
+
+    gc.collect()
+
+    return events
+
+
+def run_baseline_training(
+    cfg: DictConfig, i_trial: int, env: Environment, agents: list
+):
+    num_total_steps = cfg.hparams.env_params.num_iters * cfg.hparams.episodes
+
+    agents[0].train(num_total_steps)
+
+    agents[0].save_model()
+
+
+if __name__ == "__main__":
+    run_experiment()  # TODO: cfg, score_dimensions
