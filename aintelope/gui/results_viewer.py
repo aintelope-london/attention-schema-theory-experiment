@@ -4,20 +4,29 @@ from pathlib import Path
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-from aintelope.analytics.plotting import create_figure, plot_line, save_figure
+from aintelope.analytics.plotting import (
+    create_figure,
+    save_figure,
+    prepare_plot_data,
+    PLOT_TYPES,
+)
 from aintelope.analytics.recording import list_runs, list_blocks, EventLog
 from aintelope.gui.gui import (
     Frame,
     Label,
     Combobox,
+    Notebook,
     ActionBar,
     StatusBar,
+    ValueSlider,
     StringVar,
+    Text,
     launch_window,
     X,
     LEFT,
     BOTH,
 )
+from aintelope.gui.renderer import SavannaInterpreter, StateRenderer
 
 
 class ResultsViewer:
@@ -27,13 +36,16 @@ class ResultsViewer:
         self.root.geometry("1200x800")
         self.outputs_dir = outputs_dir
         self.df = None
+        self.metadata = None
+        self.interpreter = None
+        self.renderer = StateRenderer()
         self.result = None
 
         self._create_ui()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _create_ui(self):
-        # Top bar — run and block selectors
+        # Top bar — run and block selectors (shared across tabs)
         selector_frame = Frame(self.root, padding=10)
         selector_frame.pack(fill=X)
 
@@ -53,33 +65,12 @@ class ResultsViewer:
         self.block_combo.pack(side=LEFT, padx=5)
         self.block_combo.bind("<<ComboboxSelected>>", self._on_block_selected)
 
-        # Plot controls — axis column selectors
-        controls_frame = Frame(self.root, padding=(10, 0))
-        controls_frame.pack(fill=X)
+        # Notebook with tabs
+        self.notebook = Notebook(self.root)
+        self.notebook.pack(fill=BOTH, expand=True, padx=10, pady=5)
 
-        Label(controls_frame, text="X:").pack(side=LEFT, padx=5)
-        self.x_var = StringVar()
-        self.x_combo = Combobox(
-            controls_frame, textvariable=self.x_var, width=20, state="readonly"
-        )
-        self.x_combo.pack(side=LEFT, padx=5)
-        self.x_combo.bind("<<ComboboxSelected>>", self._on_axis_changed)
-
-        Label(controls_frame, text="Y:").pack(side=LEFT, padx=(20, 5))
-        self.y_var = StringVar()
-        self.y_combo = Combobox(
-            controls_frame, textvariable=self.y_var, width=20, state="readonly"
-        )
-        self.y_combo.pack(side=LEFT, padx=5)
-        self.y_combo.bind("<<ComboboxSelected>>", self._on_axis_changed)
-
-        # Matplotlib canvas
-        canvas_frame = Frame(self.root)
-        canvas_frame.pack(fill=BOTH, expand=True, padx=10, pady=5)
-
-        self.figure, self.ax = create_figure()
-        self.canvas = FigureCanvasTkAgg(self.figure, master=canvas_frame)
-        self.canvas.get_tk_widget().pack(fill=BOTH, expand=True)
+        self._create_plots_tab()
+        self._create_playback_tab()
 
         # Actions
         self.actions = ActionBar(
@@ -97,6 +88,103 @@ class ResultsViewer:
         self.status.pack(fill=X, padx=10, pady=(0, 10))
 
         self._refresh_runs()
+
+    # =========================================================================
+    # Plots tab
+    # =========================================================================
+
+    def _create_plots_tab(self):
+        self.plots_tab = Frame(self.notebook)
+        self.notebook.add(self.plots_tab, text="Plots")
+
+        controls = Frame(self.plots_tab, padding=(10, 5))
+        controls.pack(fill=X)
+
+        Label(controls, text="Plot:").pack(side=LEFT, padx=5)
+        self.plot_type_var = StringVar()
+        self.plot_type_combo = Combobox(
+            controls, textvariable=self.plot_type_var, width=12, state="readonly"
+        )
+        self.plot_type_combo["values"] = list(PLOT_TYPES.keys())
+        self.plot_type_combo.current(0)
+        self.plot_type_combo.pack(side=LEFT, padx=5)
+        self.plot_type_combo.bind("<<ComboboxSelected>>", self._on_plot_changed)
+
+        Label(controls, text="Agent:").pack(side=LEFT, padx=(15, 5))
+        self.agent_var = StringVar(value="all")
+        self.agent_combo = Combobox(
+            controls, textvariable=self.agent_var, width=15, state="readonly"
+        )
+        self.agent_combo.pack(side=LEFT, padx=5)
+        self.agent_combo.bind("<<ComboboxSelected>>", self._on_plot_changed)
+
+        Label(controls, text="X:").pack(side=LEFT, padx=(15, 5))
+        self.x_var = StringVar()
+        self.x_combo = Combobox(
+            controls, textvariable=self.x_var, width=15, state="readonly"
+        )
+        self.x_combo.pack(side=LEFT, padx=5)
+        self.x_combo.bind("<<ComboboxSelected>>", self._on_plot_changed)
+
+        Label(controls, text="Y:").pack(side=LEFT, padx=(15, 5))
+        self.y_var = StringVar()
+        self.y_combo = Combobox(
+            controls, textvariable=self.y_var, width=15, state="readonly"
+        )
+        self.y_combo.pack(side=LEFT, padx=5)
+        self.y_combo.bind("<<ComboboxSelected>>", self._on_plot_changed)
+
+        # Matplotlib canvas
+        self.figure, self.ax = create_figure()
+        self.canvas = FigureCanvasTkAgg(self.figure, master=self.plots_tab)
+        self.canvas.get_tk_widget().pack(fill=BOTH, expand=True, padx=10, pady=5)
+
+    # =========================================================================
+    # Playback tab
+    # =========================================================================
+
+    def _create_playback_tab(self):
+        self.playback_tab = Frame(self.notebook)
+        self.notebook.add(self.playback_tab, text="Playback")
+
+        controls = Frame(self.playback_tab, padding=(10, 5))
+        controls.pack(fill=X)
+
+        Label(controls, text="Episode:").pack(side=LEFT, padx=5)
+        self.episode_var = StringVar()
+        self.episode_combo = Combobox(
+            controls, textvariable=self.episode_var, width=10, state="readonly"
+        )
+        self.episode_combo.pack(side=LEFT, padx=5)
+        self.episode_combo.bind("<<ComboboxSelected>>", self._on_episode_changed)
+
+        Label(controls, text="Agent:").pack(side=LEFT, padx=(15, 5))
+        self.playback_agent_var = StringVar()
+        self.playback_agent_combo = Combobox(
+            controls,
+            textvariable=self.playback_agent_var,
+            width=15,
+            state="readonly",
+        )
+        self.playback_agent_combo.pack(side=LEFT, padx=5)
+        self.playback_agent_combo.bind(
+            "<<ComboboxSelected>>", self._on_playback_agent_changed
+        )
+
+        self.step_slider = ValueSlider(
+            controls, label="Step", from_=0, to=0, on_change=self._on_step_changed
+        )
+        self.step_slider.pack(side=LEFT, fill=X, expand=True, padx=(15, 5))
+
+        # State display — monospaced text
+        self.state_display = Text(
+            self.playback_tab, font=("Courier", 14), state="disabled", wrap="none"
+        )
+        self.state_display.pack(fill=BOTH, expand=True, padx=10, pady=5)
+
+    # =========================================================================
+    # Data loading
+    # =========================================================================
 
     def _refresh_runs(self):
         runs = list_runs(self.outputs_dir)
@@ -118,12 +206,20 @@ class ResultsViewer:
     def _on_block_selected(self, event=None):
         run_name = self.run_var.get()
         block_name = self.block_var.get()
-        filepath = Path(self.outputs_dir) / run_name / block_name / "events.csv"
-        self.df = EventLog.read(str(filepath))
+        block_dir = Path(self.outputs_dir) / run_name / block_name
 
+        self.df = EventLog.read(str(block_dir / "events.csv"))
+        self.metadata = EventLog.read_metadata(str(block_dir))
+        self.interpreter = SavannaInterpreter(self.metadata["layer_order"])
+
+        # Populate plots tab controls
         numeric_cols = list(self.df.select_dtypes(include="number").columns)
         self.x_combo["values"] = numeric_cols
         self.y_combo["values"] = numeric_cols
+
+        agents = sorted(self.df["Agent_id"].unique())
+        self.agent_combo["values"] = ["all"] + list(agents)
+        self.agent_var.set("all")
 
         if "Episode" in numeric_cols:
             self.x_var.set("Episode")
@@ -135,13 +231,30 @@ class ResultsViewer:
         elif len(numeric_cols) > 1:
             self.y_combo.current(1)
 
+        # Populate playback tab controls
+        episodes = sorted(self.df["Episode"].unique())
+        self.episode_combo["values"] = [str(int(e)) for e in episodes]
+        self.playback_agent_combo["values"] = list(agents)
+
+        if episodes:
+            self.episode_combo.current(0)
+        if agents:
+            self.playback_agent_combo.current(0)
+
+        self._update_playback_range()
         self._redraw()
+        self._render_state()
+
         self.status.set(
             f"Loaded {block_name}: {len(self.df)} rows, "
             f"{len(numeric_cols)} numeric columns"
         )
 
-    def _on_axis_changed(self, event=None):
+    # =========================================================================
+    # Plots tab callbacks
+    # =========================================================================
+
+    def _on_plot_changed(self, event=None):
         self._redraw()
 
     def _redraw(self):
@@ -149,11 +262,76 @@ class ResultsViewer:
             return
         x_col = self.x_var.get()
         y_col = self.y_var.get()
-        if not x_col or not y_col:
+        plot_type = self.plot_type_var.get()
+        if not x_col or not y_col or not plot_type:
             return
 
-        plot_line(self.ax, self.df, x_col, [y_col])
+        filter_by = {}
+        agent = self.agent_var.get()
+        if agent != "all":
+            filter_by["Agent_id"] = agent
+
+        plot_df = prepare_plot_data(self.df, filter_by=filter_by)
+        PLOT_TYPES[plot_type](self.ax, plot_df, x_col=x_col, y_cols=[y_col])
         self.canvas.draw()
+
+    # =========================================================================
+    # Playback tab callbacks
+    # =========================================================================
+
+    def _on_episode_changed(self, event=None):
+        self._update_playback_range()
+        self._render_state()
+
+    def _on_playback_agent_changed(self, event=None):
+        self._update_playback_range()
+        self._render_state()
+
+    def _on_step_changed(self, value):
+        self._render_state()
+
+    def _update_playback_range(self):
+        episode = self.episode_var.get()
+        agent = self.playback_agent_var.get()
+        if not episode or not agent:
+            return
+        filtered = self.df[
+            (self.df["Episode"] == int(episode)) & (self.df["Agent_id"] == agent)
+        ]
+        max_step = int(filtered["Step"].max()) if len(filtered) > 0 else 0
+        self.step_slider.set_range(0, max_step)
+        self.step_slider.set(0)
+
+    def _render_state(self):
+        if self.df is None or self.interpreter is None:
+            return
+        episode = self.episode_var.get()
+        agent = self.playback_agent_var.get()
+        step = self.step_slider.get()
+        if not episode or not agent:
+            return
+
+        row = self.df[
+            (self.df["Episode"] == int(episode))
+            & (self.df["Agent_id"] == agent)
+            & (self.df["Step"] == step)
+        ]
+        if len(row) == 0:
+            return
+
+        state = row.iloc[0]["State"]
+        lines = self.renderer.render(*self.interpreter.interpret(state))
+
+        self.state_display.configure(state="normal")
+        self.state_display.delete("1.0", "end")
+        self.state_display.insert("1.0", "\n".join(lines))
+        self.state_display.configure(state="disabled")
+
+        self.status.set(f"Episode {episode}, Agent {agent}, Step {step}")
+
+    # =========================================================================
+    # Shared
+    # =========================================================================
 
     def _export_plot(self):
         filename = self.actions.get_input("Save As")
