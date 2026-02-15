@@ -192,11 +192,11 @@ def sb3_agent_train_thread_entry_point(
         # with weight sharing, the resulting filename looks like checkpointfilename_timestamp_200000_steps.zip next checkpointfilename_timestamp_400000_steps.zip etc
         checkpoint_callback = (
             CheckpointCallback(
-                save_freq=cfg.hparams.save_frequency,  # save frequency in timesteps
+                save_freq=cfg.agent_params.save_frequency,  # save frequency in timesteps
                 save_path=os.path.dirname(filename_with_timestamp),
                 name_prefix=os.path.basename(filename_with_timestamp),
             )
-            if cfg.hparams.save_frequency > 0
+            if cfg.agent_params.save_frequency > 0
             else None
         )
 
@@ -238,7 +238,7 @@ class SB3BaseAgent(Agent):
             + "."
             + env.__class__.__bases__[0].__qualname__
         )
-        self.test_mode = self.cfg.hparams.test_mode
+        self.test_mode = self.cfg.run.test_mode
         self.i_trial = i_trial
         self.next_episode_no = 0
         self.total_steps_across_episodes = 0
@@ -298,7 +298,7 @@ class SB3BaseAgent(Agent):
         self.info[INFO_EPISODE] = episode
         self.info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
         self.info[INFO_STEP] = step
-        self.info[INFO_TEST_MODE] = self.cfg.hparams.test_mode
+        self.info[INFO_TEST_MODE] = self.cfg.run.test_mode
 
         self.infos[self.id] = self.info
 
@@ -335,15 +335,17 @@ class SB3BaseAgent(Agent):
 
         env_layout_seed = (
             int(
-                i_episode / self.cfg.hparams.env_layout_seed_repeat_sequence_length
+                i_episode / self.cfg.env_params.env_layout_seed_repeat_sequence_length
             )  # TODO ensure different env_layout_seed during test when num_actual_train_episodes is not divisible by env_layout_seed_repeat_sequence_length
-            if self.cfg.hparams.env_layout_seed_repeat_sequence_length > 0
+            if self.cfg.env_params.env_layout_seed_repeat_sequence_length > 0
             else i_episode  # this ensures that during test episodes, env_layout_seed based map randomization seed is different from training seeds. The environment is re-constructed when testing starts. Without explicitly providing env_layout_seed, the map randomization seed would be automatically reset to env_layout_seed = 0, which would overlap with the training seeds.
         )
 
         # How many different layout seeds there should be overall? After given amount of seeds has been used, the seed will loop over to zero and repeat the seed sequence. Zero or negative modulo parameter value disables the modulo feature.
-        if self.cfg.hparams.env_layout_seed_modulo > 0:
-            env_layout_seed = env_layout_seed % self.cfg.hparams.env_layout_seed_modulo
+        if self.cfg.env_params.env_layout_seed_modulo > 0:
+            env_layout_seed = (
+                env_layout_seed % self.cfg.env_params.env_layout_seed_modulo
+            )
 
         kwargs["env_layout_seed"] = env_layout_seed
 
@@ -371,7 +373,7 @@ class SB3BaseAgent(Agent):
             info[INFO_EPISODE] = i_episode
             info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
             info[INFO_STEP] = 0
-            info[INFO_TEST_MODE] = self.cfg.hparams.test_mode
+            info[INFO_TEST_MODE] = self.cfg.run.test_mode
 
         if self.model:
             if hasattr(self.model.policy, "my_reset"):
@@ -427,7 +429,7 @@ class SB3BaseAgent(Agent):
             info[INFO_EPISODE] = i_episode
             info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
             info[INFO_STEP] = step
-            info[INFO_TEST_MODE] = self.cfg.hparams.test_mode
+            info[INFO_TEST_MODE] = self.cfg.run.test_mode
 
             agent_step_info = [
                 agent,
@@ -451,7 +453,7 @@ class SB3BaseAgent(Agent):
                     i_episode,
                     env_layout_seed,
                     step,
-                    self.cfg.hparams.test_mode,
+                    self.cfg.run.test_mode,
                 ]
                 + agent_step_info
                 + env_step_info
@@ -524,7 +526,7 @@ class SB3BaseAgent(Agent):
         self.info[INFO_EPISODE] = i_episode
         self.info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
         self.info[INFO_STEP] = step
-        self.info[INFO_TEST_MODE] = self.cfg.hparams.test_mode
+        self.info[INFO_TEST_MODE] = self.cfg.run.test_mode
 
         self.infos[self.id] = self.info
 
@@ -538,7 +540,7 @@ class SB3BaseAgent(Agent):
                 i_episode,
                 env_layout_seed,
                 step,
-                self.cfg.hparams.test_mode,
+                self.cfg.run.test_mode,
             ]
             + agent_step_info
             + env_step_info
@@ -589,17 +591,17 @@ class SB3BaseAgent(Agent):
         else:
             self.env._post_step_callback2 = self.sequential_env_post_step_callback
 
-        checkpoint_dir = Path(self.cfg.outputs_dir) / "checkpoints"
+        checkpoint_dir = Path(self.cfg.run.outputs_dir) / "checkpoints"
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
         if self.model is not None:  # single-model scenario
             checkpoint_callback = (
                 CheckpointCallback(
-                    save_freq=self.cfg.hparams.save_frequency,
+                    save_freq=self.cfg.agent_params.save_frequency,
                     save_path=str(checkpoint_dir),
                     name_prefix=self.id,
                 )
-                if self.cfg.hparams.save_frequency > 0
+                if self.cfg.agent_params.save_frequency > 0
                 else None
             )
 

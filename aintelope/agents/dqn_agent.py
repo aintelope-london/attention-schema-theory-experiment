@@ -59,7 +59,7 @@ class ExpertOverrideMixin:
             agent_id=agent_id,
             cfg=cfg,
             action_space=self.action_space,
-            **cfg.hparams.agent_params,
+            **cfg.agent_params,
         )
 
     def set_info(self, info):
@@ -131,22 +131,20 @@ def dqn_model_constructor(env, env_classname, agent_id, cfg):
     # Also: make sure your image is in the channel-first format
 
     use_imitation_learning = (
-        cfg.hparams.model_params.instinct_bias_epsilon_start > 0
-        or cfg.hparams.model_params.instinct_bias_epsilon_end > 0
+        cfg.agent_params.instinct_bias_epsilon_start > 0
+        or cfg.agent_params.instinct_bias_epsilon_end > 0
     )
     if use_imitation_learning:
         policy_override_class = (
             CnnPolicyWithExpertOverride
-            if cfg.hparams.model_params.num_conv_layers > 0
+            if cfg.agent_params.num_conv_layers > 0
             else MlpPolicyWithExpertOverride
         )
         policy = PolicyWithConfigFactory(
             env_classname, agent_id, cfg, policy_override_class
         )
     else:
-        policy = (
-            "CnnPolicy" if cfg.hparams.model_params.num_conv_layers > 0 else "MlpPolicy"
-        )
+        policy = "CnnPolicy" if cfg.agent_params.num_conv_layers > 0 else "MlpPolicy"
 
     return DQN(
         policy,
@@ -158,10 +156,10 @@ def dqn_model_constructor(env, env_classname, agent_id, cfg):
                 "features_extractor_class": CustomCNN,  # need custom CNN in order to handle observation shape 9x9
                 "features_extractor_kwargs": {
                     "features_dim": 256,  # TODO: config parameter. Note this is not related to the number of features in the original observation (15 or 39), this parameter here is model's internal feature dimensionality
-                    "num_conv_layers": cfg.hparams.model_params.num_conv_layers,
+                    "num_conv_layers": cfg.agent_params.num_conv_layers,
                 },
             }
-            if cfg.hparams.model_params.num_conv_layers > 0
+            if cfg.agent_params.num_conv_layers > 0
             else {"normalize_images": False}
         ),
         device=torch.device(

@@ -39,7 +39,6 @@ class QAgent(Agent):
     ) -> None:
         self.id = agent_id
         self.trainer = trainer
-        self.hparams = trainer.hparams
         self.done = False
         self.last_action = None
 

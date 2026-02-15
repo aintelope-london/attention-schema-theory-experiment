@@ -40,7 +40,7 @@ class ConfigGUI:
         self.root.geometry("1000x700")
 
         self.default_cfg = default_cfg
-        self.default_hparams = OmegaConf.to_container(default_cfg.hparams, resolve=True)
+        self.default_values = OmegaConf.to_container(default_cfg, resolve=True)
         self.ui_schema = load_ui_schema()
         self.result = None
         self.tabs = []
@@ -96,7 +96,7 @@ class ConfigGUI:
             overrides = {}
 
         merged = OmegaConf.to_container(
-            OmegaConf.merge(self.default_cfg.hparams, overrides), resolve=True
+            OmegaConf.merge(self.default_cfg, overrides), resolve=True
         )
 
         tab = {
@@ -210,8 +210,7 @@ class ConfigGUI:
                     side=LEFT, padx=(level * 20, 10)
                 )
 
-                schema_path = f"hparams.{current_path}"
-                spec = get_field_spec(self.ui_schema, schema_path)
+                spec = get_field_spec(self.ui_schema, current_path)
 
                 widget, refresher = create_widget(
                     param_frame,
@@ -239,7 +238,7 @@ class ConfigGUI:
         """Update a value in a specific tab's config."""
         keys = path.split(".")
 
-        spec = get_field_spec(self.ui_schema, f"hparams.{path}")
+        spec = get_field_spec(self.ui_schema, path)
         if spec:
             vtype = spec[1]
             if vtype == "bool":
@@ -256,7 +255,7 @@ class ConfigGUI:
         current[keys[-1]] = value
 
         # Track diff against defaults
-        default = self.default_hparams
+        default = self.default_values
         for key in keys:
             default = default[key]
 

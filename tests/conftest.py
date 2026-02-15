@@ -27,13 +27,13 @@ def constants() -> DictConfig:
 
 @pytest.fixture
 def base_test_config():
-    """Minimal hparams diff for fast test execution.
+    """Minimal params diff for fast test execution.
     Merged over default_config.yaml by run_experiments().
     """
     return OmegaConf.create(
         {
             "episodes": 1,
-            "run_params": {
+            "run": {
                 "save_logs": False,
             },
             "env_params": {
@@ -53,11 +53,9 @@ def base_env_cfg():
     return OmegaConf.merge(
         cfg,
         {
-            "hparams": {
-                "env_params": {
-                    "num_iters": 10,
-                    "map_max": 5,
-                },
+            "env_params": {
+                "num_iters": 10,
+                "map_max": 5,
             },
         },
     )
@@ -66,7 +64,7 @@ def base_env_cfg():
 @pytest.fixture
 def base_env_params(base_env_cfg):
     """Flat env_params dict for tests that need raw params."""
-    return dict(base_env_cfg.hparams.env_params)
+    return dict(base_env_cfg.env_params)
 
 
 @pytest.fixture

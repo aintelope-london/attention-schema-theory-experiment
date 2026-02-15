@@ -38,7 +38,7 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
     cfg = OmegaConf.create(cfg_dict)
     main_config = OmegaConf.create(main_config_dict)
 
-    trial_seed = cfg.hparams.run_params.seed + i_trial
+    trial_seed = cfg.run.seed + i_trial
     set_global_seeds(trial_seed)
 
     configs = []
@@ -46,13 +46,11 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
 
     for _, experiment_name in enumerate(main_config):
         experiment_cfg = copy.deepcopy(cfg)
-        experiment_cfg.hparams = OmegaConf.merge(
-            experiment_cfg.hparams, main_config[experiment_name]
-        )
+        experiment_cfg = OmegaConf.merge(cfg, main_config[experiment_name])
         OmegaConf.update(
             experiment_cfg, "experiment_name", experiment_name, force_add=True
         )
-        OmegaConf.update(experiment_cfg.hparams, "seed", trial_seed, force_add=True)
+        OmegaConf.update(experiment_cfg.run, "seed", trial_seed, force_add=True)
 
         score_dimensions = get_score_dimensions(experiment_cfg)
         reporter = ProgressReporter(["episode"], on_update=None)
@@ -64,8 +62,8 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
             reporter=reporter,
         )
 
-        if cfg.hparams.run_params.save_logs:
-            block_output_dir = os.path.join(cfg.outputs_dir, experiment_name)
+        if cfg.run.save_logs:
+            block_output_dir = os.path.join(cfg.run.outputs_dir, experiment_name)
             events.write(block_output_dir)
 
         all_events.append(events.to_dataframe())
@@ -77,9 +75,8 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
 def run_experiments(main_config):
     """Main orchestrator entry point."""
     cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
-    timestamp = str(cfg.timestamp)
 
-    set_console_title(cfg.hparams.params_set_title + " : " + timestamp)
+    set_console_title(cfg.run.outputs_dir)
 
     configs = []
     all_events = []
@@ -92,7 +89,7 @@ def run_experiments(main_config):
     with ProcessPoolExecutor(max_workers=workers) as executor:
         futures = {
             executor.submit(run_trial, cfg_dict, main_config_dict, i_trial): i_trial
-            for i_trial in range(cfg.hparams.trials)
+            for i_trial in range(cfg.run.trials)
         }
         for future in as_completed(futures):
             result = future.result()
@@ -101,4 +98,8 @@ def run_experiments(main_config):
 
     archive_code(cfg)
 
-    return {"Outputs_dir": cfg.outputs_dir, "configs": configs, "events": all_events}
+    return {
+        "Outputs_dir": cfg.run.outputs_dir,
+        "configs": configs,
+        "events": all_events,
+    }

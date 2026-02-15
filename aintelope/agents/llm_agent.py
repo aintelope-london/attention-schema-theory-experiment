@@ -86,7 +86,6 @@ class LLMAgent(Agent):
     ) -> None:
         self.id = agent_id
         self.trainer = trainer
-        self.hparams = trainer.hparams
         self.env = env
         self.cfg = cfg
         self.done = False
@@ -363,25 +362,22 @@ class LLMAgent(Agent):
             )
 
         # TODO: warn if last_frame=0/1 or last_env_layout_seed=0/1 or last_episode=0/1 in any of the below values: for disabling the epsilon counting for corresponding variable one should use -1
-        epsilon = (
-            self.hparams.model_params.eps_start - self.hparams.model_params.eps_end
-        )
-        if self.hparams.model_params.eps_last_frame > 1:
-            epsilon *= max(0, 1 - step / self.hparams.model_params.eps_last_frame)
-        if self.hparams.model_params.eps_last_env_layout_seed > 1:
+        epsilon = self.agent_params.eps_start - self.agent_params.eps_end
+        if self.agent_params.eps_last_frame > 1:
+            epsilon *= max(0, 1 - step / self.agent_params.eps_last_frame)
+        if self.agent_params.eps_last_env_layout_seed > 1:
             epsilon *= max(
                 0,
-                1
-                - env_layout_seed / self.hparams.model_params.eps_last_env_layout_seed,
+                1 - env_layout_seed / self.agent_params.eps_last_env_layout_seed,
             )
-        if self.hparams.model_params.eps_last_episode > 1:
-            epsilon *= max(0, 1 - episode / self.hparams.model_params.eps_last_episode)
-        if self.hparams.model_params.eps_last_trial > 1:
+        if self.agent_params.eps_last_episode > 1:
+            epsilon *= max(0, 1 - episode / self.agent_params.eps_last_episode)
+        if self.agent_params.eps_last_trial > 1:
             epsilon *= max(
                 0,
-                1 - trial / self.hparams.model_params.eps_last_trial,
+                1 - trial / self.agent_params.eps_last_trial,
             )
-        epsilon += self.hparams.model_params.eps_end
+        epsilon += self.agent_params.eps_end
 
         temperature = (
             2 * epsilon

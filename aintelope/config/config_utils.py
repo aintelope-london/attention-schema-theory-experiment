@@ -98,15 +98,6 @@ def custom_now(format: str = "%Y%m%d%H%M%S") -> str:
     return time.strftime(format)
 
 
-def append_pid_and_uuid(timestamp: str) -> str:
-    pid = os.getpid()
-    unique_id = (
-        uuid.uuid1()
-    )  # Generate a UUID from a host ID, sequence number, and the current time. If node is not given, getnode() is used to obtain the hardware address. If clock_seq is given, it is used as the sequence number; otherwise a random 14-bit sequence number is chosen.  # TODO: uuid1 is good for multi-machine cloud computing. Other uuid methods might be preferrable in case of privacy considerations. See https://docs.python.org/3/library/uuid.html
-    result = f"{timestamp}_{pid}_{unique_id}"
-    return result
-
-
 def create_range(start, exclusive_end):
     return list(range(start, exclusive_end))
 
@@ -133,16 +124,13 @@ def register_resolvers() -> None:
     OmegaConf.register_new_resolver("custom_now", custom_now, replace=True)
     OmegaConf.register_new_resolver("now", custom_now, replace=True)
     OmegaConf.register_new_resolver("abs_path", get_project_path, replace=True)
-    OmegaConf.register_new_resolver(
-        "append_pid_and_uuid", append_pid_and_uuid, use_cache=True, replace=True
-    )
     OmegaConf.register_new_resolver("minus_3", minus_3, replace=True)
     OmegaConf.register_new_resolver("muldiv", muldiv, replace=True)
     OmegaConf.register_new_resolver("range", create_range, replace=True)
 
 
 def get_score_dimensions(cfg: DictConfig):
-    scores = cfg.hparams.env_params.scores
+    scores = cfg.env_params.scores
     dimensions = set()
     for event_name, score_dims_dict in scores.items():
         score_dims_dict = literal_eval(score_dims_dict)
@@ -323,7 +311,7 @@ def archive_code(cfg):
         os.path.dirname(os.path.realpath(__file__)), ".."
     )  # archive only files under aintelope folder, no need to archive the tests folder
     zip_path = os.path.join(
-        os.path.normpath(cfg.outputs_dir), "aintelope_code_archive.zip"
+        os.path.normpath(cfg.run.outputs_dir), "aintelope_code_archive.zip"
     )
     archive_code_in_dir(code_directory_path, zip_path)
 
@@ -331,7 +319,7 @@ def archive_code(cfg):
         code_directory_path, "..", "ai_safety_gridworlds"
     )
     zip_path = os.path.join(
-        os.path.normpath(cfg.outputs_dir), "gridworlds_code_archive.zip"
+        os.path.normpath(cfg.run.outputs_dir), "gridworlds_code_archive.zip"
     )
     archive_code_in_dir(code_directory_path, zip_path)
 

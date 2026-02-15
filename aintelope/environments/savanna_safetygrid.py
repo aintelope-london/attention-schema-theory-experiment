@@ -160,9 +160,9 @@ class GridworldZooBaseEnv:
     }
 
     def __init__(self, cfg: Optional[Dict] = None):
-        env_params = dict(cfg.hparams.env_params)
+        env_params = dict(cfg.env_params)
         env_params.setdefault("scalarize_rewards", False)
-        if cfg.hparams.agent_class.startswith("sb3_") and not cfg.hparams.test_mode:
+        if cfg.agent_params.agent_class.startswith("sb3_") and not cfg.run.test_mode:
             env_params["scalarize_rewards"] = True
 
         self.render_mode = None  # Some libraries require this field to be present. The actual value seems to be unimportant.
@@ -982,7 +982,7 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
 
 class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
     def __init__(self, cfg: Optional[Dict] = None):
-        self.observe_immediately_after_agent_action = cfg.hparams.env_params.get(
+        self.observe_immediately_after_agent_action = cfg.env_params.get(
             "observe_immediately_after_agent_action", False
         )  # TODO: configure
 

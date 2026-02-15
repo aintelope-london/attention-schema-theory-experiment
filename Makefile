@@ -4,12 +4,6 @@ TESTS = tests
 CODEBASE = ${PROJECT} ${TESTS}
 VENV = venv_$(PROJECT)
 
-run-training-baseline: ## run baseline experiment
-	python -m ${PROJECT} hparams.agent_id=example_agent
-
-run-orchestrator: ## run orchestrator
-	python -m ${PROJECT} hparams.agent_id=example_agent
-
 # ---------- installation and environment ----------
 .PHONY: venv clean-venv install install-dev install-all build-local
 

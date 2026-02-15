@@ -55,7 +55,6 @@ class SB3HandWrittenRulesExpert(object):
         self.id = agent_id
         self.env_classname = env_classname
         self.cfg = cfg
-        self.hparams = cfg.hparams
         # self.last_action = None
         self.action_space = action_space
 
@@ -99,62 +98,56 @@ class SB3HandWrittenRulesExpert(object):
     ) -> int:
         _random = np.random
 
-        if self.hparams.episodes == 0:  # there is no training
+        if self.run.episodes == 0:  # there is no training
             # detected pure handwritten rules agent test without training - if that config is detected then test mode will use the handwritten rules
             return 1, _random  # handwritten rules mode
         elif test_mode:
             return 0, None  # SB3 policy mode
 
         # TODO: warn if last_frame=0/1 or last_env_layout_seed=0/1 or last_episode=0/1 in any of the below values: for disabling the epsilon counting for corresponding variable one should use -1
-        epsilon = (
-            self.hparams.model_params.eps_start - self.hparams.model_params.eps_end
-        )
-        if self.hparams.model_params.eps_last_frame > 1:
-            epsilon *= max(0, 1 - step / self.hparams.model_params.eps_last_frame)
-        if self.hparams.model_params.eps_last_env_layout_seed > 1:
+        epsilon = self.agent_params.eps_start - self.agent_params.eps_end
+        if self.agent_params.eps_last_frame > 1:
+            epsilon *= max(0, 1 - step / self.agent_params.eps_last_frame)
+        if self.agent_params.eps_last_env_layout_seed > 1:
             epsilon *= max(
                 0,
-                1
-                - env_layout_seed / self.hparams.model_params.eps_last_env_layout_seed,
+                1 - env_layout_seed / self.agent_params.eps_last_env_layout_seed,
             )
-        if self.hparams.model_params.eps_last_episode > 1:
-            epsilon *= max(0, 1 - episode / self.hparams.model_params.eps_last_episode)
-        if self.hparams.model_params.eps_last_trial > 1:
+        if self.agent_params.eps_last_episode > 1:
+            epsilon *= max(0, 1 - episode / self.agent_params.eps_last_episode)
+        if self.agent_params.eps_last_trial > 1:
             epsilon *= max(
                 0,
-                1 - trial / self.hparams.model_params.eps_last_trial,
+                1 - trial / self.agent_params.eps_last_trial,
             )
-        epsilon += self.hparams.model_params.eps_end
+        epsilon += self.agent_params.eps_end
 
         handwritten_rule_epsilon = (
-            self.hparams.model_params.handwritten_rule_bias_epsilon_start
-            - self.hparams.model_params.handwritten_rule_bias_epsilon_end
+            self.agent_params.handwritten_rule_bias_epsilon_start
+            - self.agent_params.handwritten_rule_bias_epsilon_end
         )
-        if self.hparams.model_params.eps_last_frame > 1:
+        if self.agent_params.eps_last_frame > 1:
             handwritten_rule_epsilon *= max(
-                0, 1 - step / self.hparams.model_params.eps_last_frame
+                0, 1 - step / self.agent_params.eps_last_frame
             )
-        if self.hparams.model_params.eps_last_env_layout_seed > 1:
+        if self.agent_params.eps_last_env_layout_seed > 1:
             handwritten_rule_epsilon *= max(
                 0,
-                1
-                - env_layout_seed / self.hparams.model_params.eps_last_env_layout_seed,
+                1 - env_layout_seed / self.agent_params.eps_last_env_layout_seed,
             )
-        if self.hparams.model_params.eps_last_episode > 1:
+        if self.agent_params.eps_last_episode > 1:
             handwritten_rule_epsilon *= max(
-                0, 1 - episode / self.hparams.model_params.eps_last_episode
+                0, 1 - episode / self.agent_params.eps_last_episode
             )
-        if self.hparams.model_params.eps_last_trial > 1:
+        if self.agent_params.eps_last_trial > 1:
             handwritten_rule_epsilon *= max(
                 0,
-                1 - trial / self.hparams.model_params.eps_last_trial,
+                1 - trial / self.agent_params.eps_last_trial,
             )
-        handwritten_rule_epsilon += (
-            self.hparams.model_params.handwritten_rule_bias_epsilon_end
-        )
+        handwritten_rule_epsilon += self.agent_params.handwritten_rule_bias_epsilon_end
 
         apply_handwritten_rule_eps_before_random_eps = (
-            self.hparams.model_params.apply_handwritten_rule_eps_before_random_eps
+            self.agent_params.apply_handwritten_rule_eps_before_random_eps
         )
 
         if (

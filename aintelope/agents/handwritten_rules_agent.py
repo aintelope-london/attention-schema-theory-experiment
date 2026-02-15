@@ -52,7 +52,6 @@ class HandwrittenRulesAgent(Agent):
     ) -> None:
         self.id = agent_id
         self.trainer = trainer
-        self.hparams = trainer.hparams
         self.env = env
         self.cfg = cfg
         self.done = False

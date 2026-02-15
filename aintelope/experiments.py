@@ -39,15 +39,10 @@ def run_experiment(
     i_trial: int = 0,
     reporter=None,
 ) -> None:
-    if "trial_length" in cfg:  # backwards compatibility
-        cfg.env_layout_seed_repeat_sequence_length = cfg.trial_length
-    if "eps_last_env_layout_seed" in cfg:  # backwards compatibility
-        cfg.eps_last_env_layout_seed = cfg.eps_last_env_layout_seed
-
-    is_sb3 = cfg.hparams.agent_class.startswith("sb3_")
+    is_sb3 = cfg.agent_class.startswith("sb3_")
 
     # Environment
-    env = get_env_class(cfg.hparams.env)(cfg=cfg)
+    env = get_env_class(cfg.env_params.env)(cfg=cfg)
 
     # This reset here does not increment episode number since no steps are played before one more reset in the main episode loop takes place
     if isinstance(env, ParallelEnv):
@@ -60,7 +55,7 @@ def run_experiment(
     else:
         raise NotImplementedError(f"Unknown environment type {type(env)}")
 
-    events_columns = list(cfg.hparams.run_params.event_columns) + (
+    events_columns = list(cfg.run.event_columns) + (
         score_dimensions if isinstance(env, GridworldZooBaseEnv) else ["Score"]
     )
 
@@ -88,12 +83,12 @@ def run_experiment(
 
     for i in range(env.max_num_agents):
         agent_id = f"agent_{i}"
-        agent = get_agent_class(cfg.hparams.agent_class)(
+        agent = get_agent_class(cfg.agent_params.agent_class)(
             agent_id=agent_id,
             trainer=trainer,
             env=env,
             cfg=cfg,
-            **cfg.hparams.agent_params,
+            **cfg.agent_params,
         )
         agents.append(agent)
 
@@ -112,7 +107,7 @@ def run_experiment(
             observation = env.observe(agent_id)
             info = env.observe_info(agent_id)
 
-        if not cfg.hparams.env_params.combine_interoception_and_vision:
+        if not cfg.env_params.combine_interoception_and_vision:
             observation_shape = (observation[0].shape, observation[1].shape)
         else:
             observation_shape = observation.shape
@@ -122,10 +117,10 @@ def run_experiment(
         # TODO: is this reset necessary here? In main loop below,
         # there is also a reset call
         agent.reset(observation, info, type(env))
-        checkpoint = get_checkpoint(cfg.outputs_dir, agent_id)
+        checkpoint = get_checkpoint(cfg.run.outputs_dir, agent_id)
 
         # Add agent, with potential checkpoint
-        if not cfg.hparams.env_params.combine_interoception_and_vision:
+        if not cfg.env_params.combine_interoception_and_vision:
             agent.init_model(
                 (observation[0].shape, observation[1].shape),
                 env.action_space,
@@ -142,7 +137,7 @@ def run_experiment(
     # Main loop
 
     # SB3 training has its own loop
-    if is_sb3 and not cfg.hparams.test_mode:
+    if is_sb3 and not cfg.run.test_mode:
         run_baseline_training(cfg, i_trial, env, agents)
         gc.collect()
         return events
@@ -150,25 +145,25 @@ def run_experiment(
     model_needs_saving = (
         False  # if no training episodes are specified then do not save models
     )
-    reporter.set_total("episode", cfg.hparams.episodes)
-    for i_episode in range(cfg.hparams.episodes):
+    reporter.set_total("episode", cfg.run.episodes)
+    for i_episode in range(cfg.run.episodes):
         reporter.update("episode", i_episode + 1)
 
         env_layout_seed = (
-            int(i_episode / cfg.hparams.env_layout_seed_repeat_sequence_length)
-            if cfg.hparams.env_layout_seed_repeat_sequence_length > 0
+            int(i_episode / cfg.env_params.env_layout_seed_repeat_sequence_length)
+            if cfg.env_params.env_layout_seed_repeat_sequence_length > 0
             else i_episode
         )
 
-        if cfg.hparams.env_layout_seed_modulo > 0:
-            env_layout_seed = env_layout_seed % cfg.hparams.env_layout_seed_modulo
+        if cfg.env_params.env_layout_seed_modulo > 0:
+            env_layout_seed = env_layout_seed % cfg.env_params.env_layout_seed_modulo
 
         print(
-            f"\ni_trial: {i_trial} episode: {i_episode} env_layout_seed: {env_layout_seed} test_mode: {cfg.hparams.test_mode}"
+            f"\ni_trial: {i_trial} episode: {i_episode} env_layout_seed: {env_layout_seed} test_mode: {cfg.run.test_mode}"
         )
 
         for agent in agents:
-            agent.save_model(checkpoint_path(cfg.outputs_dir, agent.id))
+            agent.save_model(checkpoint_path(cfg.run.outputs_dir, agent.id))
 
         # Reset
         if isinstance(env, ParallelEnv):
@@ -189,7 +184,7 @@ def run_experiment(
                 dones[agent.id] = False
 
         # Iterations within the episode
-        for step in range(cfg.hparams.env_params.num_iters):
+        for step in range(cfg.run.steps):
             if isinstance(env, ParallelEnv):
                 # loop: get observations and collect actions
                 actions = {}
@@ -251,7 +246,7 @@ def run_experiment(
                             i_episode,
                             env_layout_seed,
                             step,
-                            cfg.hparams.test_mode,
+                            cfg.run.test_mode,
                         ]
                         + agent_step_info
                         + env_step_info
@@ -309,7 +304,7 @@ def run_experiment(
                             i_episode,
                             env_layout_seed,
                             step,
-                            cfg.hparams.test_mode,
+                            cfg.run.test_mode,
                         ]
                         + agent_step_info
                         + env_step_info
@@ -328,7 +323,7 @@ def run_experiment(
                 raise NotImplementedError(f"Unknown environment type {type(env)}")
 
             # Perform one step of the optimization (on the policy network)
-            if not cfg.hparams.test_mode:
+            if not cfg.run.test_mode:
                 trainer.optimize_models()
 
             # Break when all agents are done
@@ -343,7 +338,7 @@ def run_experiment(
 def run_baseline_training(
     cfg: DictConfig, i_trial: int, env: Environment, agents: list
 ):
-    num_total_steps = cfg.hparams.env_params.num_iters * cfg.hparams.episodes
+    num_total_steps = cfg.run.steps * cfg.run.episodes
     agents[0].train(num_total_steps)
     agents[0].save_model()
 

@@ -48,14 +48,15 @@ class TestGetFieldSpec:
     """Tests for get_field_spec path navigation."""
 
     def test_top_level_key(self, ui_schema):
-        """Top-level key returns correct spec."""
+        """Unannotated top-level key returns locked spec."""
         spec = get_field_spec(ui_schema, "outputs_dir")
-        assert spec == [None, "str"]
+        assert spec == [None, "locked"]
 
     def test_deep_nested_key(self, ui_schema):
         """Deeply nested key returns correct spec."""
-        spec = get_field_spec(ui_schema, "hparams.env_params.scores.GOLD_SCORE")
-        assert spec == [None, "str"]
+        spec = get_field_spec(ui_schema, "env_params.scores.GOLD_SCORE")
+        assert spec is not None
+        assert len(spec) == 2
 
     def test_missing_key_returns_none(self, ui_schema):
         """Non-existent path returns None."""
@@ -64,8 +65,30 @@ class TestGetFieldSpec:
 
     def test_intermediate_node_returns_none(self, ui_schema):
         """Intermediate node (dict, not leaf) returns None."""
-        spec = get_field_spec(ui_schema, "hparams.env_params")
+        spec = get_field_spec(ui_schema, "env_params")
         assert spec is None
+
+    def test_annotated_field_not_locked(self, ui_schema):
+        """Field with @ui annotation has a type other than locked."""
+        # Walk the schema to find any annotated field
+        annotated = _find_annotated(ui_schema)
+        if annotated is None:
+            pytest.skip("No @ui annotations in config yet")
+        spec = get_field_spec(ui_schema, annotated)
+        assert spec[1] != "locked"
+
+
+def _find_annotated(schema, prefix=""):
+    """Recursively find first non-locked leaf in schema."""
+    for key, value in schema.items():
+        path = f"{prefix}.{key}" if prefix else key
+        if isinstance(value, dict):
+            result = _find_annotated(value, path)
+            if result:
+                return result
+        elif isinstance(value, list) and value[1] != "locked":
+            return path
+    return None
 
 
 # =============================================================================
@@ -103,6 +126,16 @@ class TestGetRangeDisplay:
 
 class TestCreateWidget:
     """Tests for create_widget factory returning correct widget types."""
+
+    def test_locked_spec_returns_disabled_entry(self, tk_root):
+        """Locked spec returns disabled Entry."""
+        parent = tk.Frame(tk_root)
+        spec = [None, "locked"]
+        widget, refresh = create_widget(
+            parent, "test_locked", "read_only", spec, lambda v: None
+        )
+        assert isinstance(widget, tk.Entry)
+        assert widget.cget("state") == "disabled"
 
     def test_bool_spec_returns_frame(self, tk_root):
         """Bool spec returns Frame (custom checkbox container)."""

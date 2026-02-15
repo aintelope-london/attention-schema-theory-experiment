@@ -68,9 +68,8 @@ class Trainer:
         self.observation_shapes = {}
         self.action_spaces = {}
 
-        self.hparams = params.hparams
         self.combine_interoception_and_vision = (
-            params.hparams.env_params.combine_interoception_and_vision
+            params.env_params.combine_interoception_and_vision
         )
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
