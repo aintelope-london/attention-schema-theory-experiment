@@ -325,6 +325,7 @@ def archive_code(cfg):
 
 
 def archive_code_in_dir(directory_path, zip_path):
+    os.makedirs(os.path.dirname(zip_path), exist_ok=True)
     with zipfile.ZipFile(zip_path, "w") as ziph:
         for root, dirs, files in os.walk(
             directory_path, topdown=True, followlinks=False

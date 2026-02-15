@@ -526,31 +526,3 @@ Let's start the simulation!
             self.messages.append({"role": "system", "content": self.system_prompt})
             self.full_message_history = None  # TODO
 
-    def save_model(
-        self,
-        i_episode,
-        path,
-        experiment_name,
-        use_separate_models_for_each_experiment,
-    ):
-        checkpoint_filename = self.id
-        if use_separate_models_for_each_experiment:
-            checkpoint_filename += "-" + experiment_name
-
-        filename = os.path.join(
-            path,
-            checkpoint_filename
-            + "-"
-            + datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S_%f"),
-        )
-
-        with open(filename + ".gz", "wb", 1024 * 1024) as fh:
-            with gzip.GzipFile(
-                fileobj=fh, filename=filename, mode="wb", compresslevel=compresslevel
-            ) as gzip_file:
-                pickle.dump(
-                    (self.system_prompt, self.messages, self.full_message_history),
-                    gzip_file,
-                )
-                gzip_file.flush()  # NB! necessary to prevent broken gz archives on random occasions (does not depend on input data)
-            fh.flush()  # just in case

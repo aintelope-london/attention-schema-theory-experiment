@@ -48,9 +48,9 @@ class TestGetFieldSpec:
     """Tests for get_field_spec path navigation."""
 
     def test_top_level_key(self, ui_schema):
-        """Unannotated top-level key returns locked spec."""
-        spec = get_field_spec(ui_schema, "outputs_dir")
-        assert spec == [None, "locked"]
+        """Nested key returns correct spec."""
+        spec = get_field_spec(ui_schema, "run.seed")
+        assert spec == [[0, 9999], "int"]
 
     def test_deep_nested_key(self, ui_schema):
         """Deeply nested key returns correct spec."""

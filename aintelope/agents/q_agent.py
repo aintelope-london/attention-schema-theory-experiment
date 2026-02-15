@@ -146,6 +146,3 @@ class QAgent(Agent):
 
     def init_model(self, *args, **kwargs):
         self.trainer.add_agent(self.id, *args, **kwargs)
-
-    def save_model(self, *args, **kwargs):
-        self.trainer.save_model(self.id, *args, **kwargs)

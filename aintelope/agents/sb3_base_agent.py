@@ -637,7 +637,7 @@ class SB3BaseAgent(Agent):
     def save_model(self, path: Path):
         models = {self.id: self.model} if self.model is not None else self.models
         for agent_id, model in models.items():
-            model.save(path.parent / f"{agent_id}.pt")
+            torch.save(model.get_parameters(), path.parent / f"{agent_id}.pt")
 
     def init_model(
         self,

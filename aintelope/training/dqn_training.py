@@ -210,42 +210,11 @@ class Trainer:
         # TODO
         pass
 
-    def save_model(
-        self,
-        agent_id,
-        episode,
-        path,
-        experiment_name,
-        use_separate_models_for_each_experiment,
-    ):
-        """
-        Save model artifacts to 'path'.
-
-        Args:
-            episode (int): number of environment cycle; each cycle is divided into steps
-            path (str): location where artifact is saved
-
-        Returns:
-            None
-        """
-
-        # TODO
-
-        checkpoint_filename = agent_id
-        if use_separate_models_for_each_experiment:
-            checkpoint_filename += "-" + experiment_name
-
-        filename = os.path.join(
-            path,
-            checkpoint_filename
-            + "-"
-            + datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S_%f"),
-        )
-
+    def save_model(self, agent_id, path):
+        """Save model checkpoint."""
         torch.save(
             {
-                "epoch": episode,
-                # TODO
+                # TODO, this was a stub anyway. we're removing this class eventually
             },
-            filename,
+            path,
         )

@@ -20,9 +20,8 @@ def test_agent_learns(base_test_config):
     """Learning agent achieves reward threshold on simple gridworld."""
 
     shared_overrides = {
-        "agent_class": "sb3_ppo_agent",
-        "env_layout_seed_repeat_sequence_length": 5,
-        "model_params": {
+        "agent_params": {
+            "agent_class": "sb3_ppo_agent",
             "num_conv_layers": 0,
             "learning_rate": 0.001,
             "ppo_n_steps": 32,

@@ -59,9 +59,8 @@ class Agent(ABC):
     ) -> None:
         ...
 
-    @abstractmethod
     def save_model(
         self,
         path: Path,
     ) -> None:
-        ...
+        self.trainer.save_model(self.id, path)

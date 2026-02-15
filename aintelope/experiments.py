@@ -39,7 +39,7 @@ def run_experiment(
     i_trial: int = 0,
     reporter=None,
 ) -> None:
-    is_sb3 = cfg.agent_class.startswith("sb3_")
+    is_sb3 = cfg.agent_params.agent_class.startswith("sb3_")
 
     # Environment
     env = get_env_class(cfg.env_params.env)(cfg=cfg)
@@ -340,7 +340,7 @@ def run_baseline_training(
 ):
     num_total_steps = cfg.run.steps * cfg.run.episodes
     agents[0].train(num_total_steps)
-    agents[0].save_model()
+    agents[0].save_model(checkpoint_path(cfg.run.outputs_dir, agents[0].id))
 
 
 if __name__ == "__main__":

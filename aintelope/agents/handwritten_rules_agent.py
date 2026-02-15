@@ -264,13 +264,3 @@ class HandwrittenRulesAgent(Agent):
             **kwargs,
         )
 
-    def save_model(
-        self,
-        i_episode,
-        path,
-        experiment_name,
-        use_separate_models_for_each_experiment,
-        *args,
-        **kwargs,
-    ):
-        pass
