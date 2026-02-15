@@ -5,18 +5,12 @@
 # Repository:
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
-timestamp: ${now:%Y%m%d%H%M%S}      
-experiment_name: experiment
-outputs_dir: outputs/${timestamp}/
+#timestamp: ${now:%Y%m%d%H%M%S}      
+outputs_dir: outputs/${now:%Y%m%d%H%M%S}/
 #outputs_dir: outputs
+#experiment_name: experiment
 #log_dir: outputs/${timestamp}/
 #checkpoint_dir: checkpoints
-
-trainer_params:
-  num_workers: 1        # unused        # TODO
-  checkpoint: ${log_dir}checkpoints/
-  device: gpu        # unused        # TODO
-  verbose: false
 
 hparams:
   run_params:

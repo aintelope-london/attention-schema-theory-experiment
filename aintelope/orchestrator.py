@@ -56,7 +56,6 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
 
         events = run_experiment(
             experiment_cfg,
-            experiment_name=experiment_name,
             score_dimensions=score_dimensions,
             i_trial=i_trial,
             reporter=reporter,

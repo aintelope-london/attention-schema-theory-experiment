@@ -52,11 +52,6 @@ class TestGetFieldSpec:
         spec = get_field_spec(ui_schema, "experiment_name")
         assert spec == [None, "str"]
 
-    def test_nested_key(self, ui_schema):
-        """Nested key (one level) returns correct spec."""
-        spec = get_field_spec(ui_schema, "trainer_params.num_workers")
-        assert spec == [[1, 16], "int"]
-
     def test_deep_nested_key(self, ui_schema):
         """Deeply nested key returns correct spec."""
         spec = get_field_spec(ui_schema, "hparams.env_params.scores.GOLD_SCORE")

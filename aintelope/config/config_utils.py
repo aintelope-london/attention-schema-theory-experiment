@@ -322,7 +322,9 @@ def archive_code(cfg):
     code_directory_path = os.path.join(
         os.path.dirname(os.path.realpath(__file__)), ".."
     )  # archive only files under aintelope folder, no need to archive the tests folder
-    zip_path = os.path.join(os.path.normpath(cfg.outputs_dir), "aintelope_code_archive.zip")
+    zip_path = os.path.join(
+        os.path.normpath(cfg.outputs_dir), "aintelope_code_archive.zip"
+    )
     archive_code_in_dir(code_directory_path, zip_path)
 
     code_directory_path = os.path.join(

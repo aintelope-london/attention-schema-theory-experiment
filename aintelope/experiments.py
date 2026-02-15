@@ -13,7 +13,11 @@ import gc
 from omegaconf import DictConfig
 
 from aintelope.agents import get_agent_class
-from aintelope.analytics import recording
+from aintelope.analytics.recording import (
+    EventLog,
+    get_checkpoint,
+    checkpoint_path,
+)
 from aintelope.environments import get_env_class
 from aintelope.environments.savanna_safetygrid import (
     GridworldZooBaseEnv,
@@ -31,7 +35,6 @@ Environment = Union[gym.Env, PettingZooEnv]
 
 def run_experiment(
     cfg: DictConfig,
-    experiment_name: str = "",  # TODO: remove this argument and read it from cfg.experiment_name
     score_dimensions: list = [],
     i_trial: int = 0,
     reporter=None,
@@ -61,7 +64,7 @@ def run_experiment(
         score_dimensions if isinstance(env, GridworldZooBaseEnv) else ["Score"]
     )
 
-    events = recording.EventLog(events_columns)
+    events = EventLog(events_columns)
 
     # Capture observation layer order for playback rendering
     first_agent_info = (
@@ -90,7 +93,7 @@ def run_experiment(
     # Agents
     agents = []
     dones = {}
-    prev_agent_checkpoint = None
+
     for i in range(env.max_num_agents):
         agent_id = f"agent_{i}"
         agent = get_agent_class(cfg.hparams.agent_class)(
@@ -127,25 +130,7 @@ def run_experiment(
         # TODO: is this reset necessary here? In main loop below,
         # there is also a reset call
         agent.reset(observation, info, type(env))
-        # Get latest checkpoint if existing
-
-        checkpoint = None
-
-        if (
-            cfg.hparams.model_params.use_weight_sharing
-            and prev_agent_checkpoint is not None
-        ):
-            checkpoint = prev_agent_checkpoint
-        else:
-            checkpoint_filename = agent_id
-            if use_separate_models_for_each_experiment:
-                checkpoint_filename += "-" + experiment_name
-            checkpoints = glob.glob(os.path.join(dir_cp, checkpoint_filename + "-*"))
-            if len(checkpoints) > 0:
-                checkpoint = max(checkpoints, key=os.path.getctime)
-                prev_agent_checkpoint = checkpoint
-            elif prev_agent_checkpoint is not None:
-                checkpoint = prev_agent_checkpoint
+        checkpoint = get_checkpoint(cfg.outputs_dir, agent_id)
 
         # Add agent, with potential checkpoint
         if not cfg.hparams.env_params.combine_interoception_and_vision:
@@ -187,27 +172,11 @@ def run_experiment(
             env_layout_seed = env_layout_seed % cfg.hparams.env_layout_seed_modulo
 
         print(
-            f"\ni_trial: {i_trial} experiment: {experiment_name} episode: {i_episode} env_layout_seed: {env_layout_seed} test_mode: {cfg.hparams.test_mode}"
+            f"\ni_trial: {i_trial} episode: {i_episode} env_layout_seed: {env_layout_seed} test_mode: {cfg.hparams.test_mode}"
         )
 
-        # TODO: refactor these checks into separate function
-        # Save models
-        if not cfg.hparams.test_mode:
-            if i_episode > 0 and cfg.hparams.save_frequency != 0:
-                model_needs_saving = True
-                if i_episode % cfg.hparams.save_frequency == 0:
-                    os.makedirs(dir_cp, exist_ok=True)
-                    for agent in agents:
-                        agent.save_model(
-                            i_episode,
-                            dir_cp,
-                            experiment_name,
-                            use_separate_models_for_each_experiment,
-                        )
-
-                    model_needs_saving = False
-            else:
-                model_needs_saving = True
+        for agent in agents:
+            agent.save_model(checkpoint_path(cfg.outputs_dir, agent.id))
 
         # Reset
         if isinstance(env, ParallelEnv):
@@ -395,9 +364,7 @@ def run_baseline_training(
     cfg: DictConfig, i_trial: int, env: Environment, agents: list
 ):
     num_total_steps = cfg.hparams.env_params.num_iters * cfg.hparams.episodes
-
     agents[0].train(num_total_steps)
-
     agents[0].save_model()
 
 

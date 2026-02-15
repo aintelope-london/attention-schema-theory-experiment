@@ -8,8 +8,9 @@
 import os
 
 import traceback
-from typing import List, NamedTuple, Optional, Tuple
+from typing import Optional, Tuple
 from gymnasium.spaces import Discrete
+from pathlib import Path
 
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
@@ -678,16 +679,10 @@ class SB3BaseAgent(Agent):
 
         return checkpoint_filenames
 
-    def save_model(self, *args, **kwargs):
-        checkpoint_filenames = self.get_checkpoint_filenames(include_timestamp=True)
+    def save_model(self, path: Path):
         models = {self.id: self.model} if self.model is not None else self.models
-
         for agent_id, model in models.items():
-            if not isinstance(
-                model, str
-            ):  # model can contain a path to an already saved model
-                checkpoint_filename = checkpoint_filenames[agent_id]
-                model.save(checkpoint_filename)
+            model.save(path.parent / f"{agent_id}.pt")
 
     def init_model(
         self,

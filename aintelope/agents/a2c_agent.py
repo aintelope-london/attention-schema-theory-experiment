@@ -192,7 +192,7 @@ def dqn_model_constructor(env, env_classname, agent_id, cfg):
         device=torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         ),  # Note, CUDA-based CPU performance is much better than Torch-CPU mode.
-        #tensorboard_log=cfg.tensorboard_dir,
+        # tensorboard_log=cfg.tensorboard_dir,
         # optimize_memory_usage=True, # this argument is not supported with this algorithm because it does not have a replay buffer
     )
 

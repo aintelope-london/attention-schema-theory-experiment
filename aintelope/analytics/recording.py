@@ -5,10 +5,23 @@ import json
 import os
 import zlib
 from pathlib import Path
-
+from typing import Optional
 import numpy as np
 import pandas as pd
 import pickle
+
+
+def get_checkpoint(outputs_dir: str, agent_id: str) -> Optional[Path]:
+    """Return existing checkpoint path for an agent, or None."""
+    path = Path(outputs_dir) / "checkpoints" / f"{agent_id}.pt"
+    return path if path.exists() else None
+
+
+def checkpoint_path(outputs_dir: str, agent_id: str) -> Path:
+    """Return the checkpoint save path for an agent, ensuring the directory exists."""
+    path = Path(outputs_dir) / "checkpoints" / f"{agent_id}.pt"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def serialize_state(state):
