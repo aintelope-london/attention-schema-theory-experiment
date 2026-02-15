@@ -657,7 +657,7 @@ class SB3BaseAgent(Agent):
         # if not use_separate_models_for_each_experiment:
         #    raise NotImplementedError("sharing models over experiments is not implemented yet")
 
-        dir_out = os.path.normpath(self.cfg.log_dir)
+        dir_out = os.path.normpath(self.cfg.outputs_dir)
         checkpoint_dir = os.path.normpath(self.cfg.checkpoint_dir)
         path = os.path.join(dir_out, checkpoint_dir)
         os.makedirs(path, exist_ok=True)

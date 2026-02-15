@@ -11,7 +11,6 @@ outputs_dir: outputs/${timestamp}/
 #outputs_dir: outputs
 #log_dir: outputs/${timestamp}/
 #checkpoint_dir: checkpoints
-#tensorboard_dir: null #tensorboard if you want to have this later
 
 trainer_params:
   num_workers: 1        # unused        # TODO
