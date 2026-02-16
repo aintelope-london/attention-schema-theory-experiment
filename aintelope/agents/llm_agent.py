@@ -525,4 +525,3 @@ Let's start the simulation!
             self.messages = deque()
             self.messages.append({"role": "system", "content": self.system_prompt})
             self.full_message_history = None  # TODO
-

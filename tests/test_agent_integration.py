@@ -30,12 +30,15 @@ def test_agent_learns(base_test_config):
             "map_max": 4,
             "num_iters": 10,
             "combine_interoception_and_vision": True,
+            "env_layout_seed_repeat_sequence_length": 5,
         },
     }
 
-    train_block = OmegaConf.merge(base_test_config, shared_overrides, {"episodes": 500})
+    train_block = OmegaConf.merge(
+        base_test_config, shared_overrides, {"run": {"episodes": 500}}
+    )
     test_block = OmegaConf.merge(
-        base_test_config, shared_overrides, {"episodes": 10, "test_mode": True}
+        base_test_config, shared_overrides, {"run": {"episodes": 10, "test_mode": True}}
     )
 
     result = run(OmegaConf.create({"train": train_block, "test": test_block}))

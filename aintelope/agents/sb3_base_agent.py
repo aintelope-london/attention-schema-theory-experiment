@@ -646,11 +646,8 @@ class SB3BaseAgent(Agent):
         checkpoint: Optional[str] = None,
     ):
         if checkpoint:
-            # NB! torch.cuda.device_count() > 0 is needed here since SB3 does not support CPU-based CUDA device during model load() or set_parameters() for some reason
             use_cuda = torch.cuda.is_available() and torch.cuda.device_count() > 0
             device = torch.device("cuda" if use_cuda else "cpu")
 
-            # Warning: load() re-creates the model from scratch, it does not update it in-place! For an in-place load use set_parameters() instead.
-            self.model.set_parameters(
-                checkpoint, device=device
-            )  # device argument in needed in case the model is loaded to CPU. SB3 seems to be buggy in that regard that it will crash during model load() or set_parameters() if Torch-CPU device is not explicitly specified.
+            params = torch.load(checkpoint, map_location=device)
+            self.model.set_parameters(params, device=device)
