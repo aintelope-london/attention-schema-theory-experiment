@@ -100,7 +100,7 @@ def aggregate_series(df, x_col, y_col):
 # Rendering primitives
 # =============================================================================
 
-
+''' TODO clenaup
 def plot_band(ax, x, mean, std, label=None, color=None, alpha=0.2):
     """Draw a line with shaded standard deviation region.
 
@@ -115,6 +115,12 @@ def plot_band(ax, x, mean, std, label=None, color=None, alpha=0.2):
     """
     ax.plot(x, mean, linewidth=0.75, label=label, color=color)
     ax.fill_between(x, mean - std, mean + std, alpha=alpha, color=color)
+'''
+
+
+def plot_band(ax, x, mean, std, label=None, color=None, alpha=0.15):
+    ax.plot(x, mean, linewidth=1.5, label=label, color=color)
+    ax.fill_between(x, mean - std, mean + std, alpha=alpha, color=color, linewidth=0)
 
 
 def plot_grouped_bands(ax, df, metric, groups, group_col, series_fn, x_label):

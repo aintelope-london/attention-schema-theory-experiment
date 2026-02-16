@@ -72,6 +72,7 @@ def run_experiment(
     events.metadata["layer_order"] = first_agent_info[
         INFO_AGENT_OBSERVATION_LAYERS_ORDER
     ]
+    events.metadata["experiment_name"] = cfg.experiment_name
 
     # Common trainer for each agent's models
     if is_sb3:

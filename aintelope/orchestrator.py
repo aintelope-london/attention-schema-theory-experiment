@@ -9,7 +9,6 @@ import os
 import copy
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
-
 from omegaconf import OmegaConf
 
 from aintelope.config.config_utils import (
@@ -21,6 +20,7 @@ from aintelope.experiments import run_experiment
 from aintelope.utils.seeding import set_global_seeds
 from aintelope.utils.progress import ProgressReporter
 from aintelope.utils.concurrency import find_workers
+from aintelope.analytics.recording import write_results
 
 
 def run_trial(cfg_dict, main_config_dict, i_trial):
@@ -56,11 +56,7 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
             reporter=reporter,
         )
 
-        if cfg.run.save_logs:
-            block_output_dir = os.path.join(cfg.run.outputs_dir, experiment_name)
-            events.write(block_output_dir)
-
-        all_events.append(events.to_dataframe())
+        all_events.append(events)
         configs.append(experiment_cfg)
 
     return {"configs": configs, "events": all_events}
@@ -93,7 +89,9 @@ def run_experiments(main_config):
             configs.extend(result["configs"])
             all_events.extend(result["events"])
 
-    archive_code(cfg)
+    if cfg.run.save_logs:
+        write_results(outputs_dir, all_events)
+        archive_code(cfg)
 
     return {
         "Outputs_dir": cfg.run.outputs_dir,
