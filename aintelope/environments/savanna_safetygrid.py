@@ -691,6 +691,7 @@ class GridworldZooBaseEnv:
             INTEROCEPTION_FOOD_TRANSFORMED,
             INTEROCEPTION_DRINK_TRANSFORMED,
             ACTION_RELATIVE_COORDINATE_MAP,
+            INFO_AGENT_OBSERVATION_LAYERS_CUBE,
             INFO_REWARD_DICT,  # keep reward dict for case the score is scalarised
         ]
         if self._observation_direction_mode == -1:

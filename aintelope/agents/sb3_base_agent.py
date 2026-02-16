@@ -28,6 +28,8 @@ from aintelope.training.dqn_training import Trainer
 
 from aintelope.environments.savanna_safetygrid import (
     INFO_REWARD_DICT,
+    INFO_AGENT_OBSERVATION_LAYERS_CUBE,
+    INFO_AGENT_INTEROCEPTION_VECTOR,
 )
 from zoo_to_gym_multiagent_adapter.multiagent_zoo_to_gym_adapter import (
     MultiAgentZooToGymAdapterGymSide,
@@ -438,6 +440,10 @@ class SB3BaseAgent(Agent):
                 score,
                 done,
                 next_state,
+                (
+                    info[INFO_AGENT_OBSERVATION_LAYERS_CUBE],
+                    info[INFO_AGENT_INTEROCEPTION_VECTOR],
+                ),
             ]  # NB! agent_step_info uses scalarised score
 
             env_step_info = (
@@ -499,6 +505,10 @@ class SB3BaseAgent(Agent):
             score,
             done,
             next_state,
+            (
+                info[INFO_AGENT_OBSERVATION_LAYERS_CUBE],
+                info[INFO_AGENT_INTEROCEPTION_VECTOR],
+            ),
         ]  # NB! agent_step_info uses scalarised score
 
         self.state = next_state

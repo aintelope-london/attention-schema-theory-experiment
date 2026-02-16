@@ -11,7 +11,7 @@ run:
   concurrent: False                # @ui bool
   event_columns: [
     Run_id, Trial, Episode, Env layout seed, Step, IsTest,
-    Agent_id, State, Action, Reward, Done, Next_state,]
+    Agent_id, State, Action, Reward, Done, Next_state, Observation]
   save_logs: True                  # @ui bool
   trials: 1                        # @ui int 1 100
   episodes: 1                      # @ui int 1 100000

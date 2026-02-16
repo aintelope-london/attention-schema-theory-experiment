@@ -77,7 +77,7 @@ def run_experiments(main_config):
     cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
     # resolve timestamp, freeze
     outputs_dir = cfg.run.outputs_dir
-    OmegaConf.update(cfg, "run.outputs_dir", outputs_dir)  
+    OmegaConf.update(cfg, "run.outputs_dir", outputs_dir)
 
     set_console_title(cfg.run.outputs_dir)
 
