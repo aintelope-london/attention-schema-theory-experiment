@@ -161,10 +161,6 @@ class GridworldZooBaseEnv:
 
     def __init__(self, cfg: Optional[Dict] = None):
         env_params = dict(cfg.env_params)
-        env_params.setdefault("scalarize_rewards", False)
-        if cfg.agent_params.agent_class.startswith("sb3_") and not cfg.run.test_mode:
-            env_params["scalarize_rewards"] = True
-
         self.render_mode = None  # Some libraries require this field to be present. The actual value seems to be unimportant.
 
         # NB! Need to clone in order to not modify the default dict.

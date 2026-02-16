@@ -593,6 +593,7 @@ class SB3BaseAgent(Agent):
         return event
 
     def train(self, num_total_steps):
+        self.env._scalarize_rewards = True
         self.env._pre_reset_callback2 = self.env_pre_reset_callback
         self.env._post_reset_callback2 = self.env_post_reset_callback
         self.env._pre_step_callback2 = self.env_pre_step_callback
@@ -636,7 +637,7 @@ class SB3BaseAgent(Agent):
                 terminate_all_agents_when_one_excepts=True,
                 checkpoint_filenames=checkpoint_filenames,
             )
-
+        self.env._scalarize_rewards = False
         self.env._pre_reset_callback2 = None
         self.env._post_reset_callback2 = None
         self.env._post_step_callback2 = None
