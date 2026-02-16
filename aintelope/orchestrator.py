@@ -8,7 +8,6 @@
 import os
 import copy
 
-import torch
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from omegaconf import OmegaConf
@@ -21,12 +20,7 @@ from aintelope.config.config_utils import (
 from aintelope.experiments import run_experiment
 from aintelope.utils.seeding import set_global_seeds
 from aintelope.utils.progress import ProgressReporter
-
-
-def find_workers() -> int:
-    """Return max available workers (GPUs if available, else CPUs)."""
-    gpu_count = torch.cuda.device_count()
-    return gpu_count if gpu_count > 0 else os.cpu_count()
+from aintelope.utils.concurrency import find_workers
 
 
 def run_trial(cfg_dict, main_config_dict, i_trial):
@@ -84,7 +78,7 @@ def run_experiments(main_config):
     configs = []
     all_events = []
 
-    workers = find_workers()
+    workers = workers = find_workers(cfg.run.max_workers, cfg.run.trials)
 
     cfg_dict = OmegaConf.to_container(cfg, resolve=True)
     main_config_dict = OmegaConf.to_container(main_config, resolve=True)
