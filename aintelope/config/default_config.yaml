@@ -14,13 +14,17 @@ run:
     Agent_id, State, Action, Reward, Done, Next_state,]
   save_logs: True                  # @ui bool
   trials: 1                        # @ui int 1 100
-  episodes: 1                      # @ui int 1 10000
+  episodes: 1                      # @ui int 1 100000
   steps: 10                        # @ui int 1 10000
   test_mode: False                 # @ui bool
 agent_params:
-  agent_class: example_agent       # @ui str sb3_ppo_agent,sb3_a2c_agent
+  agent_class: sb3_ppo_agent       # @ui str sb3_ppo_agent,sb3_a2c_agent
   target_handwritten_rules: [food,drink,gold,silver,danger,predator,collision,antimovement]  # @ui str
   use_weight_sharing: False        # @ui bool
+  # SB3 model parameters
+  num_conv_layers: 0               # @ui int 0 3
+  learning_rate: 0.0003            # @ui float 0.0001 0.01
+  ppo_n_steps: 64                # @ui int 32 8192
   eps_start: 0.66                  # @ui float 0.0 1.0
   eps_end: 0.0                     # @ui float 0.0 1.0
   instinct_bias_epsilon_start: 0.0 # @ui float 0.0 1.0
@@ -34,7 +38,7 @@ env_params:
   env: savanna-safetygrid-parallel-v1  # @ui str savanna-safetygrid-parallel-v1,savanna-safetygrid-sequential-v1
   env_layout_seed_repeat_sequence_length: -1  # @ui int -1 1000
   env_layout_seed_modulo: 0        # @ui int 0 1000
-  combine_interoception_and_vision: False  # @ui bool
+  combine_interoception_and_vision: True  # @ui bool
   interoception_transformation_mode: 0     # @ui int 0 4
   interoception_embedding_gaussian_centers: [-32, -16, -8, -4, -2, -1, 0, 1, 2, 4]
   interoception_embedding_gaussian_scales: [32, 16, 8, 4, 2, 1, 1, 1, 2, 4]
