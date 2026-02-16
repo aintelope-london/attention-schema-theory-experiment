@@ -330,6 +330,7 @@ class ResultsViewer:
             & (self.df["Step"] == step)
         ]
         state = row.iloc[0]["State"]
+
         return self.renderer.render(*self.interpreter.interpret(state))
 
     def _render_state(self):
