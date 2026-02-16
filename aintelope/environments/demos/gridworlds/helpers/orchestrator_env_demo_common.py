@@ -50,11 +50,8 @@ def main(orchestrator_env_conf_name):
             OmegaConf.update(
                 experiment_cfg, "experiment_name", orchestrator_env_conf_name
             )
-            OmegaConf.update(
-                experiment_cfg,
-                "hparams",
-                orchestrator_cfg[orchestrator_env_conf_name],
-                force_add=True,
+            experiment_cfg = OmegaConf.merge(
+                experiment_cfg, orchestrator_cfg[orchestrator_env_conf_name]
             )
 
         FLAGS = define_flags()

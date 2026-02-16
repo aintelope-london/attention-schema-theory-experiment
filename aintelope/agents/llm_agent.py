@@ -12,7 +12,7 @@ import pickle
 import datetime
 
 import csv
-import logging
+
 from typing import List, Optional, Tuple
 from collections import defaultdict
 from gymnasium.spaces import Discrete
@@ -67,8 +67,6 @@ from aintelope.models.llm_utilities import (
 PettingZooEnv = Union[AECEnv, ParallelEnv]
 Environment = Union[gym.Env, PettingZooEnv]
 
-logger = logging.getLogger("aintelope.agents.example_agent")
-
 # https://stackoverflow.com/questions/28452429/does-gzip-compression-level-have-any-impact-on-decompression
 # there's no extra overhead for the client/browser to decompress more heavily compressed gzip files
 compresslevel = 6  # 6 is default level for gzip: https://linux.die.net/man/1/gzip
@@ -88,7 +86,6 @@ class LLMAgent(Agent):
     ) -> None:
         self.id = agent_id
         self.trainer = trainer
-        self.hparams = trainer.hparams
         self.env = env
         self.cfg = cfg
         self.done = False
@@ -149,9 +146,6 @@ class LLMAgent(Agent):
             "MOVEMENT": "Energy use",  # "Movement expense",
             "COOPERATION": "Cooperation",  # "Cooperation reward",
         }
-
-        logging.getLogger("openai").setLevel(logging.ERROR)
-        logging.getLogger("httpx").setLevel(logging.ERROR)
 
     def reset(self, state, info, env_class) -> None:
         """Resets self and updates the state."""
@@ -368,25 +362,22 @@ class LLMAgent(Agent):
             )
 
         # TODO: warn if last_frame=0/1 or last_env_layout_seed=0/1 or last_episode=0/1 in any of the below values: for disabling the epsilon counting for corresponding variable one should use -1
-        epsilon = (
-            self.hparams.model_params.eps_start - self.hparams.model_params.eps_end
-        )
-        if self.hparams.model_params.eps_last_frame > 1:
-            epsilon *= max(0, 1 - step / self.hparams.model_params.eps_last_frame)
-        if self.hparams.model_params.eps_last_env_layout_seed > 1:
+        epsilon = self.agent_params.eps_start - self.agent_params.eps_end
+        if self.agent_params.eps_last_frame > 1:
+            epsilon *= max(0, 1 - step / self.agent_params.eps_last_frame)
+        if self.agent_params.eps_last_env_layout_seed > 1:
             epsilon *= max(
                 0,
-                1
-                - env_layout_seed / self.hparams.model_params.eps_last_env_layout_seed,
+                1 - env_layout_seed / self.agent_params.eps_last_env_layout_seed,
             )
-        if self.hparams.model_params.eps_last_episode > 1:
-            epsilon *= max(0, 1 - episode / self.hparams.model_params.eps_last_episode)
-        if self.hparams.model_params.eps_last_trial > 1:
+        if self.agent_params.eps_last_episode > 1:
+            epsilon *= max(0, 1 - episode / self.agent_params.eps_last_episode)
+        if self.agent_params.eps_last_trial > 1:
             epsilon *= max(
                 0,
-                1 - trial / self.hparams.model_params.eps_last_trial,
+                1 - trial / self.agent_params.eps_last_trial,
             )
-        epsilon += self.hparams.model_params.eps_end
+        epsilon += self.agent_params.eps_end
 
         temperature = (
             2 * epsilon
@@ -534,34 +525,3 @@ Let's start the simulation!
             self.messages = deque()
             self.messages.append({"role": "system", "content": self.system_prompt})
             self.full_message_history = None  # TODO
-
-    def save_model(
-        self,
-        i_episode,
-        path,
-        experiment_name,
-        use_separate_models_for_each_experiment,
-    ):
-        checkpoint_filename = self.id
-        if use_separate_models_for_each_experiment:
-            checkpoint_filename += "-" + experiment_name
-
-        filename = os.path.join(
-            path,
-            checkpoint_filename
-            + "-"
-            + datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S_%f"),
-        )
-
-        logger.info(f"Saving agent {self.id} model to disk at {filename}")
-
-        with open(filename + ".gz", "wb", 1024 * 1024) as fh:
-            with gzip.GzipFile(
-                fileobj=fh, filename=filename, mode="wb", compresslevel=compresslevel
-            ) as gzip_file:
-                pickle.dump(
-                    (self.system_prompt, self.messages, self.full_message_history),
-                    gzip_file,
-                )
-                gzip_file.flush()  # NB! necessary to prevent broken gz archives on random occasions (does not depend on input data)
-            fh.flush()  # just in case

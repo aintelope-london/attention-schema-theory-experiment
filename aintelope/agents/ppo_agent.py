@@ -5,7 +5,7 @@
 # Repository:
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
-import logging
+
 from typing import List, NamedTuple, Optional, Tuple
 from gymnasium.spaces import Discrete
 
@@ -51,9 +51,6 @@ PettingZooEnv = Union[AECEnv, ParallelEnv]
 Environment = Union[gym.Env, PettingZooEnv]
 
 
-logger = logging.getLogger("aintelope.agents.ppo_agent")
-
-
 class ExpertOverrideMixin:  # TODO: merge with code from A2C agent (the code is identical)
     def __init__(self, env_classname, agent_id, cfg, *args, **kwargs):
         self.cfg = cfg
@@ -64,7 +61,7 @@ class ExpertOverrideMixin:  # TODO: merge with code from A2C agent (the code is 
             agent_id=agent_id,
             cfg=cfg,
             action_space=self.action_space,
-            **cfg.hparams.agent_params,
+            **cfg.agent_params,
         )
 
     def set_info(self, info):
@@ -159,45 +156,43 @@ def ppo_model_constructor(env, env_classname, agent_id, cfg):
     # Also: make sure your image is in the channel-first format.
 
     use_imitation_learning = (
-        cfg.hparams.model_params.instinct_bias_epsilon_start > 0
-        or cfg.hparams.model_params.instinct_bias_epsilon_end > 0
+        cfg.agent_params.instinct_bias_epsilon_start > 0
+        or cfg.agent_params.instinct_bias_epsilon_end > 0
     )
     if use_imitation_learning:
         policy_override_class = (
             CnnPolicyWithExpertOverride
-            if cfg.hparams.model_params.num_conv_layers > 0
+            if cfg.agent_params.num_conv_layers > 0
             else MlpPolicyWithExpertOverride
         )
         policy = PolicyWithConfigFactory(
             env_classname, agent_id, cfg, policy_override_class
         )
     else:
-        policy = (
-            "CnnPolicy" if cfg.hparams.model_params.num_conv_layers > 0 else "MlpPolicy"
-        )
+        policy = "CnnPolicy" if cfg.agent_params.num_conv_layers > 0 else "MlpPolicy"
 
     return PPO(
         policy,
         env,
         verbose=0,
-        n_steps=cfg.hparams.model_params.get("ppo_n_steps", 2048),
-        learning_rate=cfg.hparams.model_params.get("learning_rate", 3e-4),
+        n_steps=cfg.agent_params.get("ppo_n_steps", 2048),
+        learning_rate=cfg.agent_params.get("learning_rate", 3e-4),
         policy_kwargs=(
             {
                 "normalize_images": False,
                 "features_extractor_class": CustomCNN,  # need custom CNN in order to handle observation shape 9x9
                 "features_extractor_kwargs": {
                     "features_dim": 256,  # TODO: config parameter. Note this is not related to the number of features in the original observation (15 or 39), this parameter here is model's internal feature dimensionality
-                    "num_conv_layers": cfg.hparams.model_params.num_conv_layers,
+                    "num_conv_layers": cfg.agent_params.num_conv_layers,
                 },
             }
-            if cfg.hparams.model_params.num_conv_layers > 0
+            if cfg.agent_params.num_conv_layers > 0
             else {"normalize_images": False}
         ),
         device=torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         ),  # Note, CUDA-based CPU performance is much better than Torch-CPU mode.
-        tensorboard_log=cfg.tensorboard_dir,
+        # tensorboard_log=cfg.tensorboard_dir,
         # optimize_memory_usage=True, # this argument is not supported with this algorithm because it does not have a replay buffer
     )
 
@@ -224,7 +219,7 @@ class PPOAgent(SB3BaseAgent):
         ):  # during test, each agent has a separate in-process instance with its own model and not using threads/subprocesses
             env = SingleAgentZooToGymAdapter(env, self.id)
             self.model = self.model_constructor(env, self.env_classname, self.id, cfg)
-        elif self.env.num_agents == 1 or cfg.hparams.model_params.use_weight_sharing:
+        elif self.env.num_agents == 1 or cfg.agent_params.use_weight_sharing:
             # PPO supports weight sharing for multi-agent scenarios
             # TODO: Environment duplication support for parallel compute purposes. Abseil package needs to be replaced for that end.
 

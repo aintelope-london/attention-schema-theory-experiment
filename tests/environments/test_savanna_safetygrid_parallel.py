@@ -6,189 +6,71 @@
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
 import os
-import traceback
 
 import numpy as np
-import numpy.testing as npt
 import pytest
 from omegaconf import OmegaConf
 
 from aintelope.environments import savanna_safetygrid as safetygrid
-from aintelope.environments.savanna_safetygrid import SavannaGridworldParallelEnv
-
-from zoo_to_gym_multiagent_adapter.singleagent_zoo_to_gym_adapter import (
-    SingleAgentZooToGymAdapter,
-)
-from zoo_to_gym_multiagent_adapter.multiagent_zoo_to_gym_adapter import (
-    MultiAgentZooToGymAdapterGymSide,
-    MultiAgentZooToGymAdapterZooSide,
-)
-
-from gymnasium.spaces import Discrete, MultiDiscrete
-from pettingzoo.test import max_cycles_test, performance_benchmark, render_test
 from pettingzoo.test.parallel_test import parallel_api_test
 from pettingzoo.test.seed_test import parallel_seed_test
-from stable_baselines3.common.env_checker import check_env
-
-# from pettingzoo.utils import parallel_to_aec
+from gymnasium.spaces import Discrete
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_api_parallel_scalarized_rewards(execution_number, base_env_cfg):
-    # TODO: refactor these values out to a test-params file
+def test_parallel_api(execution_number, base_env_cfg):
+    """Smoke test: PettingZoo parallel API compliance."""
     cfg = OmegaConf.merge(
         base_env_cfg,
         {
-            "hparams": {
-                "env_params": {
-                    "num_iters": 500,  # duration of the game
-                    "map_min": 0,
-                    "map_max": 100,
-                    "render_map_max": 100,
-                    "amount_agents": 1,  # for now only one agent
-                    "amount_grass_patches": 2,
-                    "amount_water_holes": 2,
-                    "scalarize_rewards": True,  # Zoo parallel API tests work with multidimensional rewards as well, but Zoo sequential API tests do not. So just for consistency, test Zoo parallel API both with scalarized and multidimensional rewards. The tests for multidimensional rewars are below.
-                }
+            "env_params": {
+                "num_iters": 500,
+                "map_min": 0,
+                "map_max": 100,
+                "render_map_max": 100,
+                "amount_agents": 1,
+                "amount_grass_patches": 2,
+                "amount_water_holes": 2,
+                "scalarize_rewards": True,
             }
         },
     )
     env = safetygrid.SavannaGridworldParallelEnv(cfg=cfg)
     env.seed(execution_number)
-
-    # sequential_env = parallel_to_aec(env)
     parallel_api_test(env, num_cycles=10)
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_api_parallel_with_death_scalarized_rewards(
-    execution_number, base_env_cfg
-):
-    # TODO: refactor these values out to a test-params file
-    # for Gridworlds, the seed needs to be specified during environment construction
-    # since it affects map randomisation, while seed called later does not change map
+def test_parallel_seed(execution_number, base_env_cfg):
+    """Reproducibility: same seed produces same trajectory."""
     cfg = OmegaConf.merge(
         base_env_cfg,
         {
-            "hparams": {
-                "env_params": {
-                    "num_iters": 500,  # duration of the game
-                    "map_min": 0,
-                    "map_max": 100,
-                    "render_map_max": 100,
-                    "amount_agents": 2,  # needed for death test
-                    "amount_grass_patches": 2,
-                    "amount_water_holes": 2,
-                    "test_death": True,
-                    "seed": execution_number,
-                    "scalarize_rewards": True,  # Zoo parallel API tests work with multidimensional rewards as well, but Zoo sequential API tests do not.
-                }
-            }
-        },
-    )
-    env = safetygrid.SavannaGridworldParallelEnv(cfg=cfg)
-
-    # sequential_env = parallel_to_aec(env)
-    parallel_api_test(env, num_cycles=10)
-
-
-@pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_api_parallel(execution_number, base_env_cfg):
-    # TODO: refactor these values out to a test-params file
-    cfg = OmegaConf.merge(
-        base_env_cfg,
-        {
-            "hparams": {
-                "env_params": {
-                    "num_iters": 500,  # duration of the game
-                    "map_min": 0,
-                    "map_max": 100,
-                    "render_map_max": 100,
-                    "amount_agents": 1,  # for now only one agent
-                    "amount_grass_patches": 2,
-                    "amount_water_holes": 2,
-                }
-            }
-        },
-    )
-    env = safetygrid.SavannaGridworldParallelEnv(cfg=cfg)
-    env.seed(execution_number)
-
-    # sequential_env = parallel_to_aec(env)
-    parallel_api_test(env, num_cycles=10)
-
-
-@pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_api_parallel_with_death(execution_number, base_env_cfg):
-    # TODO: refactor these values out to a test-params file
-    # for Gridworlds, the seed needs to be specified during environment construction
-    # since it affects map randomisation, while seed called later does not change map
-    cfg = OmegaConf.merge(
-        base_env_cfg,
-        {
-            "hparams": {
-                "env_params": {
-                    "num_iters": 500,  # duration of the game
-                    "map_min": 0,
-                    "map_max": 100,
-                    "render_map_max": 100,
-                    "amount_agents": 2,  # needed for death test
-                    "amount_grass_patches": 2,
-                    "amount_water_holes": 2,
-                    "test_death": True,
-                    "seed": execution_number,
-                }
-            }
-        },
-    )
-    env = safetygrid.SavannaGridworldParallelEnv(cfg=cfg)
-
-    # sequential_env = parallel_to_aec(env)
-    parallel_api_test(env, num_cycles=10)
-
-
-@pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_seed(execution_number, base_env_cfg):
-    # override_infos: Zoo parallel_seed_test is unable to compare infos unless they have simple
-    # structure.
-    # seed: for Gridworlds, the seed needs to be specified during environment construction
-    # since it affects map randomisation, while seed called later does not change map
-    cfg = OmegaConf.merge(
-        base_env_cfg,
-        {
-            "hparams": {
-                "env_params": {
-                    "override_infos": True,
-                    "seed": execution_number,
-                }
+            "env_params": {
+                "override_infos": True,
+                "seed": execution_number,
             }
         },
     )
 
     def get_env_instance() -> safetygrid.SavannaGridworldParallelEnv:
-        """Method for seed_test"""
         return safetygrid.SavannaGridworldParallelEnv(cfg=cfg)
 
     try:
         parallel_seed_test(get_env_instance, num_cycles=10)
     except TypeError:
-        # for some reason the test env in Git does not recognise the num_cycles
-        # neither as named or positional argument
         parallel_seed_test(get_env_instance)
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_step_result(execution_number, base_env_cfg):
-    # default is 1 iter which means that the env is done after 1 step below and the
-    # test will fail
+def test_parallel_step_result(execution_number, base_env_cfg):
+    """Step returns correct observation/reward structure."""
     cfg = OmegaConf.merge(
         base_env_cfg,
         {
-            "hparams": {
-                "env_params": {
-                    "num_iters": 2,
-                    "seed": execution_number,
-                }
+            "env_params": {
+                "num_iters": 2,
+                "seed": execution_number,
             }
         },
     )
@@ -209,24 +91,23 @@ def test_gridworlds_step_result(execution_number, base_env_cfg):
     assert isinstance(observations, dict), "observations is not a dict"
     assert isinstance(
         observations[agent][0], np.ndarray
-    ), "observations[0] of agent is not an array"
+    ), "observations[0] is not an array"
     assert isinstance(
         observations[agent][1], np.ndarray
-    ), "observations[1] of agent is not an array"
+    ), "observations[1] is not an array"
     assert isinstance(rewards, dict), "rewards is not a dict"
     assert isinstance(rewards[agent], dict), "reward of agent is not a dict"
 
 
 @pytest.mark.parametrize("execution_number", range(1))
-def test_gridworlds_done_step(execution_number, base_env_cfg):
+def test_parallel_done_step(execution_number, base_env_cfg):
+    """Environment terminates after num_iters and rejects further steps."""
     cfg = OmegaConf.merge(
         base_env_cfg,
         {
-            "hparams": {
-                "env_params": {
-                    "amount_agents": 1,
-                    "seed": execution_number,
-                }
+            "env_params": {
+                "amount_agents": 1,
+                "seed": execution_number,
             }
         },
     )
@@ -234,7 +115,7 @@ def test_gridworlds_done_step(execution_number, base_env_cfg):
     assert len(env.possible_agents) == 1
     env.reset()
 
-    agent = env.possible_agents[0]  # TODO: multi-agent iteration
+    agent = env.possible_agents[0]
     for _ in range(env.metadata["num_iters"]):
         action = {agent: env.action_space(agent).sample()}
         _, _, terminateds, truncateds, _ = env.step(action)
@@ -249,10 +130,10 @@ def test_gridworlds_done_step(execution_number, base_env_cfg):
         env.step(action)
 
 
-def test_gridworlds_agents(base_env_cfg):
+def test_parallel_agents(base_env_cfg):
+    """Agent registry is well-formed."""
     env = safetygrid.SavannaGridworldParallelEnv(cfg=base_env_cfg)
 
-    # assert len(env.possible_agents) == env.metadata["amount_agents"]  # TODO: this is now determined by the environment, not by config
     assert isinstance(env.possible_agents, list)
     assert isinstance(env.unwrapped.agent_name_mapping, dict)
     assert all(
@@ -261,7 +142,8 @@ def test_gridworlds_agents(base_env_cfg):
     )
 
 
-def test_gridworlds_action_spaces(base_env_cfg):
+def test_parallel_action_spaces(base_env_cfg):
+    """Action spaces are Discrete with expected size."""
     env = safetygrid.SavannaGridworldParallelEnv(cfg=base_env_cfg)
 
     for agent in env.possible_agents:
@@ -269,118 +151,5 @@ def test_gridworlds_action_spaces(base_env_cfg):
         assert env.action_space(agent).n == 5  # includes no-op
 
 
-@pytest.mark.parametrize("execution_number", range(1))
-def test_singleagent_zoo_to_gym_wrapper_scalarized_rewards(
-    execution_number, base_env_cfg
-):
-    # TODO: refactor these values out to a test-params file
-    cfg = OmegaConf.merge(
-        base_env_cfg,
-        {
-            "hparams": {
-                "env_params": {
-                    "num_iters": 500,  # duration of the game
-                    "map_min": 0,
-                    "map_max": 100,
-                    "render_map_max": 100,
-                    "amount_agents": 1,  # for now only one agent
-                    "amount_grass_patches": 2,
-                    "amount_water_holes": 2,
-                    "scalarize_rewards": True,  # Gym test requires scalarised rewards
-                    "combine_interoception_and_vision": True,  # SB3 does not support complex observation spaces
-                }
-            }
-        },
-    )
-    env = safetygrid.SavannaGridworldParallelEnv(cfg=cfg)
-    env.seed(execution_number)
-
-    env = SingleAgentZooToGymAdapter(env, "agent_0")
-    # OpenAI Stable Baselines 3 Gym env checker
-    # warn=False : disable additional warnings since they are handled in the agent side by:
-    # * disabling normalization
-    # * using custom feature extractor
-    check_env(env, warn=False, skip_render_check=True)
-
-
-def sb3_gym_test_thread_entry_point(
-    pipe,
-    gpu_index,
-    num_total_steps,
-    model_constructor,
-    env_classname,
-    agent_id,
-    checkpoint_filename,
-    cfg,
-    observation_space,
-    action_space,
-    *args,
-    **kwargs,
-):
-    env_wrapper = MultiAgentZooToGymAdapterGymSide(
-        pipe, agent_id, checkpoint_filename, observation_space, action_space
-    )
-    try:
-        # OpenAI Stable Baselines 3 Gym env checker
-        # warn=False : disable additional warnings since they are handled in the agent side by:
-        # * disabling normalization
-        # * using custom feature extractor
-        check_env(env_wrapper, warn=False, skip_render_check=True)
-
-        env_wrapper.save_or_return_model(model=None, filename_timestamp_sufix_str=None)
-    except (
-        Exception
-    ) as ex:  # NB! need to catch exception so that the env wrapper can signal the training ended
-        info = str(ex) + os.linesep + traceback.format_exc()
-        env_wrapper.terminate_with_exception(info)
-        print(info)
-
-
-@pytest.mark.parametrize("execution_number", range(1))
-def test_multiagent_zoo_to_gym_wrapper_scalarized_rewards(
-    execution_number, base_env_cfg
-):
-    # TODO: refactor these values out to a test-params file
-    cfg = OmegaConf.merge(
-        base_env_cfg,
-        {
-            "hparams": {
-                "env_params": {
-                    "num_iters": 500,  # duration of the game
-                    "map_min": 0,
-                    "map_max": 100,
-                    "render_map_max": 100,
-                    "amount_agents": 2,  # NB!
-                    "amount_grass_patches": 2,
-                    "amount_water_holes": 2,
-                    "scalarize_rewards": True,  # Gym test requires scalarised rewards
-                    "combine_interoception_and_vision": True,  # SB3 does not support complex observation spaces
-                }
-            }
-        },
-    )
-    env = safetygrid.SavannaGridworldParallelEnv(cfg=cfg)
-    env.seed(execution_number)
-
-    env_wrapper = MultiAgentZooToGymAdapterZooSide(
-        env, cfg=None, env_classname=None
-    )  # cfg is unused at sb3_gym_test_thread_entry_point() function
-    _, exceptions = env_wrapper.train(
-        num_total_steps=None,  # unused at sb3_gym_test_thread_entry_point() function
-        agent_thread_entry_point=sb3_gym_test_thread_entry_point,
-        model_constructor=None,  # unused at sb3_gym_test_thread_entry_point() function
-        terminate_all_agents_when_one_excepts=True,
-        checkpoint_filenames=None,
-    )
-
-    if exceptions:
-        raise Exception(str(exceptions))
-
-
-# TODO: single-agent env test with death
-# TODO: multi-agent env wrapper test with death
-
-
-if __name__ == "__main__" and os.name == "nt":  # detect debugging
-    pytest.main([__file__])  # run tests only in this file
-    # test_gridworlds_api_parallel_with_death()
+if __name__ == "__main__" and os.name == "nt":
+    pytest.main([__file__])

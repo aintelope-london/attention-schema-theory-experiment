@@ -30,13 +30,7 @@ def test_reward_dict_parallel(base_env_cfg):
     """scalarize_rewards=False returns dict reward."""
     cfg = OmegaConf.merge(
         base_env_cfg,
-        {
-            "hparams": {
-                "env_params": {
-                    "scalarize_rewards": False,
-                }
-            }
-        },
+        {"env_params": {"scalarize_rewards": False}},
     )
 
     env = SavannaGridworldParallelEnv(cfg=cfg)
@@ -52,13 +46,7 @@ def test_reward_dict_sequential(base_env_cfg):
     """scalarize_rewards=False returns dict reward."""
     cfg = OmegaConf.merge(
         base_env_cfg,
-        {
-            "hparams": {
-                "env_params": {
-                    "scalarize_rewards": False,
-                }
-            }
-        },
+        {"env_params": {"scalarize_rewards": False}},
     )
 
     env = SavannaGridworldSequentialEnv(cfg=cfg)
@@ -75,13 +63,7 @@ def test_reward_scalar_parallel(base_env_cfg):
     """scalarize_rewards=True returns numeric reward."""
     cfg = OmegaConf.merge(
         base_env_cfg,
-        {
-            "hparams": {
-                "env_params": {
-                    "scalarize_rewards": True,
-                }
-            }
-        },
+        {"env_params": {"scalarize_rewards": True}},
     )
 
     env = SavannaGridworldParallelEnv(cfg=cfg)
@@ -97,13 +79,7 @@ def test_reward_scalar_sequential(base_env_cfg):
     """scalarize_rewards=True returns numeric reward."""
     cfg = OmegaConf.merge(
         base_env_cfg,
-        {
-            "hparams": {
-                "env_params": {
-                    "scalarize_rewards": True,
-                }
-            }
-        },
+        {"env_params": {"scalarize_rewards": True}},
     )
 
     env = SavannaGridworldSequentialEnv(cfg=cfg)
@@ -125,13 +101,7 @@ def test_obs_tuple_parallel(base_env_cfg):
     """combine_interoception_and_vision=False returns (vision, interoception) tuple."""
     cfg = OmegaConf.merge(
         base_env_cfg,
-        {
-            "hparams": {
-                "env_params": {
-                    "combine_interoception_and_vision": False,
-                }
-            }
-        },
+        {"env_params": {"combine_interoception_and_vision": False}},
     )
 
     env = SavannaGridworldParallelEnv(cfg=cfg)
@@ -148,13 +118,7 @@ def test_obs_tuple_sequential(base_env_cfg):
     """combine_interoception_and_vision=False returns (vision, interoception) tuple."""
     cfg = OmegaConf.merge(
         base_env_cfg,
-        {
-            "hparams": {
-                "env_params": {
-                    "combine_interoception_and_vision": False,
-                }
-            }
-        },
+        {"env_params": {"combine_interoception_and_vision": False}},
     )
 
     env = SavannaGridworldSequentialEnv(cfg=cfg)
@@ -172,13 +136,7 @@ def test_obs_array_parallel(base_env_cfg):
     """combine_interoception_and_vision=True returns single array."""
     cfg = OmegaConf.merge(
         base_env_cfg,
-        {
-            "hparams": {
-                "env_params": {
-                    "combine_interoception_and_vision": True,
-                }
-            }
-        },
+        {"env_params": {"combine_interoception_and_vision": True}},
     )
 
     env = SavannaGridworldParallelEnv(cfg=cfg)
@@ -193,13 +151,7 @@ def test_obs_array_sequential(base_env_cfg):
     """combine_interoception_and_vision=True returns single array."""
     cfg = OmegaConf.merge(
         base_env_cfg,
-        {
-            "hparams": {
-                "env_params": {
-                    "combine_interoception_and_vision": True,
-                }
-            }
-        },
+        {"env_params": {"combine_interoception_and_vision": True}},
     )
 
     env = SavannaGridworldSequentialEnv(cfg=cfg)
@@ -226,13 +178,7 @@ def test_interoception_length(base_env_cfg):
     """
     cfg = OmegaConf.merge(
         base_env_cfg,
-        {
-            "hparams": {
-                "env_params": {
-                    "combine_interoception_and_vision": False,
-                }
-            }
-        },
+        {"env_params": {"combine_interoception_and_vision": False}},
     )
 
     env = SavannaGridworldParallelEnv(cfg=cfg)

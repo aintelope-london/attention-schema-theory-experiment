@@ -6,17 +6,17 @@
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
 import os
-import logging
+
 import traceback
-from typing import List, NamedTuple, Optional, Tuple
+from typing import Optional, Tuple
 from gymnasium.spaces import Discrete
+from pathlib import Path
 
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 
 import numpy as np
 import numpy.typing as npt
-import os
 import sys
 import datetime
 
@@ -54,9 +54,6 @@ INFO_TEST_MODE = "test_mode"
 
 PettingZooEnv = Union[AECEnv, ParallelEnv]
 Environment = Union[gym.Env, PettingZooEnv]
-
-
-logger = logging.getLogger("aintelope.agents.sb3_agent")
 
 
 class PolicyWithConfigFactory(object):
@@ -195,11 +192,11 @@ def sb3_agent_train_thread_entry_point(
         # with weight sharing, the resulting filename looks like checkpointfilename_timestamp_200000_steps.zip next checkpointfilename_timestamp_400000_steps.zip etc
         checkpoint_callback = (
             CheckpointCallback(
-                save_freq=cfg.hparams.save_frequency,  # save frequency in timesteps
+                save_freq=cfg.agent_params.save_frequency,  # save frequency in timesteps
                 save_path=os.path.dirname(filename_with_timestamp),
                 name_prefix=os.path.basename(filename_with_timestamp),
             )
-            if cfg.hparams.save_frequency > 0
+            if cfg.agent_params.save_frequency > 0
             else None
         )
 
@@ -241,7 +238,7 @@ class SB3BaseAgent(Agent):
             + "."
             + env.__class__.__bases__[0].__qualname__
         )
-        self.test_mode = self.cfg.hparams.test_mode
+        self.test_mode = self.cfg.run.test_mode
         self.i_trial = i_trial
         self.next_episode_no = 0
         self.total_steps_across_episodes = 0
@@ -272,8 +269,6 @@ class SB3BaseAgent(Agent):
         self.infos = {self.id: info}
 
         self.env_class = env_class
-        # if isinstance(self.state, tuple):
-        #    self.state = self.state[0]
 
     def get_action(
         self,
@@ -297,14 +292,13 @@ class SB3BaseAgent(Agent):
         if self.done:
             return None
 
-        # action_space = self.env.action_space(self.id)
         self.info = info
 
         self.info[INFO_trial] = trial
         self.info[INFO_EPISODE] = episode
         self.info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
         self.info[INFO_STEP] = step
-        self.info[INFO_TEST_MODE] = self.cfg.hparams.test_mode
+        self.info[INFO_TEST_MODE] = self.cfg.run.test_mode
 
         self.infos[self.id] = self.info
 
@@ -341,15 +335,17 @@ class SB3BaseAgent(Agent):
 
         env_layout_seed = (
             int(
-                i_episode / self.cfg.hparams.env_layout_seed_repeat_sequence_length
+                i_episode / self.cfg.env_params.env_layout_seed_repeat_sequence_length
             )  # TODO ensure different env_layout_seed during test when num_actual_train_episodes is not divisible by env_layout_seed_repeat_sequence_length
-            if self.cfg.hparams.env_layout_seed_repeat_sequence_length > 0
+            if self.cfg.env_params.env_layout_seed_repeat_sequence_length > 0
             else i_episode  # this ensures that during test episodes, env_layout_seed based map randomization seed is different from training seeds. The environment is re-constructed when testing starts. Without explicitly providing env_layout_seed, the map randomization seed would be automatically reset to env_layout_seed = 0, which would overlap with the training seeds.
         )
 
         # How many different layout seeds there should be overall? After given amount of seeds has been used, the seed will loop over to zero and repeat the seed sequence. Zero or negative modulo parameter value disables the modulo feature.
-        if self.cfg.hparams.env_layout_seed_modulo > 0:
-            env_layout_seed = env_layout_seed % self.cfg.hparams.env_layout_seed_modulo
+        if self.cfg.env_params.env_layout_seed_modulo > 0:
+            env_layout_seed = (
+                env_layout_seed % self.cfg.env_params.env_layout_seed_modulo
+            )
 
         kwargs["env_layout_seed"] = env_layout_seed
 
@@ -368,8 +364,6 @@ class SB3BaseAgent(Agent):
         env_layout_seed = (
             self.env.get_env_layout_seed()
         )  # no need to substract 1 here since env_layout_seed value is overridden in env_pre_reset_callback
-        step = 0
-        test_mode = False
 
         for (
             agent,
@@ -379,7 +373,7 @@ class SB3BaseAgent(Agent):
             info[INFO_EPISODE] = i_episode
             info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
             info[INFO_STEP] = 0
-            info[INFO_TEST_MODE] = self.cfg.hparams.test_mode
+            info[INFO_TEST_MODE] = self.cfg.run.test_mode
 
         if self.model:
             if hasattr(self.model.policy, "my_reset"):
@@ -414,7 +408,6 @@ class SB3BaseAgent(Agent):
         step = (
             self.env.get_step_no() - 1
         )  # get_step_no() returned step indexes start with 1
-        test_mode = False
 
         for agent, next_state in next_states.items():
             state = self.states[agent]
@@ -436,7 +429,7 @@ class SB3BaseAgent(Agent):
             info[INFO_EPISODE] = i_episode
             info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
             info[INFO_STEP] = step
-            info[INFO_TEST_MODE] = self.cfg.hparams.test_mode
+            info[INFO_TEST_MODE] = self.cfg.run.test_mode
 
             agent_step_info = [
                 agent,
@@ -460,13 +453,11 @@ class SB3BaseAgent(Agent):
                     i_episode,
                     env_layout_seed,
                     step,
-                    self.cfg.hparams.test_mode,
+                    self.cfg.run.test_mode,
                 ]
                 + agent_step_info
                 + env_step_info
             )
-
-        # / for agent, next_state in next_states.items():
 
         self.states = next_states
         self.infos = infos
@@ -529,14 +520,13 @@ class SB3BaseAgent(Agent):
         step = (
             self.env.get_step_no() - 1
         )  # get_step_no() returned step indexes start with 1
-        test_mode = False
 
         # TODO: move this code to savanna_safetygrid.py
         self.info[INFO_trial] = i_trial
         self.info[INFO_EPISODE] = i_episode
         self.info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
         self.info[INFO_STEP] = step
-        self.info[INFO_TEST_MODE] = self.cfg.hparams.test_mode
+        self.info[INFO_TEST_MODE] = self.cfg.run.test_mode
 
         self.infos[self.id] = self.info
 
@@ -550,7 +540,7 @@ class SB3BaseAgent(Agent):
                 i_episode,
                 env_layout_seed,
                 step,
-                self.cfg.hparams.test_mode,
+                self.cfg.run.test_mode,
             ]
             + agent_step_info
             + env_step_info
@@ -593,30 +583,25 @@ class SB3BaseAgent(Agent):
         return event
 
     def train(self, num_total_steps):
-        self.env._pre_reset_callback2 = (
-            self.env_pre_reset_callback
-        )  # pre-reset callback is same for both parallel and sequential environment
-        self.env._post_reset_callback2 = (
-            self.env_post_reset_callback
-        )  # post-reset callback is same for both parallel and sequential environment
+        self.env._pre_reset_callback2 = self.env_pre_reset_callback
+        self.env._post_reset_callback2 = self.env_post_reset_callback
         self.env._pre_step_callback2 = self.env_pre_step_callback
         if isinstance(self.env, ParallelEnv):
             self.env._post_step_callback2 = self.parallel_env_post_step_callback
         else:
             self.env._post_step_callback2 = self.sequential_env_post_step_callback
 
-        if self.model is not None:  # single-model scenario
-            checkpoint_filenames = self.get_checkpoint_filenames(include_timestamp=True)
-            filename_with_timestamp = checkpoint_filenames[self.id]
+        checkpoint_dir = Path(self.cfg.run.outputs_dir) / "checkpoints"
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-            # resulting filename looks like checkpointfilename_timestamp_100000_steps.zip next checkpointfilename_timestamp_200000_steps.zip etc
+        if self.model is not None:  # single-model scenario
             checkpoint_callback = (
                 CheckpointCallback(
-                    save_freq=self.cfg.hparams.save_frequency,  # save frequency in timesteps
-                    save_path=os.path.dirname(filename_with_timestamp),
-                    name_prefix=os.path.basename(filename_with_timestamp),
+                    save_freq=self.cfg.agent_params.save_frequency,
+                    save_path=str(checkpoint_dir),
+                    name_prefix=self.id,
                 )
-                if self.cfg.hparams.save_frequency > 0
+                if self.cfg.agent_params.save_frequency > 0
                 else None
             )
 
@@ -624,13 +609,12 @@ class SB3BaseAgent(Agent):
                 total_timesteps=num_total_steps, callback=checkpoint_callback
             )
         else:
-            checkpoint_filenames = self.get_checkpoint_filenames(
-                include_timestamp=False
-            )
+            checkpoint_filenames = {
+                agent_id: str(checkpoint_dir / agent_id)
+                for agent_id in self.env.possible_agents
+            }
 
-            OmegaConf.resolve(
-                self.cfg
-            )  # need to resolve the conf before passing to subprocesses since OmegaConf resolvers do not seem to work well in subprocesses
+            OmegaConf.resolve(self.cfg)
 
             env_wrapper = MultiAgentZooToGymAdapterZooSide(
                 self.env, self.cfg, self.env_classname
@@ -650,47 +634,10 @@ class SB3BaseAgent(Agent):
         if self.exceptions:
             raise Exception(str(self.exceptions))
 
-    def get_checkpoint_filenames(self, include_timestamp=True):
-        checkpoint_filenames = {}
-
-        experiment_name = self.cfg.experiment_name
-        use_separate_models_for_each_experiment = (
-            self.cfg.hparams.use_separate_models_for_each_experiment
-        )
-        # if not use_separate_models_for_each_experiment:
-        #    raise NotImplementedError("sharing models over experiments is not implemented yet")
-
-        dir_out = os.path.normpath(self.cfg.log_dir)
-        checkpoint_dir = os.path.normpath(self.cfg.checkpoint_dir)
-        path = os.path.join(dir_out, checkpoint_dir)
-        os.makedirs(path, exist_ok=True)
-
-        for agent_id in self.env.possible_agents:
-            checkpoint_filename = agent_id
-            if use_separate_models_for_each_experiment:
-                checkpoint_filename += "-" + experiment_name
-
-            filename = os.path.join(path, checkpoint_filename)
-
-            if include_timestamp:
-                filename += "-" + datetime.datetime.now().strftime(
-                    "%Y_%m_%d_%H_%M_%S_%f"
-                )
-
-            checkpoint_filenames[agent_id] = filename
-
-        return checkpoint_filenames
-
-    def save_model(self, *args, **kwargs):
-        checkpoint_filenames = self.get_checkpoint_filenames(include_timestamp=True)
+    def save_model(self, path: Path):
         models = {self.id: self.model} if self.model is not None else self.models
-
         for agent_id, model in models.items():
-            if not isinstance(
-                model, str
-            ):  # model can contain a path to an already saved model
-                checkpoint_filename = checkpoint_filenames[agent_id]
-                model.save(checkpoint_filename)
+            torch.save(model.get_parameters(), path.parent / f"{agent_id}.pt")
 
     def init_model(
         self,
@@ -699,11 +646,8 @@ class SB3BaseAgent(Agent):
         checkpoint: Optional[str] = None,
     ):
         if checkpoint:
-            # NB! torch.cuda.device_count() > 0 is needed here since SB3 does not support CPU-based CUDA device during model load() or set_parameters() for some reason
             use_cuda = torch.cuda.is_available() and torch.cuda.device_count() > 0
             device = torch.device("cuda" if use_cuda else "cpu")
 
-            # Warning: load() re-creates the model from scratch, it does not update it in-place! For an in-place load use set_parameters() instead.
-            self.model.set_parameters(
-                checkpoint, device=device
-            )  # device argument in needed in case the model is loaded to CPU. SB3 seems to be buggy in that regard that it will crash during model load() or set_parameters() if Torch-CPU device is not explicitly specified.
+            params = torch.load(checkpoint, map_location=device)
+            self.model.set_parameters(params, device=device)

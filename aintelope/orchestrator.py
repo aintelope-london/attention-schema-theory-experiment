@@ -7,7 +7,7 @@
 
 import os
 import copy
-import logging
+
 import torch
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -22,8 +22,6 @@ from aintelope.experiments import run_experiment
 from aintelope.utils.seeding import set_global_seeds
 from aintelope.utils.progress import ProgressReporter
 
-logger = logging.getLogger("aintelope.__main__")
-
 
 def find_workers() -> int:
     """Return max available workers (GPUs if available, else CPUs)."""
@@ -31,7 +29,7 @@ def find_workers() -> int:
     return gpu_count if gpu_count > 0 else os.cpu_count()
 
 
-def run_trial(cfg_dict, main_config_dict, i_trial, run_dir):
+def run_trial(cfg_dict, main_config_dict, i_trial):
     """Run all experiments for a single trial.
 
     Args must be dicts (not OmegaConf) for multiprocessing pickling.
@@ -40,7 +38,7 @@ def run_trial(cfg_dict, main_config_dict, i_trial, run_dir):
     cfg = OmegaConf.create(cfg_dict)
     main_config = OmegaConf.create(main_config_dict)
 
-    trial_seed = cfg.hparams.run_params.seed + i_trial
+    trial_seed = cfg.run.seed + i_trial
     set_global_seeds(trial_seed)
 
     configs = []
@@ -48,30 +46,24 @@ def run_trial(cfg_dict, main_config_dict, i_trial, run_dir):
 
     for _, experiment_name in enumerate(main_config):
         experiment_cfg = copy.deepcopy(cfg)
-        experiment_cfg.hparams = OmegaConf.merge(
-            experiment_cfg.hparams, main_config[experiment_name]
+        experiment_cfg = OmegaConf.merge(cfg, main_config[experiment_name])
+        OmegaConf.update(
+            experiment_cfg, "experiment_name", experiment_name, force_add=True
         )
-        OmegaConf.update(experiment_cfg.hparams, "seed", trial_seed, force_add=True)
-
-        logger.info("Running training with the following configuration")
-        logger.info(os.linesep + str(OmegaConf.to_yaml(experiment_cfg, resolve=True)))
-
-        params_set_title = experiment_cfg.hparams.params_set_title
-        logger.info(f"params_set: {params_set_title}, experiment: {experiment_name}")
+        OmegaConf.update(experiment_cfg.run, "seed", trial_seed, force_add=True)
 
         score_dimensions = get_score_dimensions(experiment_cfg)
         reporter = ProgressReporter(["episode"], on_update=None)
 
         events = run_experiment(
             experiment_cfg,
-            experiment_name=experiment_name,
             score_dimensions=score_dimensions,
             i_trial=i_trial,
             reporter=reporter,
         )
 
-        if cfg.hparams.run_params.save_logs:
-            block_output_dir = os.path.join(run_dir, experiment_name)
+        if cfg.run.save_logs:
+            block_output_dir = os.path.join(cfg.run.outputs_dir, experiment_name)
             events.write(block_output_dir)
 
         all_events.append(events.to_dataframe())
@@ -83,14 +75,8 @@ def run_trial(cfg_dict, main_config_dict, i_trial, run_dir):
 def run_experiments(main_config):
     """Main orchestrator entry point."""
     cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
-    timestamp = str(cfg.timestamp)
-    timestamp_pid_uuid = str(cfg.timestamp_pid_uuid)
-    logger.info(f"timestamp: {timestamp}")
-    logger.info(f"timestamp_pid_uuid: {timestamp_pid_uuid}")
 
-    set_console_title(cfg.hparams.params_set_title + " : " + timestamp_pid_uuid)
-
-    run_dir = os.path.join(cfg.outputs_dir, timestamp_pid_uuid)
+    set_console_title(cfg.run.outputs_dir)
 
     configs = []
     all_events = []
@@ -102,10 +88,8 @@ def run_experiments(main_config):
 
     with ProcessPoolExecutor(max_workers=workers) as executor:
         futures = {
-            executor.submit(
-                run_trial, cfg_dict, main_config_dict, i_trial, run_dir
-            ): i_trial
-            for i_trial in range(cfg.hparams.trials)
+            executor.submit(run_trial, cfg_dict, main_config_dict, i_trial): i_trial
+            for i_trial in range(cfg.run.trials)
         }
         for future in as_completed(futures):
             result = future.result()
@@ -114,4 +98,8 @@ def run_experiments(main_config):
 
     archive_code(cfg)
 
-    return {"run_dir": run_dir, "configs": configs, "events": all_events}
+    return {
+        "Outputs_dir": cfg.run.outputs_dir,
+        "configs": configs,
+        "events": all_events,
+    }

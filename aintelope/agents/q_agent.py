@@ -5,7 +5,7 @@
 # Repository:
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
-import logging
+
 from typing import List, NamedTuple, Optional, Tuple
 from gymnasium.spaces import Discrete
 
@@ -25,8 +25,6 @@ from pettingzoo import AECEnv, ParallelEnv
 PettingZooEnv = Union[AECEnv, ParallelEnv]
 Environment = Union[gym.Env, PettingZooEnv]
 
-logger = logging.getLogger("aintelope.agents.q_agent")
-
 
 class QAgent(Agent):
     """QAgent class, functioning as a base class for agents"""
@@ -41,7 +39,6 @@ class QAgent(Agent):
     ) -> None:
         self.id = agent_id
         self.trainer = trainer
-        self.hparams = trainer.hparams
         self.done = False
         self.last_action = None
 
@@ -149,6 +146,3 @@ class QAgent(Agent):
 
     def init_model(self, *args, **kwargs):
         self.trainer.add_agent(self.id, *args, **kwargs)
-
-    def save_model(self, *args, **kwargs):
-        self.trainer.save_model(self.id, *args, **kwargs)

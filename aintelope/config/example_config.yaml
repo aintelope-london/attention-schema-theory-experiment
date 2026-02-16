@@ -6,7 +6,7 @@
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
 train:
-  run_params:
+  run:
     trials: 1
     episodes: 100
     steps: 20
@@ -16,7 +16,7 @@ train:
         FOOD_SCORE: '{"FOOD": 10}'
 
 test:
-  run_params:
+  run:
     test_mode: True
     episodes: 10
 

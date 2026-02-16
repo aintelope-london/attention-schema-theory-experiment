@@ -6,7 +6,7 @@
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
 import datetime
-import logging
+
 import os
 from collections import namedtuple
 from typing import Optional, Tuple
@@ -20,7 +20,6 @@ from torch import nn
 
 from aintelope.aintelope_typing import ObservationFloat
 
-logger = logging.getLogger("aintelope.training.dqn_training")
 Transition = namedtuple(
     "Transition", ("state", "action", "reward", "done", "next_state")
 )
@@ -69,9 +68,8 @@ class Trainer:
         self.observation_shapes = {}
         self.action_spaces = {}
 
-        self.hparams = params.hparams
         self.combine_interoception_and_vision = (
-            params.hparams.env_params.combine_interoception_and_vision
+            params.env_params.combine_interoception_and_vision
         )
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -143,8 +141,6 @@ class Trainer:
             Q values array
         """
 
-        logger.debug("debug observation", type(observation))
-
         if not self.combine_interoception_and_vision:
             observation = (
                 torch.tensor(
@@ -153,11 +149,6 @@ class Trainer:
                     )  # vision     # call .flatten() in case you want to force 1D network even on 3D vision
                 ),
                 torch.tensor(np.expand_dims(observation[1], 0)),  # interoception
-            )
-            logger.debug(
-                "debug observation tensor",
-                (type(observation[0]), type(observation[1])),
-                (observation[0].shape, observation[1].shape),
             )
 
             if str(self.device) not in ["cpu"]:
@@ -170,11 +161,6 @@ class Trainer:
                 np.expand_dims(
                     observation, 0
                 )  # vision     # call .flatten() in case you want to force 1D network even on 3D vision
-            )
-            logger.debug(
-                "debug observation tensor",
-                type(observation),
-                observation.shape,
             )
 
             if str(self.device) not in ["cpu"]:
@@ -224,43 +210,11 @@ class Trainer:
         # TODO
         pass
 
-    def save_model(
-        self,
-        agent_id,
-        episode,
-        path,
-        experiment_name,
-        use_separate_models_for_each_experiment,
-    ):
-        """
-        Save model artifacts to 'path'.
-
-        Args:
-            episode (int): number of environment cycle; each cycle is divided into steps
-            path (str): location where artifact is saved
-
-        Returns:
-            None
-        """
-
-        # TODO
-
-        checkpoint_filename = agent_id
-        if use_separate_models_for_each_experiment:
-            checkpoint_filename += "-" + experiment_name
-
-        filename = os.path.join(
-            path,
-            checkpoint_filename
-            + "-"
-            + datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S_%f"),
-        )
-
-        logger.info(f"Saving agent {agent_id} models to disk at {filename}")
+    def save_model(self, agent_id, path):
+        """Save model checkpoint."""
         torch.save(
             {
-                "epoch": episode,
-                # TODO
+                # TODO, this was a stub anyway. we're removing this class eventually
             },
-            filename,
+            path,
         )

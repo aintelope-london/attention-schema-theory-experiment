@@ -6,7 +6,7 @@
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
 import csv
-import logging
+
 from typing import List, Optional, Tuple
 from collections import defaultdict
 from gymnasium.spaces import Discrete
@@ -37,8 +37,6 @@ from pettingzoo import AECEnv, ParallelEnv
 PettingZooEnv = Union[AECEnv, ParallelEnv]
 Environment = Union[gym.Env, PettingZooEnv]
 
-logger = logging.getLogger("aintelope.agents.handwritten_rules_agent")
-
 
 class HandwrittenRulesAgent(Agent):
     """Agent class with handwritten rules"""
@@ -54,7 +52,6 @@ class HandwrittenRulesAgent(Agent):
     ) -> None:
         self.id = agent_id
         self.trainer = trainer
-        self.hparams = trainer.hparams
         self.env = env
         self.cfg = cfg
         self.done = False
@@ -210,10 +207,6 @@ class HandwrittenRulesAgent(Agent):
                         handwritten_rule_event,
                     ) = handwritten_rule_object.calc_reward(self, next_state, next_info)
                     reward += handwritten_rule_reward  # TODO: nonlinear aggregation
-                    logger.debug(
-                        f"Reward of {handwritten_rule_name}: {handwritten_rule_reward}; "
-                        f"total reward: {reward}"
-                    )
                     if handwritten_rule_event != 0:
                         handwritten_rule_events.append(
                             (handwritten_rule_name, handwritten_rule_event)
@@ -236,10 +229,9 @@ class HandwrittenRulesAgent(Agent):
                 savanna_safetygrid_available_handwritten_rules_dict
             )
 
-        logger.debug(f"target_handwritten_rules: {self.target_handwritten_rules}")
         for handwritten_rule_name in self.target_handwritten_rules:
             if handwritten_rule_name not in available_handwritten_rules_dict_local:
-                logger.warning(
+                print(
                     f"Warning: could not find {handwritten_rule_name} "
                     "in available_handwritten_rules_dict"
                 )
@@ -271,14 +263,3 @@ class HandwrittenRulesAgent(Agent):
             *args,
             **kwargs,
         )
-
-    def save_model(
-        self,
-        i_episode,
-        path,
-        experiment_name,
-        use_separate_models_for_each_experiment,
-        *args,
-        **kwargs,
-    ):
-        pass

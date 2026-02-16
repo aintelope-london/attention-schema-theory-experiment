@@ -6,7 +6,7 @@
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
 import sys
-import logging
+
 from collections import OrderedDict, namedtuple
 from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
@@ -69,8 +69,6 @@ ACTION_RELATIVE_COORDINATE_MAP = (
     "action_relative_coordinate_map"  # TODO: move to Gridworld environment
 )
 ALL_AGENTS_LAYER = "all_agents"
-
-logger = logging.getLogger("aintelope.environments.savanna_safetygrid")
 
 # typing aliases
 Action = Actions  # int
@@ -162,9 +160,9 @@ class GridworldZooBaseEnv:
     }
 
     def __init__(self, cfg: Optional[Dict] = None):
-        env_params = dict(cfg.hparams.env_params)
+        env_params = dict(cfg.env_params)
         env_params.setdefault("scalarize_rewards", False)
-        if cfg.hparams.agent_class.startswith("sb3_") and not cfg.hparams.test_mode:
+        if cfg.agent_params.agent_class.startswith("sb3_") and not cfg.run.test_mode:
             env_params["scalarize_rewards"] = True
 
         self.render_mode = None  # Some libraries require this field to be present. The actual value seems to be unimportant.
@@ -178,7 +176,6 @@ class GridworldZooBaseEnv:
             self.metadata.update(
                 scores
             )  # move scores to same metadata level with other parameters
-        logger.info(f"initializing savanna env with params: {self.metadata}")
 
         metadata_to_super_initargs_dict = {
             "level": "level",
@@ -921,7 +918,6 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
         or generally:
             {<agent_name>: <agent_action or None if agent is done>}
         """
-        logger.debug("debug actions", actions)
 
         if self._pre_step_callback2 is not None:
             actions = self._pre_step_callback2(actions)
@@ -970,14 +966,6 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
             infos = {agent: {} for agent in infos.keys()}
 
         filtered_infos = self.filter_infos(infos)
-        logger.debug(
-            "debug return",
-            self.observations2,
-            rewards,
-            terminateds,
-            truncateds,
-            filtered_infos,
-        )
         result = (
             self.observations2,
             rewards2,
@@ -994,7 +982,7 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
 
 class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
     def __init__(self, cfg: Optional[Dict] = None):
-        self.observe_immediately_after_agent_action = cfg.hparams.env_params.get(
+        self.observe_immediately_after_agent_action = cfg.env_params.get(
             "observe_immediately_after_agent_action", False
         )  # TODO: configure
 
@@ -1186,7 +1174,6 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         - truncated
         - info
         """
-        logger.debug("debug action", action)
 
         agent = self.agent_selection
 
@@ -1253,14 +1240,6 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
             step_agent_info = {}
 
         filtered_info = self.filter_info(agent, step_agent_info)
-        logger.debug(
-            "debug return",
-            observation2,
-            reward2,
-            terminated,
-            truncated,
-            filtered_info,
-        )
         result = (
             observation2,
             reward2,
@@ -1286,7 +1265,6 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
         or generally:
             {<agent_name>: <agent_action or None if agent is done>}
         """
-        logger.debug("debug actions", actions)
         # If a user passes in actions with no agents,
         # then just return empty observations, etc.
         if not actions:
@@ -1386,14 +1364,6 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
             infos = {agent: {} for agent in infos.keys()}
 
         filtered_infos = self.filter_infos(infos)
-        logger.debug(
-            "debug return",
-            self.observations2,
-            rewards2,
-            terminateds,
-            truncateds,
-            filtered_infos,
-        )
         return (
             self.observations2,
             rewards2,

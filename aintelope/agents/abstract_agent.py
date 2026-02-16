@@ -8,6 +8,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Union
 import numpy.typing as npt
+from pathlib import Path
 
 from aintelope.aintelope_typing import ObservationFloat
 from pettingzoo import AECEnv, ParallelEnv
@@ -54,16 +55,12 @@ class Agent(ABC):
         self,
         observation_shape,
         action_space,
-        checkpoint: Optional[str] = None,
+        checkpoint: Optional[Path] = None,
     ) -> None:
         ...
 
-    @abstractmethod
     def save_model(
         self,
-        i_episode,
-        dir_cp,
-        experiment_name,
-        use_separate_models_for_each_experiment,
+        path: Path,
     ) -> None:
-        ...
+        self.trainer.save_model(self.id, path)

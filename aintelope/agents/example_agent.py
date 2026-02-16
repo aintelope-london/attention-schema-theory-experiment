@@ -6,7 +6,7 @@
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
 import csv
-import logging
+
 from typing import List, Optional, Tuple
 from collections import defaultdict
 from gymnasium.spaces import Discrete
@@ -28,8 +28,6 @@ from pettingzoo import AECEnv, ParallelEnv
 
 PettingZooEnv = Union[AECEnv, ParallelEnv]
 Environment = Union[gym.Env, PettingZooEnv]
-
-logger = logging.getLogger("aintelope.agents.example_agent")
 
 
 class ExampleAgent(Agent):
@@ -151,25 +149,6 @@ class ExampleAgent(Agent):
             observation_shape,
             action_space,
             checkpoint,
-            *args,
-            **kwargs,
-        )
-
-    def save_model(
-        self,
-        i_episode,
-        path,
-        experiment_name,
-        use_separate_models_for_each_experiment,
-        *args,
-        **kwargs,
-    ):
-        self.trainer.save_model(
-            self.id,
-            i_episode,
-            path,
-            experiment_name,
-            use_separate_models_for_each_experiment,
             *args,
             **kwargs,
         )

@@ -299,6 +299,19 @@ def create_widget(
         range_or_choices = spec[0]
         value_type = spec[1]
 
+    # Locked -> disabled Entry (no @ui annotation in config)
+    if value_type == "locked":
+        var = tk.StringVar(value=str(value))
+        widget = tk.Entry(
+            parent,
+            textvariable=var,
+            width=ENTRY_WIDTH,
+            font=font,
+            state="disabled",
+            disabledforeground="gray",
+        )
+        return widget, lambda v: var.set(str(v))
+
     # Boolean -> Checkbutton with custom indicator
     if value_type == "bool":
         var = tk.BooleanVar(value=bool(value))
