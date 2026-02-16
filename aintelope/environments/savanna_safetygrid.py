@@ -161,10 +161,6 @@ class GridworldZooBaseEnv:
 
     def __init__(self, cfg: Optional[Dict] = None):
         env_params = dict(cfg.env_params)
-        env_params.setdefault("scalarize_rewards", False)
-        if cfg.agent_params.agent_class.startswith("sb3_") and not cfg.run.test_mode:
-            env_params["scalarize_rewards"] = True
-
         self.render_mode = None  # Some libraries require this field to be present. The actual value seems to be unimportant.
 
         # NB! Need to clone in order to not modify the default dict.
@@ -691,6 +687,7 @@ class GridworldZooBaseEnv:
             INTEROCEPTION_FOOD_TRANSFORMED,
             INTEROCEPTION_DRINK_TRANSFORMED,
             ACTION_RELATIVE_COORDINATE_MAP,
+            INFO_AGENT_OBSERVATION_LAYERS_CUBE,
             INFO_REWARD_DICT,  # keep reward dict for case the score is scalarised
         ]
         if self._observation_direction_mode == -1:

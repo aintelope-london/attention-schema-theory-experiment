@@ -36,7 +36,7 @@ def deserialize_state(cell):
 
 
 class EventLog:
-    SERIALIZABLE_COLUMNS = ("State", "Next_state")
+    SERIALIZABLE_COLUMNS = ("State", "Next_state", "Observation")
 
     def __init__(self, columns):
         self.columns = columns

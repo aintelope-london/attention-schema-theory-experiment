@@ -22,6 +22,8 @@ from aintelope.environments import get_env_class
 from aintelope.environments.savanna_safetygrid import (
     GridworldZooBaseEnv,
     INFO_AGENT_OBSERVATION_LAYERS_ORDER,
+    INFO_AGENT_OBSERVATION_LAYERS_CUBE,
+    INFO_AGENT_INTEROCEPTION_VECTOR,
 )
 from aintelope.training.dqn_training import Trainer
 
@@ -238,7 +240,10 @@ def run_experiment(
                         if isinstance(score, dict)
                         else [score]
                     )
-
+                    raw_obs = (
+                        info[INFO_AGENT_OBSERVATION_LAYERS_CUBE],
+                        info[INFO_AGENT_INTEROCEPTION_VECTOR],
+                    )
                     events.log_event(
                         [
                             cfg.experiment_name,
@@ -249,6 +254,7 @@ def run_experiment(
                             cfg.run.test_mode,
                         ]
                         + agent_step_info
+                        + [raw_obs]
                         + env_step_info
                     )
 
@@ -296,7 +302,10 @@ def run_experiment(
                         if isinstance(score, dict)
                         else [score]
                     )
-
+                    raw_obs = (
+                        info[INFO_AGENT_OBSERVATION_LAYERS_CUBE],
+                        info[INFO_AGENT_INTEROCEPTION_VECTOR],
+                    )
                     events.log_event(
                         [
                             cfg.experiment_name,
@@ -307,6 +316,7 @@ def run_experiment(
                             cfg.run.test_mode,
                         ]
                         + agent_step_info
+                        + [raw_obs]
                         + env_step_info
                     )
 

@@ -329,7 +329,8 @@ class ResultsViewer:
             & (self.df["Agent_id"] == self.playback_agent_var.get())
             & (self.df["Step"] == step)
         ]
-        state = row.iloc[0]["State"]
+        state = row.iloc[0]["Observation"]
+
         return self.renderer.render(*self.interpreter.interpret(state))
 
     def _render_state(self):

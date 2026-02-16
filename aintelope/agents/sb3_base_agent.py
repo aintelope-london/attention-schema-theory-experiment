@@ -28,6 +28,8 @@ from aintelope.training.dqn_training import Trainer
 
 from aintelope.environments.savanna_safetygrid import (
     INFO_REWARD_DICT,
+    INFO_AGENT_OBSERVATION_LAYERS_CUBE,
+    INFO_AGENT_INTEROCEPTION_VECTOR,
 )
 from zoo_to_gym_multiagent_adapter.multiagent_zoo_to_gym_adapter import (
     MultiAgentZooToGymAdapterGymSide,
@@ -438,6 +440,10 @@ class SB3BaseAgent(Agent):
                 score,
                 done,
                 next_state,
+                (
+                    info[INFO_AGENT_OBSERVATION_LAYERS_CUBE],
+                    info[INFO_AGENT_INTEROCEPTION_VECTOR],
+                ),
             ]  # NB! agent_step_info uses scalarised score
 
             env_step_info = (
@@ -499,6 +505,10 @@ class SB3BaseAgent(Agent):
             score,
             done,
             next_state,
+            (
+                info[INFO_AGENT_OBSERVATION_LAYERS_CUBE],
+                info[INFO_AGENT_INTEROCEPTION_VECTOR],
+            ),
         ]  # NB! agent_step_info uses scalarised score
 
         self.state = next_state
@@ -583,6 +593,7 @@ class SB3BaseAgent(Agent):
         return event
 
     def train(self, num_total_steps):
+        self.env._scalarize_rewards = True
         self.env._pre_reset_callback2 = self.env_pre_reset_callback
         self.env._post_reset_callback2 = self.env_post_reset_callback
         self.env._pre_step_callback2 = self.env_pre_step_callback
@@ -626,7 +637,7 @@ class SB3BaseAgent(Agent):
                 terminate_all_agents_when_one_excepts=True,
                 checkpoint_filenames=checkpoint_filenames,
             )
-
+        self.env._scalarize_rewards = False
         self.env._pre_reset_callback2 = None
         self.env._post_reset_callback2 = None
         self.env._post_step_callback2 = None
