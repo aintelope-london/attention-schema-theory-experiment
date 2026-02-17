@@ -79,15 +79,9 @@ class EventLog:
         with open(meta_path) as f:
             return json.load(f)
 
+
 def write_results(outputs_dir, event_logs):
     """Merge EventLogs by experiment and write each to disk."""
-    print(f"write_results received {len(event_logs)} EventLogs")
-    for log in event_logs:
-        df = pd.DataFrame(log._rows, columns=log.columns)
-        print(f"  experiment={log.metadata.get('experiment_name')}, trial={df['Trial'].unique()}")
-    print("-------------")
-    print("-------------")
-    print("-------------")
     by_experiment = defaultdict(list)
     for log in event_logs:
         by_experiment[log.metadata["experiment_name"]].append(log)
