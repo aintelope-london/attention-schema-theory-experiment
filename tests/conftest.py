@@ -23,16 +23,17 @@ def base_test_config():
     return OmegaConf.create(
         {
             "run": {
+                "trials": 1,
                 "episodes": 1,
+                "steps": 10,
                 "save_logs": False,
+                "max_workers": 1,
             },
             "env_params": {
-                "num_iters": 10,
                 "map_max": 5,
             },
         }
     )
-
 
 @pytest.fixture
 def base_env_cfg():

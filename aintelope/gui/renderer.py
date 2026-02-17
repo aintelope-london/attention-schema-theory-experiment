@@ -17,6 +17,7 @@ from aintelope.environments.savanna_safetygrid import (
     FOOD_CHR,
     GAP_CHR,
     GOLD_CHR,
+    LAYER_ORDER,
     PREDATOR_NPC_CHR,
     SILVER_CHR,
     SMALL_DRINK_CHR,
@@ -33,8 +34,7 @@ from aintelope.environments.savanna_safetygrid import (
 class SavannaInterpreter:
     """Translates savanna gridworld observations into renderer-ready data.
 
-    Receives the layer order list from meta.json (recorded at experiment time).
-    Maps each layer key to a display character.
+    Maps each layer key to a display character using the canonical LAYER_ORDER.
     """
 
     # Layer key → display character. None = skip during rendering.
@@ -56,13 +56,6 @@ class SavannaInterpreter:
 
     FLOOR = "."
 
-    def __init__(self, layer_order):
-        """Args:
-        layer_order: list of layer keys as recorded in meta.json,
-                     e.g. ['#', 'W', 'P', 'D', 'F', ...].
-        """
-        self.layer_order = layer_order
-
     def interpret(self, state):
         """Extract renderable layers from a savanna observation.
 
@@ -78,7 +71,7 @@ class SavannaInterpreter:
         cube = state[0]
         layers = [
             (idx, self.DISPLAY[key])
-            for idx, key in enumerate(self.layer_order[: cube.shape[0]])
+            for idx, key in enumerate(LAYER_ORDER[: cube.shape[0]])
             if key in self.DISPLAY and self.DISPLAY[key] is not None
         ]
         return cube, layers, self.FLOOR
@@ -109,11 +102,9 @@ class StateRenderer:
         """
         height, width = cube.shape[1], cube.shape[2]
         grid = [[floor] * width for _ in range(height)]
-
         for layer_idx, char in layers:
             for y in range(height):
                 for x in range(width):
                     if cube[layer_idx, y, x]:
                         grid[y][x] = char
-
         return ["".join(row) for row in grid]
