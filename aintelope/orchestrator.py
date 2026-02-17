@@ -80,9 +80,10 @@ def run_experiments(main_config):
     main_config_dict = OmegaConf.to_container(main_config, resolve=True)
 
     with ProcessPoolExecutor(max_workers=workers) as executor:
+        trials = list(main_config.values())[0].run.trials
         futures = {
             executor.submit(run_trial, cfg_dict, main_config_dict, i_trial): i_trial
-            for i_trial in range(cfg.run.trials)
+            for i_trial in range(trials)
         }
         for future in as_completed(futures):
             result = future.result()

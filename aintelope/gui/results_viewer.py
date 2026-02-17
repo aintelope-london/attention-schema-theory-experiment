@@ -288,10 +288,6 @@ class ResultsViewer:
         if agent != "all":
             agents = [agent]
 
-        print(self.df["Trial"].nunique())  # TODO remove line TEMP
-        print("-------------")
-        print("-------------")
-        print("-------------")
         PLOT_TYPES[plot_type](self.ax, self.df, metric, agents, "Agent_id")
         self.canvas.draw()
 
