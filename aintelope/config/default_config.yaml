@@ -18,13 +18,13 @@ run:
   steps: 10                        # @ui int 1 10000
   test_mode: False                 # @ui bool
 agent_params:
-  agent_class: sb3_ppo_agent       # @ui str sb3_ppo_agent,sb3_a2c_agent
+  agent_class: random_agent        # @ui str rangom_agent,sb3_ppo_agent,sb3_a2c_agent
   target_handwritten_rules: [food,drink,gold,silver,danger,predator,collision,antimovement]  # @ui str
   use_weight_sharing: False        # @ui bool
   # SB3 model parameters
   num_conv_layers: 0               # @ui int 0 3
   learning_rate: 0.0003            # @ui float 0.0001 0.01
-  ppo_n_steps: 64                # @ui int 32 8192
+  ppo_n_steps: 64                  # @ui int 32 8192
   eps_start: 0.66                  # @ui float 0.0 1.0
   eps_end: 0.0                     # @ui float 0.0 1.0
   instinct_bias_epsilon_start: 0.0 # @ui float 0.0 1.0
@@ -32,7 +32,7 @@ agent_params:
   eps_last_trial: -1               # @ui int -1 100
   eps_last_episode: -1             # @ui int -1 10000
   eps_last_env_layout_seed: -1     # @ui int -1 1000
-  eps_last_frame: ${run.steps}  # use -1 when iteration counting for eps is disabled
+  eps_last_frame: ${run.steps}     # use -1 when iteration counting for eps is disabled
   save_frequency: ${muldiv:${run.episodes},${run.steps},10}
 env_params:
   env: savanna-safetygrid-parallel-v1  # @ui str savanna-safetygrid-parallel-v1,savanna-safetygrid-sequential-v1
@@ -57,7 +57,7 @@ env_params:
   amount_danger_tiles: 0           # @ui int 0 20
   amount_predators: 0              # @ui int 0 10
   enable_homeostasis: False        # @ui bool
-  sustainability_challenge: False   # @ui bool
+  sustainability_challenge: False  # @ui bool
   amount_gold_deposits: 0          # @ui int 0 20
   amount_silver_deposits: 0        # @ui int 0 20
   scores:

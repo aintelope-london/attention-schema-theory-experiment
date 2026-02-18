@@ -132,7 +132,7 @@ def run_experiment(
     if is_sb3 and not cfg.run.test_mode:
         run_baseline_training(cfg, i_trial, env, agents)
         gc.collect()
-        return events
+        return events.to_dataframe()
 
     reporter.set_total("episode", cfg.run.episodes)
     for i_episode in range(cfg.run.episodes):
@@ -330,7 +330,7 @@ def run_experiment(
 
     gc.collect()
 
-    return events
+    return events.to_dataframe()
 
 
 def run_baseline_training(
