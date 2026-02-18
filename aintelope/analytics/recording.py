@@ -1,7 +1,6 @@
 """Event recording and run discovery for experiment outputs."""
 
 import base64
-import json
 import os
 import zlib
 from pathlib import Path
@@ -9,7 +8,9 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 import pickle
-from collections import defaultdict
+
+
+SERIALIZABLE_COLUMNS = ("State", "Next_state", "Observation")
 
 
 def get_checkpoint(outputs_dir: str, agent_id: str) -> Optional[Path]:
@@ -37,12 +38,11 @@ def deserialize_state(cell):
 
 
 class EventLog:
-    SERIALIZABLE_COLUMNS = ("State", "Next_state", "Observation")
+    """In-experiment accumulator. Does not escape experiments.py."""
 
     def __init__(self, columns):
         self.columns = columns
         self._rows = []
-        self.experiment_name = None
 
     def log_event(self, event):
         self._rows.append(event)
@@ -50,35 +50,27 @@ class EventLog:
     def to_dataframe(self):
         return pd.DataFrame(self._rows, columns=self.columns)
 
-    def write(self, output_dir):
-        """Write events.csv and meta.json to the given directory."""
-        path = Path(output_dir) / "events.csv"
+
+def write_results(outputs_dir, events):
+    """Write DataFrames grouped by experiment to disk."""
+    combined = pd.concat(events, ignore_index=True)
+    for name, group in combined.groupby("Run_id"):
+        path = Path(outputs_dir) / name / "events.csv"
         path.parent.mkdir(exist_ok=True, parents=True)
-        df = self.to_dataframe()
-        for col in self.SERIALIZABLE_COLUMNS:
+        df = group.copy()
+        for col in SERIALIZABLE_COLUMNS:
             if col in df.columns:
                 df[col] = df[col].apply(serialize_state)
         df.to_csv(path, index=False)
 
-    @staticmethod
-    def read(filepath):
-        df = pd.read_csv(filepath)
-        for col in EventLog.SERIALIZABLE_COLUMNS:
-            if col in df.columns:
-                df[col] = df[col].apply(deserialize_state)
-        return df
 
-
-def write_results(outputs_dir, event_logs):
-    """Merge EventLogs by experiment and write each to disk."""
-    by_experiment = defaultdict(list)
-    for log in event_logs:
-        by_experiment[log.experiment_name].append(log)
-    for name, logs in by_experiment.items():
-        combined = EventLog(logs[0].columns)
-        for log in logs:
-            combined._rows.extend(log._rows)
-        combined.write(str(Path(outputs_dir) / name))
+def read_events(filepath):
+    """Read an events CSV back into a DataFrame, deserializing state columns."""
+    df = pd.read_csv(filepath)
+    for col in SERIALIZABLE_COLUMNS:
+        if col in df.columns:
+            df[col] = df[col].apply(deserialize_state)
+    return df
 
 
 def list_runs(outputs_dir):
@@ -97,14 +89,11 @@ def list_blocks(run_dir):
 
 
 def read_checkpoints(checkpoint_dir):
-    """
-    Read models from a checkpoint.
-    """
-    model_paths = []
-    for path in Path(checkpoint_dir).rglob("*"):
-        model_paths.append(path)
-    model_paths.sort(key=lambda x: os.path.getmtime(x))
-
+    """Read models from a checkpoint."""
+    model_paths = sorted(
+        Path(checkpoint_dir).rglob("*"),
+        key=lambda x: os.path.getmtime(x),
+    )
     return model_paths
 
 

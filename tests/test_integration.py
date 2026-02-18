@@ -11,9 +11,9 @@ from aintelope.analytics.analytics import (
 from aintelope.__main__ import run
 
 
-def test_integration(learning_config):
+def test_integration(config):
     """Run full train + test cycle."""
-    run(learning_config)
+    run(config)
 
 
 def test_agent_learns(base_test_config):
@@ -44,9 +44,7 @@ def test_agent_learns(base_test_config):
     result = run(OmegaConf.create({"train": train_block, "test": test_block}))
 
     # Read events directly from result, filter to training episodes
-    events_combined = pd.concat(
-        [e.to_dataframe() for e in result["events"]], ignore_index=True
-    )
+    events_combined = pd.concat(result["events"], ignore_index=True)
     train_events = events_combined[~events_combined["IsTest"]]
 
     # assert_learning_threshold(train_events)

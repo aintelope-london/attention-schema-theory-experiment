@@ -30,7 +30,6 @@ from aintelope.agents.sb3_base_agent import (
 )
 from aintelope.aintelope_typing import ObservationFloat, PettingZooEnv
 from aintelope.training.dqn_training import Trainer
-from aintelope.agents.sb3_handwritten_rules_expert import SB3HandWrittenRulesExpert
 from zoo_to_gym_multiagent_adapter.singleagent_zoo_to_gym_adapter import (
     SingleAgentZooToGymAdapter,
 )
@@ -51,101 +50,6 @@ PettingZooEnv = Union[AECEnv, ParallelEnv]
 Environment = Union[gym.Env, PettingZooEnv]
 
 
-class ExpertOverrideMixin:  # TODO: merge with code from A2C agent (the code is identical)
-    def __init__(self, env_classname, agent_id, cfg, *args, **kwargs):
-        self.cfg = cfg
-        super().__init__(*args, **kwargs)
-
-        self.expert = SB3HandWrittenRulesExpert(
-            env_classname=env_classname,
-            agent_id=agent_id,
-            cfg=cfg,
-            action_space=self.action_space,
-            **cfg.agent_params,
-        )
-
-    def set_info(self, info):
-        self.info = info
-
-    def my_reset(self, observation, info):
-        self.expert.reset()
-
-    # code adapted from
-    # https://github.com/DLR-RM/stable-baselines3/blob/dd7f5bfe63631630463f2f9bcb4762e6c040de12/stable_baselines3/common/policies.py#L636
-    @torch.no_grad()
-    def forward(
-        self, obs: th.Tensor, deterministic: bool = False
-    ) -> tuple[th.Tensor, th.Tensor, th.Tensor]:
-        """
-        Forward pass in all the networks (actor and critic)
-
-        :param obs: Observation
-        :param deterministic: Whether to sample or use deterministic actions
-        :return: action, value and log probability of the action
-        """
-        # Preprocess the observation if needed
-        features = self.extract_features(obs)
-        if self.share_features_extractor:
-            latent_pi, latent_vf = self.mlp_extractor(features)
-        else:
-            pi_features, vf_features = features
-            latent_pi = self.mlp_extractor.forward_actor(pi_features)
-            latent_vf = self.mlp_extractor.forward_critic(vf_features)
-        # Evaluate the values for the given observations
-        values = self.value_net(latent_vf)
-        distribution = self._get_action_dist_from_latent(latent_pi)
-
-        # inserted code
-        step = self.info[INFO_STEP]
-        env_layout_seed = self.info[INFO_ENV_LAYOUT_SEED]
-        episode = self.info[INFO_EPISODE]
-        trial = self.info[INFO_trial]
-        test_mode = self.info[INFO_TEST_MODE]
-
-        obs_nps = obs.detach().cpu().numpy()
-        obs_np = obs_nps[0, :]
-
-        (override_type, _random) = self.expert.should_override(
-            deterministic,
-            step,
-            env_layout_seed,
-            episode,
-            trial,
-            test_mode,
-            obs_np,
-        )
-        if override_type != 0:
-            action = self.expert.get_action(
-                obs_np,
-                self.info,
-                step,
-                env_layout_seed,
-                episode,
-                trial,
-                test_mode,
-                override_type,
-                deterministic,
-                _random,
-            )
-            # TODO: handle multiple observations and actions (for that we need also multiple infos)
-            actions = [action]
-            actions = torch.as_tensor(actions, device=obs.device, dtype=torch.long)
-        else:
-            actions = distribution.get_actions(deterministic=deterministic)
-
-        log_prob = distribution.log_prob(actions)
-        actions = actions.reshape((-1, *self.action_space.shape))  # type: ignore[misc]
-        return actions, values, log_prob
-
-
-class CnnPolicyWithExpertOverride(ExpertOverrideMixin, CnnPolicy):
-    pass
-
-
-class MlpPolicyWithExpertOverride(ExpertOverrideMixin, MlpPolicy):
-    pass
-
-
 # need separate function outside of class in order to init multi-model training threads
 def ppo_model_constructor(env, env_classname, agent_id, cfg):
     # policy_kwarg:
@@ -161,9 +65,7 @@ def ppo_model_constructor(env, env_classname, agent_id, cfg):
     )
     if use_imitation_learning:
         policy_override_class = (
-            CnnPolicyWithExpertOverride
-            if cfg.agent_params.num_conv_layers > 0
-            else MlpPolicyWithExpertOverride
+            CnnPolicy if cfg.agent_params.num_conv_layers > 0 else MlpPolicy
         )
         policy = PolicyWithConfigFactory(
             env_classname, agent_id, cfg, policy_override_class
