@@ -42,7 +42,7 @@ class EventLog:
     def __init__(self, columns):
         self.columns = columns
         self._rows = []
-        self.metadata = {}
+        self.experiment_name = None
 
     def log_event(self, event):
         self._rows.append(event)
@@ -60,9 +60,6 @@ class EventLog:
                 df[col] = df[col].apply(serialize_state)
         df.to_csv(path, index=False)
 
-        meta_path = Path(output_dir) / "meta.json"
-        with open(meta_path, "w") as f:
-            json.dump(self.metadata, f, indent=2)
 
     @staticmethod
     def read(filepath):
@@ -72,22 +69,14 @@ class EventLog:
                 df[col] = df[col].apply(deserialize_state)
         return df
 
-    @staticmethod
-    def read_metadata(block_dir):
-        """Read meta.json from a block directory."""
-        meta_path = Path(block_dir) / "meta.json"
-        with open(meta_path) as f:
-            return json.load(f)
-
 
 def write_results(outputs_dir, event_logs):
     """Merge EventLogs by experiment and write each to disk."""
     by_experiment = defaultdict(list)
     for log in event_logs:
-        by_experiment[log.metadata["experiment_name"]].append(log)
+        by_experiment[log.experiment_name].append(log)
     for name, logs in by_experiment.items():
         combined = EventLog(logs[0].columns)
-        combined.metadata = logs[0].metadata
         for log in logs:
             combined._rows.extend(log._rows)
         combined.write(str(Path(outputs_dir) / name))

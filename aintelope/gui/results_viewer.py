@@ -44,7 +44,6 @@ class ResultsViewer:
         self.root.geometry("1200x800")
         self.outputs_dir = outputs_dir
         self.df = None
-        self.metadata = None
         self.interpreter = None
         self.renderer = StateRenderer()
         self.result = None
@@ -231,8 +230,7 @@ class ResultsViewer:
         block_dir = Path(self.outputs_dir) / run_name / block_name
 
         self.df = EventLog.read(str(block_dir / "events.csv"))
-        self.metadata = EventLog.read_metadata(str(block_dir))
-        self.interpreter = SavannaInterpreter(self.metadata["layer_order"])
+        self.interpreter = SavannaInterpreter()
 
         # Populate plots tab controls
         index_cols = {"Trial", "Episode", "Step", "Agent_id", "Experiment"}

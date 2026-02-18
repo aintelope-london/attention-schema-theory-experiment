@@ -56,7 +56,7 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
             reporter=reporter,
         )
 
-        all_events.append(events.to_dataframe())
+        all_events.append(events)
         configs.append(experiment_cfg)
 
     return {"configs": configs, "events": all_events}
