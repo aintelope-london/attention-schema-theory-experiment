@@ -41,7 +41,6 @@ class EventLog:
     def __init__(self, columns):
         self.columns = columns
         self._rows = []
-        self.metadata = {}
 
     def log_event(self, event):
         self._rows.append(event)
@@ -59,9 +58,6 @@ class EventLog:
                 df[col] = df[col].apply(serialize_state)
         df.to_csv(path, index=False)
 
-        meta_path = Path(output_dir) / "meta.json"
-        with open(meta_path, "w") as f:
-            json.dump(self.metadata, f, indent=2)
 
     @staticmethod
     def read(filepath):
@@ -70,13 +66,6 @@ class EventLog:
             if col in df.columns:
                 df[col] = df[col].apply(deserialize_state)
         return df
-
-    @staticmethod
-    def read_metadata(block_dir):
-        """Read meta.json from a block directory."""
-        meta_path = Path(block_dir) / "meta.json"
-        with open(meta_path) as f:
-            return json.load(f)
 
 
 def list_runs(outputs_dir):

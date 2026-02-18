@@ -21,7 +21,6 @@ from aintelope.analytics.recording import (
 from aintelope.environments import get_env_class
 from aintelope.environments.savanna_safetygrid import (
     GridworldZooBaseEnv,
-    INFO_AGENT_OBSERVATION_LAYERS_ORDER,
     INFO_AGENT_OBSERVATION_LAYERS_CUBE,
     INFO_AGENT_INTEROCEPTION_VECTOR,
 )
@@ -62,16 +61,6 @@ def run_experiment(
     )
 
     events = EventLog(events_columns)
-
-    # Capture observation layer order for playback rendering
-    first_agent_info = (
-        infos["agent_0"]
-        if isinstance(env, ParallelEnv)
-        else env.observe_info("agent_0")
-    )
-    events.metadata["layer_order"] = first_agent_info[
-        INFO_AGENT_OBSERVATION_LAYERS_ORDER
-    ]
 
     # Common trainer for each agent's models
     if is_sb3:
@@ -144,9 +133,6 @@ def run_experiment(
         gc.collect()
         return events
 
-    model_needs_saving = (
-        False  # if no training episodes are specified then do not save models
-    )
     reporter.set_total("episode", cfg.run.episodes)
     for i_episode in range(cfg.run.episodes):
         reporter.update("episode", i_episode + 1)
