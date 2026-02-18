@@ -60,7 +60,6 @@ class EventLog:
                 df[col] = df[col].apply(serialize_state)
         df.to_csv(path, index=False)
 
-
     @staticmethod
     def read(filepath):
         df = pd.read_csv(filepath)

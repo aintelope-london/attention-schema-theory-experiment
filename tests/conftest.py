@@ -35,6 +35,7 @@ def base_test_config():
         }
     )
 
+
 @pytest.fixture
 def base_env_cfg():
     """Full cfg for direct environment construction in tests.
