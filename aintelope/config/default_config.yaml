@@ -8,7 +8,7 @@
 run:
   outputs_dir: outputs/${now:%Y%m%d%H%M%S}/
   seed: 0                          # @ui int 0 9999
-  max_workers: 0                   # @ui bool
+  max_workers: 0                   # @ui int -1 100
   event_columns: [
     Run_id, Trial, Episode, Env layout seed, Step, IsTest,
     Agent_id, State, Action, Reward, Done, Next_state, Observation]

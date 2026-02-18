@@ -61,6 +61,7 @@ def run_experiment(
     )
 
     events = EventLog(events_columns)
+    events.experiment_name = cfg.experiment_name
 
     # Common trainer for each agent's models
     if is_sb3:
@@ -149,9 +150,6 @@ def run_experiment(
         print(
             f"\ni_trial: {i_trial} episode: {i_episode} env_layout_seed: {env_layout_seed} test_mode: {cfg.run.test_mode}"
         )
-
-        for agent in agents:
-            agent.save_model(checkpoint_path(cfg.run.outputs_dir, agent.id))
 
         # Reset
         if isinstance(env, ParallelEnv):
@@ -325,6 +323,10 @@ def run_experiment(
             # Break when all agents are done
             if all(dones.values()):
                 break
+
+    if not cfg.run.test_mode:
+        for agent in agents:
+            agent.save_model(checkpoint_path(cfg.run.outputs_dir, agent.id))
 
     gc.collect()
 
