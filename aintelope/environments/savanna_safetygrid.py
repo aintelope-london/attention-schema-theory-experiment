@@ -69,7 +69,6 @@ ACTION_RELATIVE_COORDINATE_MAP = (
     "action_relative_coordinate_map"  # TODO: move to Gridworld environment
 )
 ALL_AGENTS_LAYER = "all_agents"
-# Joel: adding canonical layer order
 LAYER_ORDER = [
     GAP_CHR,
     WALL_CHR,
@@ -85,6 +84,7 @@ LAYER_ORDER = [
     AGENT_CHR2,
     ALL_AGENTS_LAYER,
 ]
+
 # typing aliases
 Action = Actions  # int
 

@@ -21,7 +21,6 @@ from aintelope.analytics.recording import (
 from aintelope.environments import get_env_class
 from aintelope.environments.savanna_safetygrid import (
     GridworldZooBaseEnv,
-    INFO_AGENT_OBSERVATION_LAYERS_ORDER,
     INFO_AGENT_OBSERVATION_LAYERS_CUBE,
     INFO_AGENT_INTEROCEPTION_VECTOR,
 )
@@ -135,9 +134,6 @@ def run_experiment(
         gc.collect()
         return events
 
-    model_needs_saving = (
-        False  # if no training episodes are specified then do not save models
-    )
     reporter.set_total("episode", cfg.run.episodes)
     for i_episode in range(cfg.run.episodes):
         reporter.update("episode", i_episode + 1)
