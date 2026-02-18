@@ -8,8 +8,8 @@
 train:
   run:
     trials: 1
-    episodes: 100
-    steps: 20
+    episodes: 10
+    steps: 10
   env_params:
     amount_agents: 1 
     scores:
@@ -18,6 +18,5 @@ train:
 test:
   run:
     test_mode: True
-    episodes: 10
 
 
