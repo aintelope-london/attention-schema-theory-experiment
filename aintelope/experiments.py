@@ -115,13 +115,13 @@ def run_experiment(
         if not cfg.env_params.combine_interoception_and_vision:
             agent.init_model(
                 (observation[0].shape, observation[1].shape),
-                env.action_space,
+                env.action_space(agent_id),
                 checkpoint=checkpoint,
             )
         else:
             agent.init_model(
                 observation.shape,
-                env.action_space,
+                env.action_space(agent_id),
                 checkpoint=checkpoint,
             )
         dones[agent_id] = False
