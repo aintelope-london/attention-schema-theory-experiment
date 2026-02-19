@@ -1,55 +1,54 @@
-"""Integration test: agent completes full orchestrator without errors."""
+"""Integration test: full orchestrator cycle."""
 
 import pytest
 import pandas as pd
 from omegaconf import OmegaConf
-
-from aintelope.analytics.analytics import (
-    assert_learning_threshold,
-    assert_learning_improvement,
-)
+from aintelope.analytics.analytics import assert_learning_improvement
 from aintelope.__main__ import run
 
 
-def test_integration(config):
-    """Run full train + test cycle."""
-    run(config)
+def test_integration(base_test_config):
+    """Run single-block config through orchestrator without errors."""
+    run(base_test_config)
 
 
 def test_agent_learns(base_test_config):
-    """Learning agent achieves reward threshold on simple gridworld."""
-
-    shared_overrides = {
-        "agent_params": {
-            "agent_class": "sb3_ppo_agent",
-            "num_conv_layers": 0,
-            "learning_rate": 0.001,
-            "ppo_n_steps": 32,
+    """SB3 agent shows learning improvement over training."""
+    learning = OmegaConf.merge(
+        base_test_config,
+        {
+            "train": {
+                "run": {"episodes": 500},
+                "agent_params": {
+                    "agent_class": "sb3_ppo_agent",
+                    "num_conv_layers": 0,
+                    "learning_rate": 0.001,
+                    "ppo_n_steps": 32,
+                },
+                "env_params": {
+                    "map_max": 4,
+                    "num_iters": 10,
+                    "combine_interoception_and_vision": True,
+                    "env_layout_seed_repeat_sequence_length": 5,
+                },
+            },
+            "test": {
+                "run": {"episodes": 10, "test_mode": True},
+                "agent_params": {
+                    "agent_class": "sb3_ppo_agent",
+                    "num_conv_layers": 0,
+                    "learning_rate": 0.001,
+                    "ppo_n_steps": 32,
+                },
+                "env_params": {
+                    "map_max": 4,
+                    "num_iters": 10,
+                    "combine_interoception_and_vision": True,
+                    "env_layout_seed_repeat_sequence_length": 5,
+                },
+            },
         },
-        "env_params": {
-            "map_max": 4,
-            "num_iters": 10,
-            "combine_interoception_and_vision": True,
-            "env_layout_seed_repeat_sequence_length": 5,
-        },
-    }
-
-    train_block = OmegaConf.merge(
-        base_test_config, shared_overrides, {"run": {"episodes": 500}}
     )
-    test_block = OmegaConf.merge(
-        base_test_config, shared_overrides, {"run": {"episodes": 10, "test_mode": True}}
-    )
-
-    result = run(OmegaConf.create({"train": train_block, "test": test_block}))
-
-    # Read events directly from result, filter to training episodes
-    events_combined = pd.concat(result["events"], ignore_index=True)
-    train_events = events_combined[~events_combined["IsTest"]]
-
-    # assert_learning_threshold(train_events)
-    assert_learning_improvement(train_events)
-
-
-if __name__ == "__main__":
-    pytest.main([__file__])
+    result = run(learning)
+    events = pd.concat(result["events"], ignore_index=True)
+    assert_learning_improvement(events[~events["IsTest"]])
