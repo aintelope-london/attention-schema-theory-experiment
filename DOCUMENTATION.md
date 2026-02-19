@@ -16,6 +16,16 @@ All execution flows through a single function: `aintelope.__main__.run()`.
 
 ### Calling conventions
 
+| Mode | Command | Use case |
+|------|---------|----------|
+| Default config | `python -m aintelope` | Quick run with defaults |
+| Custom config | `python -m aintelope my_config.yaml` | Run a specific experiment |
+| GUI | `python -m aintelope --gui` | Configure experiments visually, then run and view results |
+| Results viewer | `python -m aintelope --results` | Inspect or revisit results from any previous run |
+| Tests | `run("default_config.yaml")` or `run(my_dictconfig)` | Programmatic use from test fixtures |
+
+You can keep or remove the individual code blocks below it as you see fit — the table covers the same info more concisely.
+
 **CLI (default config):**
 ```
 python -m aintelope
