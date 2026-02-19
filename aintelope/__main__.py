@@ -61,18 +61,6 @@ def run(config: Union[str, DictConfig] = "default_config.yaml", gui: bool = Fals
     return result
 
 
-def gui_main():
-    """Entry point for aintelope-gui console script."""
-    run(gui=True)
-
-
-def results_main():
-    """Entry point for aintelope-results console script."""
-    from aintelope.gui.results_viewer import run_results_viewer
-
-    run_results_viewer()
-
-
 if __name__ == "__main__":
     import argparse
 

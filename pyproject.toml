@@ -62,10 +62,6 @@ dev = [
   "flake8>=6.0.0"
 ]
 
-[project.scripts]
-aintelope-gui = "aintelope.__main__:gui_main"
-aintelope-results = "aintelope.__main__:results_main"
-
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
