@@ -40,11 +40,7 @@ VSCode users: Press `Ctrl+Shift+P` → "Python: Select Interpreter" → select `
 
 ## Running the GUI
 
-```bash
-aintelope-gui
-```
-
-Or via module:
+Via module:
 
 ```bash
 python -m aintelope --gui
