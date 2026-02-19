@@ -84,6 +84,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.results:
-        results_main()
+        from aintelope.gui.results_viewer import run_results_viewer
+
+        run_results_viewer()
     else:
         run(args.config, gui=args.gui)
