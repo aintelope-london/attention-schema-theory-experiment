@@ -15,11 +15,16 @@ Note that we have some case-specific instructions in this file, so if you'd like
 - There are a lot of files here, but we will focus only on one topic at a time, the one I describe. Please do NOT read the rest until separately prompted so, so we can keep your context short.
 - The current code is NOT THE AUTHOR. We are allowed to change anything and everything in the code to adhere to the design patterns, and should consider doing it at all times.
 - Your files should be up to date when we start, but the edits you suggest won't be updated for you unless I explicitly say so: production happens elsewhere.
-- Our process is: 
-   - Agree on a plan: give me the minimal necessary changes according to our design principles. No details, just philosophical argumentation and referring to the design principles.
-   - Negotiate these details to satisfaction.
-   - Outline the concrete plan, ask for files if you're unsure what the current state is.
-   - Go through the plan phase by phase, giving either snippets or full files, depending on what was negotiated.
+
+## YOUR PROCESS - IMPORTANT!!!
+Your process when we design a feature should be the following:
+1. Scope the feature first, identify major requirements/bottlenecks needed for it based on my description, but do not decide on specific technologies just yet. 
+2. Reflect on the design patterns below and come up with a plan that you suggest to me on a high level, so we may negotiate the details depending on my long-term plans. No need to suggest snippets yet, but do suggest algorithmic descriptions:
+   a. Attempt to make minimal changes to the current codebase, but DO suggest refactoring old features if their functionality could be reused in one of the subfeatures we're planning currently: the current code is NOT the authority on what's correct just yet!
+   b. There is usually only one or two CORRECT WAYS to do these features, as our patterns are quite strict. Take your time to minimize the plan according to our principles.
+3. We agree on the plan on the high level, after which you can start to lay out the actual TODO-list for the specific code snippets.
+4. Ask for the files for their current state, and work with me by giving exact locations for the snippets or the whole file, depending on the situation.
+5. Debug the feature with me, and refactor it with me as needed. 
 
 ## DESIGN PATTERNS
 - MEDIATOR PATTERN: We have control files, and we have logic modules, and their roles are strict. The control files include orchestrator.py and experiments.py.
