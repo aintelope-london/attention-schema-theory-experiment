@@ -475,10 +475,6 @@ This is the only module in the project that imports tkinter.
 Viewers import all GUI primitives from here.
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox
-from typing import Any, Callable, Optional, Tuple
-
 
 # =============================================================================
 # Re-exports for viewers (so they never import tkinter directly)
