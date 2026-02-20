@@ -18,7 +18,7 @@ Note that we have some case-specific instructions in this file, so if you'd like
 
 ## YOUR PROCESS - IMPORTANT!!!
 Your process when we design a feature should be the following:
-1. Scope the feature first, identify major requirements/bottlenecks needed for it based on my description, but do not decide on specific technologies just yet. 
+1. Scope the feature first, identify major requirements/bottlenecks needed for it based on my description, but do not decide on specific technologies just yet. Do NOT verbalize your thought process/requirements, only the final plan!
 2. Reflect on the design patterns below and come up with a plan that you suggest to me on a high level, so we may negotiate the details depending on my long-term plans. No need to suggest snippets yet, but do suggest algorithmic descriptions:
    a. Attempt to make minimal changes to the current codebase, but DO suggest refactoring old features if their functionality could be reused in one of the subfeatures we're planning currently: the current code is NOT the authority on what's correct just yet!
    b. There is usually only one or two CORRECT WAYS to do these features, as our patterns are quite strict. Take your time to minimize the plan according to our principles.
