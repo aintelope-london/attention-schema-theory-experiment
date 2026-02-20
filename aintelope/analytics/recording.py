@@ -65,23 +65,28 @@ class StateLog:
         return pd.DataFrame(self._rows, columns=STATE_COLUMNS)
 
 
-def _write_csv(outputs_dir, frames, filename):
+def write_csv(path, df):
+    """Write a DataFrame to CSV. Creates parent directories."""
+    path = Path(path)
+    path.parent.mkdir(exist_ok=True, parents=True)
+    df.to_csv(path, index=False)
+
+
+def _write_grouped_csv(outputs_dir, frames, filename):
     """Write DataFrames grouped by Run_id to per-block CSV files."""
     combined = pd.concat(frames, ignore_index=True)
     for name, group in combined.groupby("Run_id"):
-        path = Path(outputs_dir) / name / filename
-        path.parent.mkdir(exist_ok=True, parents=True)
         df = group.copy()
         for col in SERIALIZABLE_COLUMNS:
             if col in df.columns:
                 df[col] = df[col].apply(serialize_state)
-        df.to_csv(path, index=False)
+        write_csv(Path(outputs_dir) / name / filename, df)
 
 
 def write_results(outputs_dir, events, states):
     """Write event and state DataFrames grouped by experiment to disk."""
-    _write_csv(outputs_dir, events, "events.csv")
-    _write_csv(outputs_dir, states, "states.csv")
+    _write_grouped_csv(outputs_dir, events, "events.csv")
+    _write_grouped_csv(outputs_dir, states, "states.csv")
 
 
 def read_events(filepath):

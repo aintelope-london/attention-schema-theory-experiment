@@ -9,7 +9,7 @@ import glob
 
 import os
 import gc
-
+from pathlib import Path
 from omegaconf import DictConfig
 
 from aintelope.agents import get_agent_class
@@ -26,7 +26,7 @@ from aintelope.environments.savanna_safetygrid import (
     INFO_AGENT_INTEROCEPTION_VECTOR,
 )
 from aintelope.training.dqn_training import Trainer
-
+from aintelope.utils.performance import ResourceMonitor
 from typing import Union
 import gymnasium as gym
 from pettingzoo import AECEnv, ParallelEnv
@@ -42,6 +42,14 @@ def run_experiment(
     reporter=None,
 ) -> None:
     is_sb3 = cfg.agent_params.agent_class.startswith("sb3_")
+
+    monitor = ResourceMonitor(
+        context={
+            "trial": i_trial,
+            "episodes": cfg.run.episodes,
+            "steps": cfg.run.steps,
+        }
+    )
 
     # Environment
     env = get_env_class(cfg.env_params.env)(cfg=cfg)
@@ -129,11 +137,15 @@ def run_experiment(
         dones[agent_id] = False
 
     # Main loop
+    monitor.sample("init")
 
     # SB3 training has its own loop
     if is_sb3 and not cfg.run.test_mode:
+        monitor.sample("sb3_train_start")
         run_baseline_training(cfg, i_trial, env, agents)
+        monitor.sample("sb3_train_end")
         gc.collect()
+        monitor.report(Path(cfg.run.outputs_dir) / cfg.experiment_name)
         return {"events": events.to_dataframe(), "states": states.to_dataframe()}
 
     reporter.set_total("episode", cfg.run.episodes)
@@ -170,7 +182,7 @@ def run_experiment(
                     env.observe(agent.id), env.observe_info(agent.id), type(env)
                 )
                 dones[agent.id] = False
-
+        monitor.sample("reset")
         # Iterations within the episode
         for step in range(cfg.run.steps):
             if isinstance(env, ParallelEnv):
@@ -353,12 +365,14 @@ def run_experiment(
             if all(dones.values()):
                 break
 
+        monitor.sample("steps")
+
     if not cfg.run.test_mode:
         for agent in agents:
             agent.save_model(checkpoint_path(cfg.run.outputs_dir, agent.id))
 
     gc.collect()
-
+    monitor.report(Path(cfg.run.outputs_dir) / cfg.experiment_name)
     return {"events": events.to_dataframe(), "states": states.to_dataframe()}
 
 
