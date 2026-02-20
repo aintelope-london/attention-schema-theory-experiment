@@ -15,6 +15,7 @@ from omegaconf import DictConfig
 from aintelope.agents import get_agent_class
 from aintelope.analytics.recording import (
     EventLog,
+    StateLog,
     get_checkpoint,
     checkpoint_path,
 )
@@ -62,6 +63,7 @@ def run_experiment(
 
     events = EventLog(events_columns)
     events.experiment_name = cfg.experiment_name
+    states = StateLog()
 
     # Common trainer for each agent's models
     if is_sb3:
@@ -132,7 +134,7 @@ def run_experiment(
     if is_sb3 and not cfg.run.test_mode:
         run_baseline_training(cfg, i_trial, env, agents)
         gc.collect()
-        return events.to_dataframe()
+        return {"events": events.to_dataframe(), "states": states.to_dataframe()}
 
     reporter.set_total("episode", cfg.run.episodes)
     for i_episode in range(cfg.run.episodes):
@@ -241,6 +243,20 @@ def run_experiment(
                         + [raw_obs]
                         + env_step_info
                     )
+                # Record global board state once per step
+                board = next(iter(env.observe_absolute_bitmaps().values()))
+                layer_order = next(
+                    iter(env.relative_observation_layers_order().values())
+                )
+                states.log(
+                    [
+                        cfg.experiment_name,
+                        i_trial,
+                        i_episode,
+                        step,
+                        (board, layer_order),
+                    ]
+                )
 
             elif isinstance(env, AECEnv):
                 agents_dict = {agent.id: agent for agent in agents}
@@ -312,7 +328,20 @@ def run_experiment(
                         # TODO: if the agent died during some other agents step,
                         # should we call agent.update() on the dead agent,
                         # else it will be never called?
-
+                # Record global board state once per step
+                board = next(iter(env.observe_absolute_bitmaps().values()))
+                layer_order = next(
+                    iter(env.relative_observation_layers_order().values())
+                )
+                states.log(
+                    [
+                        cfg.experiment_name,
+                        i_trial,
+                        i_episode,
+                        step,
+                        (board, layer_order),
+                    ]
+                )
             else:
                 raise NotImplementedError(f"Unknown environment type {type(env)}")
 
@@ -330,7 +359,7 @@ def run_experiment(
 
     gc.collect()
 
-    return events.to_dataframe()
+    return {"events": events.to_dataframe(), "states": states.to_dataframe()}
 
 
 def run_baseline_training(

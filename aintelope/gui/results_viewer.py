@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from PIL import Image, ImageTk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from aintelope.analytics.plotting import (
@@ -14,7 +15,7 @@ import aintelope.analytics.plot_library  # noqa: F401 — registers plot types
 from aintelope.analytics.recording import (
     list_runs,
     list_blocks,
-    EventLog,
+    read_events,
     frames_to_video,
 )
 from aintelope.gui.gui import (
@@ -28,24 +29,32 @@ from aintelope.gui.gui import (
     StatusBar,
     ValueSlider,
     StringVar,
-    Text,
     launch_window,
     X,
     LEFT,
     BOTH,
 )
-from aintelope.gui.renderer import SavannaInterpreter, StateRenderer
+from aintelope.gui.renderer import (
+    SavannaInterpreter,
+    StateRenderer,
+    Tileset,
+    find_tileset,
+)
 
 
 class ResultsViewer:
+    TILE_SCALE = 4
+
     def __init__(self, root, outputs_dir):
         self.root = root
         self.root.title("Results Viewer")
         self.root.geometry("1200x800")
         self.outputs_dir = outputs_dir
         self.df = None
+        self.states = None
         self.interpreter = None
-        self.renderer = StateRenderer()
+        self.renderer = StateRenderer(Tileset(find_tileset()))
+        self._photo = None
         self.result = None
 
         self._create_ui()
@@ -175,10 +184,8 @@ class ResultsViewer:
         )
         self.step_slider.pack(side=LEFT, fill=X, expand=True, padx=(15, 5))
 
-        # State display — monospaced text
-        self.state_display = Text(
-            self.playback_tab, font=("Courier", 14), state="disabled", wrap="none"
-        )
+        # State display — tile-rendered image
+        self.state_display = Label(self.playback_tab)
         self.state_display.pack(fill=BOTH, expand=True, padx=10, pady=5)
 
         # Video export controls
@@ -229,7 +236,8 @@ class ResultsViewer:
         block_name = self.block_var.get()
         block_dir = Path(self.outputs_dir) / run_name / block_name
 
-        self.df = EventLog.read(str(block_dir / "events.csv"))
+        self.df = read_events(str(block_dir / "events.csv"))
+        self.states = read_events(str(block_dir / "states.csv"))
         self.interpreter = SavannaInterpreter()
 
         # Populate plots tab controls
@@ -320,19 +328,17 @@ class ResultsViewer:
         self.export_end_slider.set_range(0, max_step)
         self.export_end_slider.set(max_step)
 
-    def _get_frame_lines(self, step):
-        """Get rendered ASCII lines for a single step in current episode/agent."""
-        row = self.df[
-            (self.df["Episode"] == int(self.episode_var.get()))
-            & (self.df["Agent_id"] == self.playback_agent_var.get())
-            & (self.df["Step"] == step)
+    def _get_frame(self, step):
+        """Get rendered PIL Image for a single step in current episode."""
+        row = self.states[
+            (self.states["Episode"] == int(self.episode_var.get()))
+            & (self.states["Step"] == step)
         ]
-        state = row.iloc[0]["Observation"]
-
-        return self.renderer.render(*self.interpreter.interpret(state))
+        board = row.iloc[0]["Board"]
+        return self.renderer.render(*self.interpreter.interpret(board))
 
     def _render_state(self):
-        if self.df is None or self.interpreter is None:
+        if self.states is None or self.interpreter is None:
             return
         episode = self.episode_var.get()
         agent = self.playback_agent_var.get()
@@ -340,12 +346,13 @@ class ResultsViewer:
         if not episode or not agent:
             return
 
-        lines = self._get_frame_lines(step)
-
-        self.state_display.configure(state="normal")
-        self.state_display.delete("1.0", "end")
-        self.state_display.insert("1.0", "\n".join(lines))
-        self.state_display.configure(state="disabled")
+        img = self._get_frame(step)
+        scaled = img.resize(
+            (img.width * self.TILE_SCALE, img.height * self.TILE_SCALE),
+            Image.NEAREST,
+        )
+        self._photo = ImageTk.PhotoImage(scaled)
+        self.state_display.configure(image=self._photo)
 
         self.status.set(f"Episode {episode}, Agent {agent}, Step {step}")
 
@@ -367,7 +374,7 @@ class ResultsViewer:
         end = self.export_end_slider.get()
         duration = float(self.export_duration_var.get())
 
-        frames = [self._get_frame_lines(step) for step in range(start, end + 1)]
+        frames = [self._get_frame(step) for step in range(start, end + 1)]
 
         run_name = self.run_var.get()
         block_name = self.block_var.get()
