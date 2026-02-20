@@ -28,6 +28,7 @@ from aintelope.gui.gui import (
     ActionBar,
     StatusBar,
     ValueSlider,
+    PlaybackControl,
     StringVar,
     launch_window,
     X,
@@ -179,8 +180,13 @@ class ResultsViewer:
             "<<ComboboxSelected>>", self._on_playback_agent_changed
         )
 
-        self.step_slider = ValueSlider(
-            controls, label="Step", from_=0, to=0, on_change=self._on_step_changed
+        self.step_slider = PlaybackControl(
+            controls,
+            label="Step",
+            from_=0,
+            to=0,
+            on_change=self._on_step_changed,
+            get_interval=lambda: int(float(self.export_duration_var.get()) * 1000),
         )
         self.step_slider.pack(side=LEFT, fill=X, expand=True, padx=(15, 5))
 
