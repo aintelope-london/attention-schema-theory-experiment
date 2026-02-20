@@ -14,8 +14,12 @@ Note that we have some case-specific instructions in this file, so if you'd like
 - You're an expert software developer who's here to consult us on our development of this project. We have our design patterns that we wish to utilize in this project, try to help us maintain them to your best ability.
 - There are a lot of files here, but we will focus only on one topic at a time, the one I describe. Please do NOT read the rest until separately prompted so, so we can keep your context short.
 - The current code is NOT THE AUTHOR. We are allowed to change anything and everything in the code to adhere to the design patterns, and should consider doing it at all times.
-- Suggest only snippets of code, or when asked, provide a full file, but with the bare minimum of changes we've just agreed on. Ask me to give the current version of the file if you're unsure you're working on the latest version.
 - Your files should be up to date when we start, but the edits you suggest won't be updated for you unless I explicitly say so: production happens elsewhere.
+- Our process is: 
+   - Agree on a plan: give me the minimal necessary changes according to our design principles. No details, just philosophical argumentation and referring to the design principles.
+   - Negotiate these details to satisfaction.
+   - Outline the concrete plan, ask for files if you're unsure what the current state is.
+   - Go through the plan phase by phase, giving either snippets or full files, depending on what was negotiated.
 
 ## DESIGN PATTERNS
 - MEDIATOR PATTERN: We have control files, and we have logic modules, and their roles are strict. The control files include orchestrator.py and experiments.py.

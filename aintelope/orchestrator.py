@@ -37,6 +37,7 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
 
     configs = []
     all_events = []
+    all_states = []
 
     for _, experiment_name in enumerate(main_config):
         experiment_cfg = copy.deepcopy(cfg)
@@ -49,21 +50,23 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
         score_dimensions = get_score_dimensions(experiment_cfg)
         reporter = ProgressReporter(["episode"], on_update=None)
 
-        events = run_experiment(
+        result = run_experiment(
             experiment_cfg,
             score_dimensions=score_dimensions,
             i_trial=i_trial,
             reporter=reporter,
         )
 
-        all_events.append(events)
+        all_events.append(result["events"])
+        all_states.append(result["states"])
         configs.append(experiment_cfg)
 
-    return {"configs": configs, "events": all_events}
+    return {"configs": configs, "events": all_events, "states": all_states}
 
 
 def run_experiments(main_config):
     """Main orchestrator entry point."""
+
     cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
     # resolve timestamp, freeze
     outputs_dir = cfg.run.outputs_dir
@@ -73,8 +76,9 @@ def run_experiments(main_config):
 
     configs = []
     all_events = []
+    all_states = []
 
-    workers = workers = find_workers(cfg.run.max_workers, cfg.run.trials)
+    workers = find_workers(cfg.run.max_workers, cfg.run.trials)
 
     cfg_dict = OmegaConf.to_container(cfg, resolve=True)
     main_config_dict = OmegaConf.to_container(main_config, resolve=True)
@@ -89,13 +93,15 @@ def run_experiments(main_config):
             result = future.result()
             configs.extend(result["configs"])
             all_events.extend(result["events"])
+            all_states.extend(result["states"])
 
     if cfg.run.save_logs:
-        write_results(outputs_dir, all_events)
+        write_results(outputs_dir, all_events, all_states)
         archive_code(cfg)
 
     return {
         "Outputs_dir": cfg.run.outputs_dir,
         "configs": configs,
         "events": all_events,
+        "states": all_states,
     }
