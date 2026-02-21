@@ -41,6 +41,7 @@ Your process when we design a feature should be the following:
    - No format-juggling! Everything should be in the same format, and we shouldn't change say a pandas df into a dictionary midway without a really good reason. Probably we'll end up refactoring that reason away anyway.
    - Also means there should be no if-else statements for isinstances or similar branching patterns. We use factory patterns or otherwise the data format should be always singular. An if isinstance hides a bug if we've f-ed up somewhere!
    - No parallel execution paths, unless they have a special permission.
+   - Correct responsibility: each feature belongs under the responsibility of a certain class/function. Logic is leaking if even a data-formatting happens somewhere else than the function itself: it is the responsibility of the feature to handle the dataflow into a common format that is understood by all recipients of that information, not a middle-class, not the end-class.
 - CONFIG-DRIVEN: 
    - Variables related to the experiments reside in the configs. They are available to the end-user via the GUI. If we end up creating a variable inside the code, it needs special permission to be there.
    - Result reviewer is one of these special permissions: variables related to creating analytical media is left for the end-user, and they can modify these variables via the results-viewer GUI element.
