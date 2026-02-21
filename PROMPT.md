@@ -23,7 +23,7 @@ Your process when we design a feature should be the following:
    a. Attempt to make minimal changes to the current codebase, but DO suggest refactoring old features if their functionality could be reused in one of the subfeatures we're planning currently: the current code is NOT the authority on what's correct just yet!
    b. There is usually only one or two CORRECT WAYS to do these features, as our patterns are quite strict. Take your time to minimize the plan according to our principles.
 3. We agree on the plan on the high level, after which you can start to lay out the actual TODO-list for the specific code snippets.
-4. Ask for the files for their current state, and work with me by giving exact locations for the snippets or the whole file, depending on the situation.
+4. Ask for the files for their current state, and work with me by giving exact locations for the snippets or the whole file, depending on the situation. IMPORTANT: before submitting the files to me for the first time, REASSESS AND REFLECT ON THE DESIGN PATTERNS ONE MORE TIME, and try to find all the spots that defy them.
 5. Debug the feature with me, and refactor it with me as needed. 
 
 ## DESIGN PATTERNS
@@ -69,3 +69,4 @@ Your process when we design a feature should be the following:
 - No defensive coding, we are NOT to create fail-safes that check for side-cases: this hides the problem!
 - Suggesting 'if isinstance' is 90% a red flag! The program has to have as few correct ways to work as possible, unless separately agreed on and documented.
 - No repeated fields that require separate updating when one thing changes: map's description will not have a new self.map_size -field described if the array's .shape or config's cfg.env_params.map_size already contains this information. Similarly we don't take values OUT of the cfg and pass them as parameters if we already pass the cfg too! Also we don't predefine layers like "agent_0_roi" to be added inside places like savanna_wrapper, when we can just append them when the add_roi() function is called a few lines later: if something changes, we don't want to have to update this change in multiple places, and we don't want to leak this kind of logic outside of roi in the first place.  
+- No leaking logic: a function that is used solely to interpret or assist another class from a different file is a red-flag: that logic likely belongs in the respective class instead.
