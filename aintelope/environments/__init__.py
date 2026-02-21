@@ -5,34 +5,24 @@
 # Repository:
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
-from typing import Mapping, Type, Union
+from typing import Mapping, Type
 
-import gymnasium as gym
-from pettingzoo import AECEnv, ParallelEnv
+from aintelope.environments.abstract_env import AbstractEnv
+from aintelope.environments.savanna_wrapper import SavannaWrapper
 
-from aintelope.environments.savanna_safetygrid import (
-    SavannaGridworldParallelEnv,
-    SavannaGridworldSequentialEnv,
-)
-
-PettingZooEnv = Union[AECEnv, ParallelEnv]
-Environment = Union[gym.Env, PettingZooEnv]
+ENV_REGISTRY: Mapping[str, Type[AbstractEnv]] = {}
 
 
-ENV_REGISTRY: Mapping[str, Type[Environment]] = {}
-
-
-def register_env_class(env_id: str, env_class: Type[Environment]):
+def register_env_class(env_id: str, env_class: Type[AbstractEnv]):
     if env_id in ENV_REGISTRY:
         raise ValueError(f"{env_id} is already registered")
     ENV_REGISTRY[env_id] = env_class
 
 
-def get_env_class(env_id: str) -> Type[Environment]:
+def get_env_class(env_id: str) -> Type[AbstractEnv]:
     if env_id not in ENV_REGISTRY:
         raise ValueError(f"{env_id} is not found in env registry")
     return ENV_REGISTRY[env_id]
 
 
-register_env_class("savanna-safetygrid-sequential-v1", SavannaGridworldSequentialEnv)
-register_env_class("savanna-safetygrid-parallel-v1", SavannaGridworldParallelEnv)
+register_env_class("savanna-safetygrid-v1", SavannaWrapper)

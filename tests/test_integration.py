@@ -51,4 +51,8 @@ def test_agent_learns(base_test_config):
     )
     result = run(learning)
     events = pd.concat(result["events"], ignore_index=True)
+
+    print(events.columns.tolist())
+    print(events.iloc[0].tolist())
+
     assert_learning_improvement(events[~events["IsTest"]])

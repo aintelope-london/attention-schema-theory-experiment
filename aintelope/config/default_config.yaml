@@ -21,6 +21,7 @@ agent_params:
   agent_class: random_agent        # @ui str rangom_agent,sb3_ppo_agent,sb3_a2c_agent
   target_handwritten_rules: [food,drink,gold,silver,danger,predator,collision,antimovement]  # @ui str
   use_weight_sharing: False        # @ui bool
+  roi_mode: "cone"                 # @ui str cone
   # SB3 model parameters
   num_conv_layers: 0               # @ui int 0 3
   learning_rate: 0.0003            # @ui float 0.0001 0.01
@@ -35,9 +36,10 @@ agent_params:
   eps_last_frame: ${run.steps}     # use -1 when iteration counting for eps is disabled
   save_frequency: ${muldiv:${run.episodes},${run.steps},10}
 env_params:
-  env: savanna-safetygrid-parallel-v1  # @ui str savanna-safetygrid-parallel-v1,savanna-safetygrid-sequential-v1
+  env: savanna-safetygrid-v1  # @ui str savanna-safetygrid-v1
   env_layout_seed_repeat_sequence_length: -1  # @ui int -1 1000
   env_layout_seed_modulo: 0        # @ui int 0 1000
+  mode: parallel         # @ui str serial,parallel
   combine_interoception_and_vision: True  # @ui bool
   interoception_transformation_mode: 0     # @ui int 0 4
   interoception_embedding_gaussian_centers: [-32, -16, -8, -4, -2, -1, 0, 1, 2, 4]
