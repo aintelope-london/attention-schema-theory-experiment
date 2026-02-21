@@ -38,6 +38,9 @@ _ENV_CLASS = {
     "sequential": SavannaGridworldSequentialEnv,
 }
 
+# Attributes that belong to the wrapper itself; everything else proxies to _env.
+_OWN_ATTRS = frozenset({"_cfg", "_mode", "_env", "_manifesto"})
+
 
 class SavannaWrapper(AbstractEnv, ParallelEnv):
     def __init__(self, cfg):
@@ -50,13 +53,12 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         """Delegate unknown attributes to the inner env for legacy compatibility."""
         return getattr(self._env, name)
 
-    @property
-    def _scalarize_rewards(self):
-        return self._env._scalarize_rewards
-
-    @_scalarize_rewards.setter
-    def _scalarize_rewards(self, value):
-        self._env._scalarize_rewards = value
+    def __setattr__(self, name, value):
+        """Transparent proxy: own state stays on wrapper, everything else forwards."""
+        if name in _OWN_ATTRS or not hasattr(self, "_env"):
+            super().__setattr__(name, value)
+        else:
+            setattr(self._env, name, value)
 
     # ── AbstractEnv contract ──────────────────────────────────────────
 
