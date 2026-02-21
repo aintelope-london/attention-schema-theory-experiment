@@ -265,4 +265,12 @@ On each run, the current source of both `aintelope/` and `ai_safety_gridworlds/`
 
 Non-SB3 agents within an experiment share a single `Trainer` object, which owns the PyTorch models and optimization. This centralizes device management and model coordination. The current Trainer implementation is legacy and largely stubbed out, but the pattern is intentional: future native agents will use a centralized trainer for shared infrastructure (device placement, checkpointing, optimization scheduling) without agents needing to manage these concerns individually.
 
+
+## Architectural state
+
+Current environment and sb3-baselines are going to become legacy, we maintain their support for validation, but move to use new envs and agents in the future. 
+The system will support "arbitrary agents and environments", as long as they adhere to an abstract class. Agents have this already, pending for envs.
+
+
+
 <!-- Entries to be added step by step -->
