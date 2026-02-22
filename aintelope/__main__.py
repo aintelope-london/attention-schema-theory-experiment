@@ -7,6 +7,7 @@
 
 import os
 import sys
+import threading
 from typing import Union
 
 from omegaconf import DictConfig, OmegaConf
@@ -38,7 +39,10 @@ def run(config: Union[str, DictConfig] = "default_config.yaml", gui: bool = Fals
         set_priorities()
 
     set_memory_limits()
-    select_gpu()
+
+    # Start GPU init early — runs underneath GUI if present
+    gpu_thread = threading.Thread(target=select_gpu)
+    gpu_thread.start()
 
     if isinstance(config, str):
         config = OmegaConf.load(os.path.join("aintelope", "config", config))
@@ -50,6 +54,9 @@ def run(config: Union[str, DictConfig] = "default_config.yaml", gui: bool = Fals
         if config is None:
             print("GUI cancelled.")
             return
+
+    # GPU must be ready before experiments
+    gpu_thread.join()
 
     result = run_experiments(config)
 
