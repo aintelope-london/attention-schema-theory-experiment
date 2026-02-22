@@ -1,7 +1,7 @@
-from aintelope.agents.abstract_agent import Agent
+from aintelope.agents.abstract_agent import AbstractAgent
 
 
-class RandomAgent(Agent):
+class RandomAgent(AbstractAgent):
     def __init__(self, agent_id, trainer=None, env=None, cfg=None, **kwargs):
         self.id = agent_id
         self.done = False

@@ -121,7 +121,7 @@ class PPOAgent(SB3BaseAgent):
         ):  # during test, each agent has a separate in-process instance with its own model and not using threads/subprocesses
             env = SingleAgentZooToGymAdapter(env, self.id)
             self.model = self.model_constructor(env, self.env_classname, self.id, cfg)
-        elif self.env.num_agents == 1 or cfg.agent_params.use_weight_sharing:
+        elif self.env.num_agents == 1 or False: # legacy, cfg.agent_params.use_weight_sharing:
             # PPO supports weight sharing for multi-agent scenarios
             # TODO: Environment duplication support for parallel compute purposes. Abseil package needs to be replaced for that end.
 

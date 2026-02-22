@@ -22,7 +22,7 @@ import datetime
 
 from aintelope.config.config_utils import select_gpu, set_priorities, set_memory_limits
 
-from aintelope.agents import Agent
+from aintelope.agents import AbstractAgent
 from aintelope.aintelope_typing import ObservationFloat, PettingZooEnv
 from aintelope.training.dqn_training import Trainer
 
@@ -214,7 +214,7 @@ def sb3_agent_train_thread_entry_point(
         print(info)
 
 
-class SB3BaseAgent(Agent):
+class SB3BaseAgent(AbstractAgent):
     """SB3BaseAgent abstract class for stable baselines 3
     https://pettingzoo.farama.org/tutorials/sb3/waterworld/
     https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html

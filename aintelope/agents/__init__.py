@@ -6,7 +6,7 @@
 # https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
 
 from typing import Mapping, Type
-from aintelope.agents.abstract_agent import Agent
+from aintelope.agents.abstract_agent import AbstractAgent
 from aintelope.agents.MainAgent import MainAgent
 
 # SB3 Discrete action space models
@@ -16,16 +16,16 @@ from aintelope.agents.dqn_agent import DQNAgent
 from aintelope.agents.random_agent import RandomAgent
 from aintelope.agents.llm_agent import LLMAgent
 
-AGENT_REGISTRY: Mapping[str, Type[Agent]] = {}
+AGENT_REGISTRY: Mapping[str, Type[AbstractAgent]] = {}
 
 
-def register_agent_class(agent_id: str, agent_class: Type[Agent]):
+def register_agent_class(agent_id: str, agent_class: Type[AbstractAgent]):
     if agent_id in AGENT_REGISTRY:
         raise ValueError(f"{agent_id} is already registered")
     AGENT_REGISTRY[agent_id] = agent_class
 
 
-def get_agent_class(agent_id: str) -> Type[Agent]:
+def get_agent_class(agent_id: str) -> Type[AbstractAgent]:
     if agent_id not in AGENT_REGISTRY:
         raise ValueError(f"{agent_id} is not found in agent registry")
     return AGENT_REGISTRY[agent_id]

@@ -27,7 +27,7 @@ import math
 
 from aintelope.environments.savanna_safetygrid import ACTION_RELATIVE_COORDINATE_MAP
 
-from aintelope.agents.abstract_agent import Agent
+from aintelope.agents.abstract_agent import AbstractAgent
 from aintelope.aintelope_typing import ObservationFloat, PettingZooEnv
 from aintelope.training.dqn_training import Trainer
 
@@ -58,7 +58,7 @@ from typing import Union
 import gymnasium as gym
 from pettingzoo import AECEnv, ParallelEnv
 
-from aintelope.models.llm_utilities import (
+from aintelope.agents.llm_utilities import (
     num_tokens_from_messages,
     get_max_tokens_for_model,
     run_llm_completion_uncached,
@@ -73,7 +73,7 @@ compresslevel = 6  # 6 is default level for gzip: https://linux.die.net/man/1/gz
 # https://github.com/ebiggers/libdeflate
 
 
-class LLMAgent(Agent):
+class LLMAgent(AbstractAgent):
     """LLM agent class"""
 
     def __init__(
