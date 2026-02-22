@@ -3,7 +3,7 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # Repository:
-# https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
+# https://github.com/aintelope-london/attention-schema-theory-experiment
 
 from aintelope.config.config_utils import register_resolvers
 

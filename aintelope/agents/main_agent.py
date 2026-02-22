@@ -29,9 +29,9 @@ class MainAgent(AbstractAgent):
         #self.actions = env_manifesto["action_space"]
         #self.action_to_idx = {name: idx for idx, name in enumerate(self.actions)}
 
-        if Agent.trainer is None:
-            Agent.trainer = Trainer(cfg)
-        Agent.trainer.add_agent(agent_id, env_manifesto)
+        if MainAgent.trainer is None:
+            MainAgent.trainer = Trainer(cfg)
+        MainAgent.trainer.add_agent(agent_id, env_manifesto)
 
         #self.affects = Affects(cfg, env_manifesto) 
 
@@ -55,7 +55,7 @@ class MainAgent(AbstractAgent):
         #action = self.actions[action_idx]
         #confidence = 1.0
         #action, reward = self.affects.activate(self.observation, confidence, action) #
-        action = Agent.trainer.get_action(self.id, self.observation)
+        action = MainAgent.trainer.get_action(self.id, self.observation)
         #self.reward = reward
         self.last_action = action
         return {"Agent_id": self.id, "Action": action}#, "Reward": self.reward}
@@ -78,8 +78,8 @@ class MainAgent(AbstractAgent):
         self.done = done
         #if not self.cfg.run_params.test_mode:
         #    Agent.trainer.update(*event)
-        event = Agent.trainer.update(next_observation, self.done)
+        event = MainAgent.trainer.update(next_observation, self.done)
         return event
 
     def save_models(self, episode):
-        Agent.trainer.save_models(episode)
+        MainAgent.trainer.save_models(episode)

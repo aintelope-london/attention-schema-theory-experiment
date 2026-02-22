@@ -3,7 +3,7 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # Repository:
-# https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
+# https://github.com/aintelope-london/attention-schema-theory-experiment
 
 """Unit tests for GUI components: ui_schema_manager and gui."""
 
