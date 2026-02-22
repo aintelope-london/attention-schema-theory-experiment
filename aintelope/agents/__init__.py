@@ -7,13 +7,12 @@
 
 from typing import Mapping, Type
 from aintelope.agents.abstract_agent import Agent
-
-from aintelope.agents.q_agent import QAgent
+from aintelope.agents.MainAgent import MainAgent
 
 # SB3 Discrete action space models
 from aintelope.agents.ppo_agent import PPOAgent
-from aintelope.agents.dqn_agent import DQNAgent
 from aintelope.agents.a2c_agent import A2CAgent
+from aintelope.agents.dqn_agent import DQNAgent
 from aintelope.agents.random_agent import RandomAgent
 from aintelope.agents.llm_agent import LLMAgent
 
@@ -33,7 +32,7 @@ def get_agent_class(agent_id: str) -> Type[Agent]:
 
 
 register_agent_class("random_agent", RandomAgent)
-register_agent_class("q_agent", QAgent)
+register_agent_class("mainagent", MainAgent)
 
 register_agent_class("sb3_ppo_agent", PPOAgent)
 register_agent_class("sb3_dqn_agent", DQNAgent)
