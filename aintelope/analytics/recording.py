@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 import pickle
 
-
 SERIALIZABLE_COLUMNS = ("State", "Next_state", "Observation", "Board")
 STATE_COLUMNS = ["Run_id", "Trial", "Episode", "Step", "Board"]
 

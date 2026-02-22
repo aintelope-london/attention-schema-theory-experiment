@@ -4,6 +4,7 @@ Contains:
     TILE_INDEX — keyword → tile index within a tileset sprite strip.
     Tileset — reads a sprite strip BMP, tile size parsed from filename.
     StateRenderer — agnostic, composites tiles onto a PIL Image.
+    overlay — composites colored boolean masks onto a rendered image.
     SavannaInterpreter — maps savanna env layer keys to keywords.
 
 To support a new environment, add an interpreter that maps env layer
@@ -12,6 +13,8 @@ keys to tile keywords via a MANIFEST dict, and implements interpret(state).
 
 import re
 from pathlib import Path
+
+import numpy as np
 from PIL import Image
 
 from aintelope.environments.savanna_safetygrid import (
@@ -90,6 +93,35 @@ def find_tileset(directory=None):
 
 
 # =============================================================================
+# Overlay — agnostic mask compositing
+# =============================================================================
+
+
+def overlay(image, masks, colors, alpha):
+    """Composite colored masks onto a rendered image.
+
+    Args:
+        image: PIL.Image.Image (RGB).
+        masks: bool ndarray [N, H, W] — grid-resolution masks.
+        colors: sequence of (R, G, B) tuples, one per mask.
+        alpha: int 0–255, overlay transparency.
+
+    Returns:
+        PIL.Image.Image (RGBA).
+    """
+    base = image.convert("RGBA")
+    arr = np.zeros((base.height, base.width, 4), dtype=np.uint8)
+    th = base.height // masks.shape[1]
+    tw = base.width // masks.shape[2]
+
+    for i in range(masks.shape[0]):
+        pixel_mask = masks[i].repeat(th, axis=0).repeat(tw, axis=1)
+        arr[pixel_mask] = (*colors[i], alpha)
+
+    return Image.alpha_composite(base, Image.fromarray(arr, "RGBA"))
+
+
+# =============================================================================
 # Interpreters — one per environment
 # =============================================================================
 
@@ -129,6 +161,28 @@ class SavannaInterpreter:
             if key in self.MANIFEST and self.MANIFEST[key] is not None
         ]
         return cube, layers, FLOOR
+
+    def agent_positions(self, state, agent_ids):
+        """Extract agent positions from board state.
+
+        Args:
+            state: (cube, layer_order) tuple.
+            agent_ids: list of agent_id strings to look up.
+
+        Returns:
+            {agent_id: (row, col)}
+        """
+        cube, layer_order = state
+        layer_map = {
+            self.MANIFEST.get(key): idx
+            for idx, key in enumerate(layer_order[: cube.shape[0]])
+        }
+        positions = {}
+        for agent_id in agent_ids:
+            agent_idx = int(agent_id.split("_")[1])
+            ys, xs = np.where(cube[layer_map[AGENTS[agent_idx]]])
+            positions[agent_id] = (int(ys[0]), int(xs[0]))
+        return positions
 
 
 # =============================================================================
