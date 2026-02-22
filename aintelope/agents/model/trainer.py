@@ -10,7 +10,7 @@ class Trainer:
     def __init__(self, cfg):
         self.cfg = cfg
         self.models = {}
-        self.device = torch.device("cuda" if cfg.dl_params.device == "cuda" and torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print("Using GPU: " + str(self.device != torch.device("cpu")))
     
     def add_agent(self, agent_id, env_manifesto):
