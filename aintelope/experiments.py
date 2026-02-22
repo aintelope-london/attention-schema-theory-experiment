@@ -208,7 +208,7 @@ def run_experiment(
 
                 # Record event
                 env_step_info = [score.get(dim, 0) for dim in score_dims]
-                raw_obs = infos[agent.id]["raw_observation"]
+                # raw_obs = infos[agent.id]["raw_observation"]
                 events.log_event(
                     [
                         cfg.experiment_name,
@@ -219,7 +219,8 @@ def run_experiment(
                         cfg.run.test_mode,
                     ]
                     + agent_step_info
-                    + [raw_obs]
+                    # + [raw_obs]
+                    + [observations[agent.id]]
                     + env_step_info
                 )
 

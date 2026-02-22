@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import numpy as np
 from PIL import Image, ImageTk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
@@ -40,7 +41,13 @@ from aintelope.gui.renderer import (
     StateRenderer,
     Tileset,
     find_tileset,
+    overlay,
 )
+
+
+# Results viewer display variables (special permission — DOCUMENTATION.md §6)
+ROI_COLOR = (255, 255, 0)
+ROI_ALPHA = 76
 
 
 class ResultsViewer:
@@ -336,12 +343,52 @@ class ResultsViewer:
 
     def _get_frame(self, step):
         """Get rendered PIL Image for a single step in current episode."""
-        row = self.states[
-            (self.states["Episode"] == int(self.episode_var.get()))
-            & (self.states["Step"] == step)
+        episode = int(self.episode_var.get())
+
+        # Render board
+        state_row = self.states[
+            (self.states["Episode"] == episode) & (self.states["Step"] == step)
+        ].iloc[0]
+        board = state_row["Board"]
+        img = self.renderer.render(*self.interpreter.interpret(board))
+
+        # Extract ROI masks from recorded observations
+        event_rows = self.df[
+            (self.df["Episode"] == episode) & (self.df["Step"] == step)
         ]
-        board = row.iloc[0]["Board"]
-        return self.renderer.render(*self.interpreter.interpret(board))
+        agents = sorted(event_rows["Agent_id"].unique())
+        n_agents = len(agents)
+        positions = self.interpreter.agent_positions(board, agents)
+        board_h, board_w = board[0].shape[1:]
+
+        # Mask accumulator — all overlay sources concatenate here
+        masks = np.zeros((n_agents, board_h, board_w), dtype=bool)
+
+        for i, agent_id in enumerate(agents):
+            obs = event_rows[event_rows["Agent_id"] == agent_id].iloc[0]["Observation"]
+
+            # ROI layers are appended after base env layers
+            roi_layer = obs[obs.shape[0] - n_agents + i]
+            vh, vw = roi_layer.shape
+
+            # Viewport origin in board coordinates
+            pos_r, pos_c = positions[agent_id]
+            or_ = pos_r - vh // 2
+            oc = pos_c - vw // 2
+
+            # Clipped ranges
+            sr = max(0, -or_)
+            sc = max(0, -oc)
+            dr = max(0, or_)
+            dc = max(0, oc)
+            h = min(vh - sr, board_h - dr)
+            w = min(vw - sc, board_w - dc)
+
+            masks[i, dr : dr + h, dc : dc + w] = roi_layer[sr : sr + h, sc : sc + w]
+
+        # Future mask sources: masks = np.concatenate([masks, other], axis=0)
+        img = overlay(img, masks, [ROI_COLOR] * masks.shape[0], ROI_ALPHA)
+        return img
 
     def _render_state(self):
         if self.states is None or self.interpreter is None:

@@ -38,6 +38,31 @@ _REGISTRY = {
 }
 
 
+def compute_masks(grid_shape, positions, directions, roi_mode, radius):
+    """Compute boolean masks on a grid.
+
+    Args:
+        grid_shape: (H, W)
+        positions:  {id: (row, col)}
+        directions: {id: (drow, dcol)}
+        roi_mode:   geometry key, e.g. "cone"
+        radius:     vision radius
+
+    Returns:
+        ndarray [N, H, W] bool — one mask per id, sorted by key.
+        (0, H, W) when positions is empty.
+    """
+    h, w = grid_shape
+    shape_fn = _REGISTRY[roi_mode]
+    ids = sorted(positions.keys())
+    masks = np.empty((len(ids), h, w), dtype=bool)
+    for i, mid in enumerate(ids):
+        r, c = positions[mid]
+        dr, dc = directions[mid]
+        masks[i] = shape_fn(h, w, r, c, dr, dc, radius)
+    return masks
+
+
 def compute_roi(observations, positions, directions, roi_mode, radius):
     """Append per-agent ROI layers to each agent's observation.
 
@@ -49,10 +74,9 @@ def compute_roi(observations, positions, directions, roi_mode, radius):
         radius:       vision radius
 
     Returns:
-        {agent_id: ndarray [layers + N_agents, H, W]}
+        {agent_id: ndarray [layers + N_masks, H, W]}
         Layer order of appended ROI layers matches sorted agent_ids.
     """
-    shape_fn = _REGISTRY[roi_mode]
     agent_ids = sorted(observations.keys())
     viewport_h, viewport_w = next(iter(observations.values())).shape[1:]
     half_h, half_w = viewport_h // 2, viewport_w // 2
@@ -62,17 +86,17 @@ def compute_roi(observations, positions, directions, roi_mode, radius):
         obs = observations[obs_id]
         obs_r, obs_c = positions[obs_id]
 
-        roi_layers = np.empty((len(agent_ids), viewport_h, viewport_w), dtype=obs.dtype)
-        for i, agent_id in enumerate(agent_ids):
-            ag_r, ag_c = positions[agent_id]
-            ag_dir_r, ag_dir_c = directions[agent_id]
-            # Transform to observer's viewport coordinates
-            rel_r = ag_r - obs_r + half_h
-            rel_c = ag_c - obs_c + half_w
-            roi_layers[i] = shape_fn(
-                viewport_h, viewport_w, rel_r, rel_c, ag_dir_r, ag_dir_c, radius
+        vp_positions = {
+            aid: (
+                positions[aid][0] - obs_r + half_h,
+                positions[aid][1] - obs_c + half_w,
             )
+            for aid in agent_ids
+        }
 
+        roi_layers = compute_masks(
+            (viewport_h, viewport_w), vp_positions, directions, roi_mode, radius
+        )
         result[obs_id] = np.concatenate([obs, roi_layers], axis=0)
 
     return result
