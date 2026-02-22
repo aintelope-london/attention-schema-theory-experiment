@@ -45,6 +45,7 @@ Your process when we design a feature should be the following:
 - CONFIG-DRIVEN: 
    - Variables related to the experiments reside in the configs. They are available to the end-user via the GUI. If we end up creating a variable inside the code, it needs special permission to be there.
    - Result reviewer is one of these special permissions: variables related to creating analytical media is left for the end-user, and they can modify these variables via the results-viewer GUI element.
+- Null object / identity element -pattern: no ifs to check if content is present, an empty case is a valid input that flows through the same code path and produces a no-op result. You never ask "is there something?", you just do it.
 - DOCUMENTATION.md:
    - Special permissions to break these patterns can be given if they serve a particular design CHOICE we have made. And those choices should reside in the DOCUMENTATION. If it is not there, it does NOT have the special permission, and is thus something we need to discuss.
 - OTHER:
