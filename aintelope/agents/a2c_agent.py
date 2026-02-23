@@ -28,7 +28,6 @@ from aintelope.agents.sb3_base_agent import (
     INFO_TEST_MODE,
 )
 from aintelope.aintelope_typing import ObservationFloat, PettingZooEnv
-from aintelope.training.dqn_training import Trainer
 from zoo_to_gym_multiagent_adapter.singleagent_zoo_to_gym_adapter import (
     SingleAgentZooToGymAdapter,
 )

@@ -24,7 +24,6 @@ from aintelope.config.config_utils import select_gpu, set_priorities, set_memory
 
 from aintelope.agents import AbstractAgent
 from aintelope.aintelope_typing import ObservationFloat, PettingZooEnv
-from aintelope.training.dqn_training import Trainer
 
 from aintelope.environments.savanna_safetygrid import (
     INFO_REWARD_DICT,
@@ -224,7 +223,6 @@ class SB3BaseAgent(AbstractAgent):
     def __init__(
         self,
         agent_id: str,
-        trainer: Trainer,
         env: Environment,
         cfg: DictConfig,
         i_trial: int = 0,
@@ -567,7 +565,7 @@ class SB3BaseAgent(AbstractAgent):
         done: bool = False,
     ) -> list:
         """
-        Takes observations and updates trainer on perceived experiences.
+        Takes observations and updates on perceived experiences.
 
         Args:
             env: Environment

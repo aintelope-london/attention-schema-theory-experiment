@@ -29,7 +29,6 @@ from aintelope.environments.savanna_safetygrid import ACTION_RELATIVE_COORDINATE
 
 from aintelope.agents.abstract_agent import AbstractAgent
 from aintelope.aintelope_typing import ObservationFloat, PettingZooEnv
-from aintelope.training.dqn_training import Trainer
 
 from aintelope.environments.savanna_safetygrid import (
     AGENT_CHR1,
@@ -79,13 +78,11 @@ class LLMAgent(AbstractAgent):
     def __init__(
         self,
         agent_id: str,
-        trainer: Trainer,
         env: Environment = None,
         cfg: DictConfig = None,
         **kwargs,
     ) -> None:
         self.id = agent_id
-        self.trainer = trainer
         self.env = env
         self.cfg = cfg
         self.done = False
@@ -438,7 +435,7 @@ class LLMAgent(AbstractAgent):
         test_mode: bool = False,
     ) -> list:
         """
-        Takes observations and updates trainer on perceived experiences.
+        Takes observations and updates on perceived experiences.
 
         Args:
             env: Environment

@@ -15,11 +15,12 @@ from aintelope.environments.savanna_safetygrid import (
     INFO_AGENT_INTEROCEPTION_VECTOR,
     AGENT_CHR1,
     AGENT_CHR2,
+    FOOD_CHR,
 )
 
 
 from pettingzoo import ParallelEnv
-from aintelope.utils.roi import compute_roi
+from aintelope.utils.roi import append_roi_layers
 
 
 # Savanna agent characters in order — maps agent index to layer key
@@ -64,14 +65,16 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
 
     def reset(self, **kwargs):
         raw_obs, raw_infos = self._env.reset(**kwargs)
-        self._manifesto = self._build_manifesto(raw_infos)
+        self._manifesto = self._build_manifesto(raw_obs, raw_infos)
         self._augment_infos(raw_infos)
         observations = self._apply_roi(raw_obs)
+        observations = self._to_dict_obs(observations)
         return observations, raw_infos
 
     def step(self, actions):
         """PettingZoo ParallelEnv interface — used by SB3 training loop.
         HACK: includes ROI because SB3 bypasses experiments.py.
+        Returns legacy observation format for SB3 compatibility.
         Remove when SB3 agents are deprecated."""
         raw_obs, raw_scores, terminateds, truncateds, raw_infos = self._env.step(
             actions
@@ -85,7 +88,8 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
             actions
         )
         self._augment_infos(raw_infos)
-        return raw_obs, raw_scores, terminateds, truncateds, raw_infos
+        observations = self._to_dict_obs(raw_obs)
+        return observations, raw_scores, terminateds, truncateds, raw_infos
 
     def step_sequential(self, actions):
         # TODO: sequential stepping — iterate agents internally,
@@ -134,12 +138,48 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
     def manifesto(self):
         return self._manifesto
 
-    # ── Internal ──────────────────────────────────────────────────────
+    # ── Observation format ────────────────────────────────────────────
 
-    def _build_manifesto(self, raw_infos):
-        sample = next(iter(raw_infos.values()))
-        layers = list(sample[INFO_AGENT_OBSERVATION_LAYERS_ORDER])
-        return {"layers": layers}
+    def _to_dict_obs(self, raw_obs):
+        """Convert inner env's tuple observations to canonical dict format.
+        Inner env must use combine_interoception_and_vision=False."""
+        return {
+            agent_id: {
+                "vision": obs[0],
+                "interoception": obs[1],
+            }
+            for agent_id, obs in raw_obs.items()
+        }
+
+    # ── Manifesto ─────────────────────────────────────────────────────
+
+    def _build_manifesto(self, raw_obs, raw_infos):
+        sample_info = next(iter(raw_infos.values()))
+        sample_agent = next(iter(raw_infos.keys()))
+        sample_obs = raw_obs[sample_agent]
+
+        layers = list(sample_info[INFO_AGENT_OBSERVATION_LAYERS_ORDER])
+
+        vision = sample_obs[0]
+        interoception = sample_obs[1]
+
+        observation_shapes = {
+            "vision": vision.shape,
+            "interoception": interoception.shape,
+        }
+
+        action_space = list(range(self._env.action_space(sample_agent).n))
+
+        food_ind = layers.index(FOOD_CHR) if FOOD_CHR in layers else None
+
+        return {
+            "layers": layers,
+            "observation_shapes": observation_shapes,
+            "action_space": action_space,
+            "food_ind": food_ind,
+        }
+
+    # ── Internal ──────────────────────────────────────────────────────
 
     def _augment_infos(self, raw_infos):
         """Add generic keys to savanna's info dicts. Original keys preserved."""
@@ -180,12 +220,12 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         return directions
 
     def _apply_roi(self, observations):
-        """Apply ROI augmentation to observations."""
+        """Apply ROI augmentation to observations (legacy ndarray format)."""
         roi_mode = self._cfg.agent_params.roi_mode
         radius = self._cfg.env_params.render_agent_radius
         positions = self._read_absolute_positions()
         directions = self._read_directions()
-        return compute_roi(
+        return append_roi_layers(
             observations,
             positions,
             directions,

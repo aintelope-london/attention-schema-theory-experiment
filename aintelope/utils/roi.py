@@ -1,8 +1,8 @@
 """Attention Region of Interest computation.
 
-Stateless spatial geometry. No project imports.
-Each shape function computes a boolean mask on a grid given
-a center position, facing direction, and radius.
+Appends per-agent boolean attention masks to the vision component
+of each agent's observation dict. Geometry functions are stateless
+spatial math.
 """
 
 import numpy as np
@@ -63,27 +63,32 @@ def compute_masks(grid_shape, positions, directions, roi_mode, radius):
     return masks
 
 
-def compute_roi(observations, positions, directions, roi_mode, radius):
-    """Append per-agent ROI layers to each agent's observation.
+def append_roi_layers(vision_obs, positions, directions, roi_mode, radius):
+    """Append per-agent ROI mask layers to vision ndarrays.
+
+    Low-level function operating on bare ndarrays. Used by environment
+    wrappers that handle legacy observation formats.
+    Passthrough when roi_mode is None.
 
     Args:
-        observations: {agent_id: ndarray [layers, H, W]}
-        positions:    {agent_id: (row, col)} — absolute grid coords
-        directions:   {agent_id: (drow, dcol)} — facing direction vector
-        roi_mode:     geometry key, e.g. "cone"
-        radius:       vision radius
+        vision_obs: {agent_id: ndarray [layers, H, W]}
+        positions:  {agent_id: (row, col)}
+        directions: {agent_id: (drow, dcol)}
+        roi_mode:   geometry key, or None for passthrough
+        radius:     vision radius
 
     Returns:
         {agent_id: ndarray [layers + N_masks, H, W]}
-        Layer order of appended ROI layers matches sorted agent_ids.
     """
-    agent_ids = sorted(observations.keys())
-    viewport_h, viewport_w = next(iter(observations.values())).shape[1:]
+    if roi_mode is None:
+        return vision_obs
+    agent_ids = sorted(vision_obs.keys())
+    viewport_h, viewport_w = next(iter(vision_obs.values())).shape[1:]
     half_h, half_w = viewport_h // 2, viewport_w // 2
 
     result = {}
     for obs_id in agent_ids:
-        obs = observations[obs_id]
+        obs = vision_obs[obs_id]
         obs_r, obs_c = positions[obs_id]
 
         vp_positions = {
@@ -100,3 +105,34 @@ def compute_roi(observations, positions, directions, roi_mode, radius):
         result[obs_id] = np.concatenate([obs, roi_layers], axis=0)
 
     return result
+
+
+def compute_roi(observations, infos, roi_mode, radius):
+    """Apply ROI to observations. Passthrough when roi_mode is None.
+
+    Args:
+        observations: {agent_id: {"vision": ndarray, "interoception": ndarray, ...}}
+        infos:        {agent_id: {"position": (r,c), "direction": (dr,dc), ...}}
+        roi_mode:     geometry key (e.g. "cone"), or None for passthrough
+        radius:       vision radius
+
+    Returns:
+        observations with ROI layers appended to the vision component.
+        Unchanged when roi_mode is None.
+    """
+    if roi_mode is None:
+        return observations
+
+    positions = {aid: infos[aid]["position"] for aid in infos}
+    directions = {aid: infos[aid]["direction"] for aid in infos}
+    vision_obs = {aid: obs["vision"] for aid, obs in observations.items()}
+
+    roi_vision = append_roi_layers(vision_obs, positions, directions, roi_mode, radius)
+
+    return {
+        aid: {
+            **observations[aid],
+            "vision": roi_vision[aid],
+        }
+        for aid in observations
+    }

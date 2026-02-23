@@ -29,7 +29,7 @@ agent_params:
   agent_0:
     agent_class: random_agent      # @ui str main_agent,rangom_agent,sb3_ppo_agent,sb3_a2c_agent
     architecture: 
-      reward: [Consume]
+      reward: [RewardInference]
       dynamic: NextState-NN
       value: StateValue-NN
       action: ModelBased
@@ -103,6 +103,9 @@ env_params:
   test_death: False                # @ui bool
   seed: ${run.seed}
 models:
+    RewardInference:
+      metadata:
+        post_activate: True
     DQN:
       metadata:
         q_network: DQN-NN

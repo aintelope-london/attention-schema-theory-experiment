@@ -24,28 +24,6 @@ All execution flows through a single function: `aintelope.__main__.run()`.
 | Results viewer | `python -m aintelope --results` | Inspect or revisit results from any previous run |
 | Tests | `run("default_config.yaml")` or `run(my_dictconfig)` | Programmatic use from test fixtures |
 
-You can keep or remove the individual code blocks below it as you see fit — the table covers the same info more concisely.
-
-**CLI (default config):**
-```
-python -m aintelope
-```
-
-**CLI (custom config):**
-```
-python -m aintelope my_config.yaml
-```
-
-**CLI (GUI):**
-```
-python -m aintelope --gui
-```
-
-**CLI (results viewer standalone):**
-```
-python -m aintelope --results
-```
-
 **Makefile targets:**
 
 | Target | Purpose |
@@ -90,7 +68,7 @@ run(my_dictconfig)           # DictConfig directly
 1. `register_resolvers()`: OmegaConf custom resolvers
 2. `set_priorities()`: CPU priority (skipped under debugger)
 3. `set_memory_limits()`: OS-level memory limits
-4. `select_gpu()`: CUDA device selection
+4. `select_gpu()`: CUDA device selection — runs in a background thread, overlapping with GUI if present. `gpu_thread.join()` gates before experiments begin.
 
 The `if __name__` block only does argument parsing: no setup logic lives there.
 
@@ -117,12 +95,12 @@ Control files: `__main__.py`, `orchestrator.py`, `experiments.py`.
 | Module | Responsibility |
 |--------|---------------|
 | `agents/` | Agent implementations and registry |
+| `agents/model/` | Component-based agent model: neural networks, memory, reward inference |
 | `environments/` | Environment wrappers and registry |
-| `training/` | PyTorch training utilities (Trainer, models) |
 | `analytics/` | Event recording, run discovery, result analysis |
 | `config/` | Config loading, OmegaConf resolvers, system setup |
 | `gui/` | Experiment config editor, results viewer |
-| `utils/` | Seeding, progress reporting, concurrency helpers |
+| `utils/` | Seeding, progress reporting, concurrency helpers, ROI |
 
 ### Registries
 
@@ -130,8 +108,8 @@ Agents and environments use a registry pattern: a string key in config maps to a
 
 **Agent registry** (`agents/__init__.py`):
 ```
+"main_agent"      → MainAgent
 "random_agent"    → RandomAgent
-"q_agent"         → QAgent
 "sb3_ppo_agent"   → PPOAgent
 "sb3_dqn_agent"   → DQNAgent
 "sb3_a2c_agent"   → A2CAgent
@@ -140,8 +118,7 @@ Agents and environments use a registry pattern: a string key in config maps to a
 
 **Environment registry** (`environments/__init__.py`):
 ```
-"savanna-safetygrid-sequential-v1" → SavannaGridworldSequentialEnv
-"savanna-safetygrid-parallel-v1"   → SavannaGridworldParallelEnv
+"savanna-safetygrid-v1" → SavannaWrapper
 ```
 
 ### Data flow
@@ -184,7 +161,7 @@ Fields in `default_config.yaml` can carry `@ui` annotations in comments. These a
 
 ```yaml
 learning_rate: 0.001  # @ui float 0.0001 0.1
-agent_class: q_agent  # @ui str random_agent,q_agent,sb3_ppo_agent
+agent_class: main_agent  # @ui str main_agent,random_agent,sb3_ppo_agent
 test_mode: false      # @ui bool
 map_max: 1            # (no annotation → locked/read-only in GUI)
 ```
@@ -196,8 +173,8 @@ map_max: 1            # (no annotation → locked/read-only in GUI)
 ### `base_test_config`
 Loads `default_config.yaml` and applies test-specific overrides for fast test execution.
 
-### `dqn_learning_config`
-Extends `base_test_config` for ML learning verification tests. Uses slightly longer runs to allow measurable learning signal.
+### `test_agent_learns`
+Uses SB3 PPO agent with inline config overrides. Runs a train block followed by a test block, then asserts learning improvement via `assert_learning_improvement`.
 
 ---
 
@@ -215,13 +192,11 @@ The intent is that a basic user never has to think about hardware utilization. I
 
 ### 2. Sequential and simultaneous environment modes
 
-Multi-agent environments can follow two execution models: sequential (agents act one at a time, observing each other's intermediate effects) or simultaneous (all agents commit actions before the environment advances). These correspond to PettingZoo's AEC and Parallel APIs respectively.
-
-The system supports both modes. The active mode is determined by the environment class selected in config. Currently the branching between the two lives as `isinstance` checks in `experiments.py`; this is a known refactor target to be unified behind a common interface.
+Multi-agent environments can follow two execution models: sequential (agents act one at a time, observing each other's intermediate effects) or simultaneous (all agents commit actions before the environment advances). The active mode is set by `cfg.env_params.mode` and branched cleanly in `experiments.py`.
 
 ### 3. SB3 baseline training path (special permission)
 
-Stable Baselines 3 agents (`sb3_*`) use an alternate training path: `run_baseline_training()` in `experiments.py`. When an SB3 agent is training, control is handed to SB3's own `.learn()` loop, bypassing the main episode/step loop entirely. During test mode, SB3 agents rejoin the standard path.
+Stable Baselines 3 agents (`sb3_*`) use an alternate training path. When an SB3 agent is training, control is handed to SB3's own `.learn()` loop, bypassing the main episode/step loop entirely. During test mode, SB3 agents rejoin the standard path. SB3 agent initialization and training are isolated into `_init_sb3_agents()` and `_run_sb3_training()` in `experiments.py`.
 
 **Why:** Classical RL frameworks assume ownership of the training loop: the agent drives environment interaction internally. This is architecturally incompatible with our mediator pattern where the control file owns the loop. Wrapping SB3's loop to match ours would require reimplementing significant framework internals for no functional gain.
 
@@ -229,7 +204,7 @@ Stable Baselines 3 agents (`sb3_*`) use an alternate training path: `run_baselin
 
 ### 4. Agent and environment registries (factory pattern)
 
-Agents and environments are instantiated via string-keyed registries (`AGENT_REGISTRY`, `ENV_REGISTRY`). A config value like `agent_class: "q_agent"` maps to a class through `get_agent_class()`, and `env: "savanna-safetygrid-parallel-v1"` maps through `get_env_class()`. Adding a new agent or environment means implementing the interface, registering it with one line, and making it available in config: no control file changes needed.
+Agents and environments are instantiated via string-keyed registries (`AGENT_REGISTRY`, `ENV_REGISTRY`). A config value like `agent_class: "main_agent"` maps to a class through `get_agent_class()`, and `env: "savanna-safetygrid-v1"` maps through `get_env_class()`. Adding a new agent or environment means implementing the interface, registering it with one line, and making it available in config: no control file changes needed.
 
 This is the mechanism that makes the system agent- and environment-agnostic. The orchestrator does not know or care what it is running, only that it conforms to the expected interface.
 
@@ -261,16 +236,35 @@ The scripts under `environments/demos/gridworlds/` launch individual environment
 
 On each run, the current source of both `aintelope/` and `ai_safety_gridworlds/` is zipped into the outputs directory. This is a reproducibility measure: the exact code that produced a set of results is always bundled alongside them.
 
-### 10. Shared Trainer instance
+### 10. Agent-owned models
 
-Non-SB3 agents within an experiment share a single `Trainer` object, which owns the PyTorch models and optimization. This centralizes device management and model coordination. The current Trainer implementation is legacy and largely stubbed out, but the pattern is intentional: future native agents will use a centralized trainer for shared infrastructure (device placement, checkpointing, optimization scheduling) without agents needing to manage these concerns individually.
+Each agent owns its Model instance directly. Models handle PyTorch internally: device resolution, neural networks, memory buffers, optimization. Instance lifecycle handles cleanup naturally — when agents go out of scope between experiment blocks, their models are garbage collected. Torch is imported only inside the `agents/model/` package and the bootstrap GPU preload in `config_utils`.
 
+### 11. ROI (Region of Interest)
+
+ROI appends per-agent boolean attention masks to the vision component of each agent's observation. It currently lives as a separate layer-addition step within `experiments.py`, applied after each environment step. The intent is to move ROI into the agents as an internal attention mechanism.
+
+Because SB3's training loop bypasses `experiments.py`, the savanna wrapper applies ROI directly inside its PettingZoo-compatible `step()` method — ensuring SB3 agents receive ROI-augmented observations through their own training path.
+
+### 12. Savanna wrapper
+
+`savanna_wrapper.py` is the interface that allows the legacy savanna gridworld environment to work with the system's `AbstractEnv` contract. It is the sole file that imports from `savanna_safetygrid`. It translates savanna's PettingZoo-derived interface into the canonical MDP contract: dict-format observations `{"vision": ndarray, "interoception": ndarray}`, augmented infos with position and direction data, and a manifesto built on each reset. Legacy-format observations and PettingZoo compatibility are maintained through the `step()` method for SB3 agents.
+
+### 13. Reward inference
+
+In canonical RL, reward is an external signal provided by the environment. This system takes a different approach: reward inference resides within the agent's brain. In nature, organisms infer reward from their sensory observations — they are not handed a scalar by the world. The agent's `RewardInference` component evaluates the observation (after the transition, via `post_activate`) and produces an internal reward signal.
+
+This is also the reason the environment manifesto exists as a feature. The manifesto informs the reward inference about what entities are present in the environment (e.g., which observation layer corresponds to food), so rewards can be inferred correctly regardless of how any particular environment presents its observations. The reward logic is hand-crafted per environment — necessarily so, since what constitutes reward depends on the environment's dynamics — but the manifesto makes the component agnostic to observation format.
+
+### 14. Abstract contracts
+
+Agents conform to `AbstractAgent`: `reset(state, **kwargs)`, `get_action(observation, **kwargs)`, `update(observation, **kwargs)`, `save_model(path, **kwargs)`. The `**kwargs` pattern allows the orchestrator to pass context (step, episode, trial, info) uniformly without the abstract class prescribing what each agent needs.
+
+Environments conform to `AbstractEnv`: `reset(**kwargs)`, `step_parallel(actions)`, `step_sequential(actions)`, `manifesto` property, `board_state()`, `score_dimensions` property. The contract is a minimal multi-agent MDP interface. It does not prescribe agent enumeration, observation spaces, or action spaces — that information lives in the manifesto and config.
 
 ## Architectural state
 
-Current environment and sb3-baselines are going to become legacy, we maintain their support for validation, but move to use new envs and agents in the future. 
-The system will support "arbitrary agents and environments", as long as they adhere to an abstract class. Agents have this already, pending for envs.
-
+SB3 baselines and the savanna gridworld environment are legacy: maintained for validation, but the system is moving toward new agents and environments. Agents and environments both conform to abstract contracts, making the system agnostic to their implementation. Observations follow a canonical dict format. The environment manifesto pattern provides agents with the structural information they need to self-configure.
 
 
 <!-- Entries to be added step by step -->

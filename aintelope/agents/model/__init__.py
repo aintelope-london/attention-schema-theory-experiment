@@ -6,7 +6,7 @@
 
 
 # NOT USED ATM, TODO, consider if we'd rather use the globals() or not everywhere
-'''
+"""
 from typing import Mapping, Type
 from aintelope.agents.model import dl_components
 from aintelope.agents.model import affects
@@ -30,4 +30,4 @@ def get_agent_class(component_id: str) -> Type[AbstractAgent]:
 register_agent_class("random_agent", RandomAgent)
 register_agent_class("affect_agent", Agent)
 register_agent_class("baby_agent", BabyAgent)
-'''
+"""

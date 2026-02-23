@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Tuple, Dict, Any
 
+
 class Component(ABC):
     """
     Lightweight abstract mixin for model components.
@@ -8,6 +9,7 @@ class Component(ABC):
     - activate(...) returns (outputs_dict, confidence: float).
     - update() performs maintenance / learning and returns a report (dict or None).
     """
+
     @abstractmethod
     def activate(self, observation: Dict[str, Any]) -> Tuple[Dict[str, Any], float]:
         raise NotImplementedError
