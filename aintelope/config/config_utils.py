@@ -24,6 +24,19 @@ DEFAULT_CONFIG = "default_config.yaml"
 PROTECTED_CONFIGS = {DEFAULT_CONFIG, "example_config.yaml"}
 
 
+def prepare_experiment_cfg(cfg, overrides, experiment_name, trial_seed):
+    """Merge overrides and derive runtime config values."""
+    merged = OmegaConf.merge(cfg, overrides)
+    OmegaConf.update(merged, "experiment_name", experiment_name, force_add=True)
+    OmegaConf.update(merged.run, "seed", trial_seed, force_add=True)
+    OmegaConf.update(
+        merged.env_params,
+        "amount_agents",
+        sum(1 for k in merged.agent_params if k.startswith("agent_")),
+    )
+    return merged
+
+
 def list_loadable_configs():
     """List configs available for loading (excludes default)."""
     return sorted(f.name for f in CONFIG_DIR.glob("*.yaml") if f.name != DEFAULT_CONFIG)
@@ -127,6 +140,13 @@ def register_resolvers() -> None:
     OmegaConf.register_new_resolver("minus_3", minus_3, replace=True)
     OmegaConf.register_new_resolver("muldiv", muldiv, replace=True)
     OmegaConf.register_new_resolver("range", create_range, replace=True)
+    OmegaConf.register_new_resolver(
+        "count_prefix",
+        lambda parent_key, prefix, *, _root_: sum(
+            1 for k in OmegaConf.select(_root_, parent_key) if k.startswith(prefix)
+        ),
+        replace=True,
+    )
 
 
 def get_score_dimensions(cfg: DictConfig):

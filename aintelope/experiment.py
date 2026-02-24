@@ -173,8 +173,8 @@ def run_experiment(
                 observation = observations[agent.id]
                 score = scores[agent.id]
                 done = dones[agent.id]
-                if terminateds[agent.id]:
-                    observation = None
+                # if terminateds[agent.id]:
+                #    observation = None
 
                 agent.update(observation=observation)
 

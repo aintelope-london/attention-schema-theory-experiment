@@ -20,19 +20,18 @@ run:
 agent_params:
   save_frequency: ${muldiv:${run.episodes},${run.steps},10}
   roi_mode: "cone"                 # @ui str cone  
-  device: cpu
-  start_with_model: False
-  use_previous_model: True
-  batch_size: 20
-  gamma: 0.7
+  start_with_model: False          # @ui bool
+  use_previous_model: True         # @ui bool
+  batch_size: 20                   # @ui int 1 100
+  gamma: 0.7                       # @ui float 0.0 1.0
   # Agents
   agent_0:
     agent_class: random_agent      # @ui str main_agent,rangom_agent,sb3_ppo_agent,sb3_a2c_agent
     architecture: 
-      reward: [RewardInference]
-      dynamic: NextState-NN
-      value: StateValue-NN
-      action: ModelBased
+      reward: [RewardInference]    # @ui str [RewardInference]
+      dynamic: NextState-NN        # @ui str None,NextState-NN
+      value: StateValue-NN         # @ui str None,StateValue-NN
+      action: ModelBased           # @ui str None,ModelBased
   # SB3 model parameters
   num_conv_layers: 0               # @ui int 0 3
   learning_rate: 0.0003            # @ui float 0.0001 0.01
@@ -55,7 +54,7 @@ env_params:
   render_agent_radius: ${minus_3:${env_params.map_max}}
   map_randomization_frequency: 3   # @ui int 0 3
   render_mode: null                # @ui str null,human,rgb_array
-  amount_agents: 1                 # @ui int 1 10
+  amount_agents: 1
   amount_grass_patches: 1          # @ui int 0 20
   amount_water_holes: 0            # @ui int 0 20
   amount_danger_tiles: 0           # @ui int 0 20

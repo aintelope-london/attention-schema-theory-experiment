@@ -11,7 +11,6 @@ train:
     episodes: 10
     steps: 10
   env_params:
-    amount_agents: 1 
     scores:
         FOOD_SCORE: '{"FOOD": 10}'
 

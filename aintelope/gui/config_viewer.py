@@ -1,5 +1,6 @@
 """Config editor GUI for creating/editing experiment configs."""
 
+import copy
 from typing import Optional
 from omegaconf import DictConfig, OmegaConf
 
@@ -32,6 +33,8 @@ from aintelope.config.config_utils import (
     save_experiment_config,
 )
 
+AGENT_PREFIX = "agent_"
+
 
 class ConfigGUI:
     def __init__(self, root, default_cfg: DictConfig):
@@ -42,6 +45,9 @@ class ConfigGUI:
         self.default_cfg = default_cfg
         self.default_values = OmegaConf.to_container(default_cfg, resolve=True)
         self.ui_schema = load_ui_schema()
+        self.agent_template = copy.deepcopy(
+            self.default_values["agent_params"]["agent_0"]
+        )
         self.result = None
         self.tabs = []
 
@@ -161,6 +167,18 @@ class ConfigGUI:
         self.status.set(f"Deleted: {name}")
 
     # =========================================================================
+    # Schema path mapping
+    # =========================================================================
+
+    def _schema_path(self, path):
+        """Map agent_N paths to agent_0 for schema lookup."""
+        parts = path.split(".")
+        for i, part in enumerate(parts):
+            if part.startswith(AGENT_PREFIX) and part != "agent_0":
+                parts[i] = "agent_0"
+        return ".".join(parts)
+
+    # =========================================================================
     # Parameter tree
     # =========================================================================
 
@@ -170,6 +188,10 @@ class ConfigGUI:
 
         for key, value in config.items():
             current_path = f"{path}.{key}" if path else key
+
+            # Agent entries are rendered by _build_agents_area
+            if path == "agent_params" and key.startswith(AGENT_PREFIX):
+                continue
 
             if isinstance(value, dict):
                 frame = Frame(parent)
@@ -210,7 +232,7 @@ class ConfigGUI:
                     side=LEFT, padx=(level * 20, 10)
                 )
 
-                spec = get_field_spec(self.ui_schema, current_path)
+                spec = get_field_spec(self.ui_schema, self._schema_path(current_path))
 
                 widget, refresher = create_widget(
                     param_frame,
@@ -230,6 +252,120 @@ class ConfigGUI:
                 tab["widgets"][current_path] = (widget, refresher)
                 row += 1
 
+        # After non-agent fields, render the agents area
+        if path == "agent_params":
+            self._build_agents_area(parent, tab, level, row)
+
+        return row
+
+    # =========================================================================
+    # Agent management
+    # =========================================================================
+
+    def _build_agents_area(self, parent, tab, level, row):
+        """Create container for agent sections and populate it."""
+        container = Frame(parent)
+        container.grid(row=row, column=0, columnspan=3, sticky=W)
+        tab["agents_container"] = container
+        tab["agents_level"] = level
+        self._populate_agents(tab)
+
+    def _populate_agents(self, tab):
+        """Rebuild all agent sections inside the agents container."""
+        container = tab["agents_container"]
+        level = tab["agents_level"]
+
+        for child in container.winfo_children():
+            child.destroy()
+        for key in list(tab["widgets"]):
+            if key.startswith(f"agent_params.{AGENT_PREFIX}"):
+                del tab["widgets"][key]
+
+        row = 0
+        agents = self._get_agent_configs(tab)
+
+        for agent_id, agent_cfg in agents.items():
+            # Header
+            header = Frame(container)
+            header.grid(row=row, column=0, columnspan=3, sticky=W, pady=(10, 2))
+            Label(
+                header,
+                text=agent_id.replace("_", " ").title(),
+                font=("Arial", 9, "bold"),
+            ).pack(side=LEFT, padx=(level * 20, 10))
+
+            if agent_id != "agent_0":
+                Button(
+                    header,
+                    text="Remove",
+                    command=lambda aid=agent_id: self._remove_agent(tab, aid),
+                ).pack(side=LEFT)
+
+            row += 1
+
+            # Fields
+            fields_frame = Frame(container)
+            fields_frame.grid(row=row, column=0, columnspan=3, sticky=W)
+            path = f"agent_params.{agent_id}"
+            self._build_param_tree(fields_frame, agent_cfg, tab, path, level + 1)
+            row += 1
+
+        # Add Agent button
+        btn_frame = Frame(container)
+        btn_frame.grid(row=row, column=0, columnspan=3, sticky=W, pady=(10, 5))
+        Button(
+            btn_frame,
+            text="Add Agent",
+            command=lambda: self._add_agent(tab),
+        ).pack(side=LEFT, padx=(level * 20, 0))
+
+    def _get_agent_configs(self, tab):
+        """Ordered dict of agent_N -> config from current tab."""
+        return {
+            k: v
+            for k, v in sorted(tab["current"]["agent_params"].items())
+            if k.startswith(AGENT_PREFIX)
+        }
+
+    def _add_agent(self, tab):
+        """Clone agent template as next sequential agent."""
+        agents = self._get_agent_configs(tab)
+        new_id = f"agent_{len(agents)}"
+        new_cfg = copy.deepcopy(self.agent_template)
+
+        tab["current"]["agent_params"][new_id] = new_cfg
+        self._set_nested(tab["diff"], ["agent_params", new_id], copy.deepcopy(new_cfg))
+
+        self._populate_agents(tab)
+        self.status.set(f"Added: {new_id}")
+
+    def _remove_agent(self, tab, agent_id):
+        """Remove agent by id and reindex remaining agents sequentially."""
+        agents = self._get_agent_configs(tab)
+        remaining = [(k, v) for k, v in agents.items() if k != agent_id]
+
+        # Clear all agent entries
+        for k in list(tab["current"]["agent_params"]):
+            if k.startswith(AGENT_PREFIX):
+                del tab["current"]["agent_params"][k]
+        if "agent_params" in tab["diff"]:
+            for k in list(tab["diff"]["agent_params"]):
+                if k.startswith(AGENT_PREFIX):
+                    del tab["diff"]["agent_params"][k]
+
+        # Re-add with sequential indices
+        for i, (_, cfg) in enumerate(remaining):
+            new_id = f"agent_{i}"
+            tab["current"]["agent_params"][new_id] = cfg
+            default_agent = self.default_values["agent_params"].get(new_id)
+            if default_agent is None or cfg != default_agent:
+                self._set_nested(
+                    tab["diff"], ["agent_params", new_id], copy.deepcopy(cfg)
+                )
+
+        self._populate_agents(tab)
+        self.status.set(f"Removed: {agent_id}")
+
     # =========================================================================
     # Value tracking
     # =========================================================================
@@ -238,7 +374,7 @@ class ConfigGUI:
         """Update a value in a specific tab's config."""
         keys = path.split(".")
 
-        spec = get_field_spec(self.ui_schema, path)
+        spec = get_field_spec(self.ui_schema, self._schema_path(path))
         if spec:
             vtype = spec[1]
             if vtype == "bool":
@@ -257,9 +393,12 @@ class ConfigGUI:
         # Track diff against defaults
         default = self.default_values
         for key in keys:
+            if not isinstance(default, dict) or key not in default:
+                default = None
+                break
             default = default[key]
 
-        if value != default:
+        if default is None or value != default:
             self._set_nested(tab["diff"], keys, value)
 
         self.status.set(f"Modified: {path}")

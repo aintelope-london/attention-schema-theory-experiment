@@ -366,9 +366,10 @@ class ResultsViewer:
 
         for i, agent_id in enumerate(agents):
             obs = event_rows[event_rows["Agent_id"] == agent_id].iloc[0]["Observation"]
+            vision = obs["vision"]
 
             # ROI layers are appended after base env layers
-            roi_layer = obs[obs.shape[0] - n_agents + i]
+            roi_layer = vision[vision.shape[0] - n_agents + i]
             vh, vw = roi_layer.shape
 
             # Viewport origin in board coordinates
