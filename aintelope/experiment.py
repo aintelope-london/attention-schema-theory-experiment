@@ -232,6 +232,7 @@ def _run_sb3_training(cfg, i_trial, env, agents, events, states, monitor):
     """SB3 training loop — special permission documented in DOCUMENTATION.md."""
     monitor.sample("sb3_train_start")
     num_total_steps = cfg.run.steps * cfg.run.episodes
+    agents[0].state_log = states
     agents[0].train(num_total_steps)
     agents[0].save_model(checkpoint_path(cfg.run.outputs_dir, agents[0].id))
     monitor.sample("sb3_train_end")

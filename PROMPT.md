@@ -25,7 +25,7 @@ Your process when we design a feature should be the following:
    b. There is usually only one or two CORRECT WAYS to do these features, as our patterns are quite strict. Take your time to minimize the plan according to our principles.
 3. We agree on the plan on the high level, after which you can start to lay out the actual TODO-list for the specific code snippets.
 4. Ask for the files for their current state, and work with me by giving exact locations for the snippets or the whole file, depending on the situation. IMPORTANT: before submitting the files to me for the first time, REASSESS AND REFLECT ON THE DESIGN PATTERNS ONE MORE TIME, and try to find all the spots that defy them.
-5. Debug the feature with me, and refactor it with me as needed. 
+5. Debug the feature with me, and refactor it with me as needed. When something breaks, do not assume that the first thing that comes to mind fixes the issue: there are multiple genuine features that need to be considered, and its better to simply state the problem, and what's around it. I'll decide on the fix.
 
 ## DESIGN PATTERNS
 - MEDIATOR PATTERN: We have control files, and we have logic modules, and their roles are strict. The control files include orchestrator.py and experiments.py.

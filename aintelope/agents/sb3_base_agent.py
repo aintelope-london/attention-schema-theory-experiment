@@ -241,6 +241,7 @@ class SB3BaseAgent(AbstractAgent):
         self.total_steps_across_episodes = 0
         self.score_dimensions = []
         self.events = None
+        self.state_log = None
         self.done = False
         self.last_action = None
         self.info = None
@@ -473,6 +474,11 @@ class SB3BaseAgent(AbstractAgent):
             self.info = infos[self.id]
 
             self.model.policy.set_info(self.info)
+        if self.state_log is not None:
+            board, layer_order = self.env.board_state()
+            self.state_log.log(
+                [self.cfg.experiment_name, i_trial, i_episode, step, (board, layer_order)]
+            )
 
     def sequential_env_post_step_callback(
         self,
@@ -555,6 +561,11 @@ class SB3BaseAgent(AbstractAgent):
             + agent_step_info
             + env_step_info
         )
+        if self.state_log is not None:
+            board, layer_order = self.env.board_state()
+            self.state_log.log(
+                [self.cfg.experiment_name, i_trial, i_episode, step, (board, layer_order)]
+            )
 
     def update(self, observation=None, **kwargs) -> list:
         """
