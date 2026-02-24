@@ -3,7 +3,7 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # Repository:
-# https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks     
+# https://github.com/aintelope-london/attention-schema-theory-experiment     
 
 run:
   outputs_dir: outputs/${now:%Y%m%d%H%M%S}/
@@ -18,23 +18,25 @@ run:
   steps: 10                        # @ui int 1 10000
   test_mode: False                 # @ui bool
 agent_params:
-  agent_class: random_agent        # @ui str rangom_agent,sb3_ppo_agent,sb3_a2c_agent
-  target_handwritten_rules: [food,drink,gold,silver,danger,predator,collision,antimovement]  # @ui str
-  use_weight_sharing: False        # @ui bool
-  roi_mode: "cone"                 # @ui str cone
+  save_frequency: ${muldiv:${run.episodes},${run.steps},10}
+  roi_mode: "cone"                 # @ui str cone  
+  device: cpu
+  start_with_model: False
+  use_previous_model: True
+  batch_size: 20
+  gamma: 0.7
+  # Agents
+  agent_0:
+    agent_class: random_agent      # @ui str main_agent,rangom_agent,sb3_ppo_agent,sb3_a2c_agent
+    architecture: 
+      reward: [RewardInference]
+      dynamic: NextState-NN
+      value: StateValue-NN
+      action: ModelBased
   # SB3 model parameters
   num_conv_layers: 0               # @ui int 0 3
   learning_rate: 0.0003            # @ui float 0.0001 0.01
   ppo_n_steps: 64                  # @ui int 32 8192
-  eps_start: 0.66                  # @ui float 0.0 1.0
-  eps_end: 0.0                     # @ui float 0.0 1.0
-  instinct_bias_epsilon_start: 0.0 # @ui float 0.0 1.0
-  instinct_bias_epsilon_end: 0.0   # @ui float 0.0 1.0
-  eps_last_trial: -1               # @ui int -1 100
-  eps_last_episode: -1             # @ui int -1 10000
-  eps_last_env_layout_seed: -1     # @ui int -1 1000
-  eps_last_frame: ${run.steps}     # use -1 when iteration counting for eps is disabled
-  save_frequency: ${muldiv:${run.episodes},${run.steps},10}
 env_params:
   env: savanna-safetygrid-v1  # @ui str savanna-safetygrid-v1
   env_layout_seed_repeat_sequence_length: -1  # @ui int -1 1000
@@ -100,3 +102,140 @@ env_params:
   action_direction_mode: 0         # @ui int 0 2
   test_death: False                # @ui bool
   seed: ${run.seed}
+models:
+    RewardInference:
+      metadata:
+        post_activate: True
+    DQN:
+      metadata:
+        q_network: DQN-NN
+        eps_start: 0.9
+        eps_end: 0.05
+        eps_decay_steps: 1000      
+    ModelBased:
+      metadata:
+        input:
+          dynamic: sae
+          value: state_value
+        num_simulations: 5
+        max_depth: 2
+        c_puct: 1.0
+    DQN-NN:
+      metadata:
+        optimizer: AdamW
+        optimizer_params:
+          lr: 0.001
+          amsgrad: True
+          weight_decay: 0.01
+        loss_function: SmoothL1Loss
+        target: [reward]
+        use_target_net: True
+        target_net_update_frequency: 100
+        tau: 0.05
+      architecture:
+        vision_net:
+          - {type: input, source: vision}
+          - {type: conv, size: 8, kernel: 1}
+          - {type: relu}
+          - {type: conv, size: 8, kernel: 3}
+          - {type: relu}
+          - {type: linear, size: 16}
+          - {type: relu}
+        interoception_net:
+          - {type: input, source: interoception}
+          - {type: linear, size: 4}
+          - {type: relu}
+        audio_net:
+          - {type: input, source: audio}
+          - {type: linear, size: 4}
+          - {type: relu}
+        combined_net:
+          - {type: input, source: vision_net+audio_net+interoception_net}
+          - {type: linear, size: 8}
+          - {type: relu}
+          - {type: linear, source: action}
+          - {type: output}
+    StateValue-NN:
+      metadata:
+        optimizer: Adam
+        optimizer_params:
+          lr: 0.0005
+        loss_function: MSELoss
+        target: [reward]
+        use_target_net: False
+      architecture:
+        vision_net:
+          - {type: input, source: vision}
+          - {type: conv, size: 8, kernel: 1}
+          - {type: relu}
+          - {type: conv, size: 8, kernel: 3}
+          - {type: relu}
+          - {type: linear, size: 16}
+          - {type: relu}
+        interoception_net:
+          - {type: input, source: interoception}
+          - {type: linear, size: 4}
+          - {type: relu}
+        audio_net:
+          - {type: input, source: audio}
+          - {type: linear, size: 4}
+          - {type: relu}
+        combined_net:
+          - {type: input, source: vision_net+audio_net+interoception_net}
+          - {type: linear, size: 8}
+          - {type: relu}
+          - {type: linear, size: 1}
+          - {type: output}
+    NextState-NN:
+      metadata:
+        optimizer: Adam
+        optimizer_params:
+          lr: 0.001
+        loss_function: MSELoss
+        target: [next_observation]
+        use_target_net: False
+        post_activate: True # cannot be processed without action during get_action! TEMP 
+      architecture:
+        vision_net:
+          - {type: input, source: vision}
+          - {type: conv, size: 8, kernel: 1}
+          - {type: relu}
+          - {type: conv, size: 8, kernel: 3}
+          - {type: relu}
+          - {type: linear, size: 16}
+          - {type: relu}
+        interoception_net:
+          - {type: input, source: interoception}
+          - {type: linear, size: 4}
+          - {type: relu}
+        audio_net:
+          - {type: input, source: audio}
+          - {type: linear, size: 4}
+          - {type: relu}
+        encoder:
+          - {type: input, source: vision_net+audio_net+interoception_net+action}
+          - {type: linear, size: 32}
+          - {type: relu}
+          - {type: linear, size: 16}
+          - {type: relu}
+          - {type: linear, size: 32}
+        vision_denet:
+          - {type: input, source: encoder}
+          - {type: linear, source: vision_encoded}
+          - {type: unflatten} #, size: [5, 5, 8]}  
+          - {type: conv_transpose, size: 8, kernel: 3}  
+          - {type: relu}
+          - {type: conv_transpose, size: 3, kernel: 1}  
+          - {type: output}
+        interoception_denet:
+          - {type: input, source: encoder}
+          - {type: relu}
+          - {type: linear, size: 4}
+          - {type: linear, source: interoception}
+          - {type: output}
+        audio_denet:
+          - {type: input, source: encoder}
+          - {type: relu}         
+          - {type: linear, size: 4}
+          - {type: linear, source: audio}
+          - {type: output}

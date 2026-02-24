@@ -3,7 +3,7 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # Repository:
-# https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
+# https://github.com/aintelope-london/attention-schema-theory-experiment
 
 
 from typing import List, NamedTuple, Optional, Tuple
@@ -28,7 +28,6 @@ from aintelope.agents.sb3_base_agent import (
     INFO_TEST_MODE,
 )
 from aintelope.aintelope_typing import ObservationFloat, PettingZooEnv
-from aintelope.training.dqn_training import Trainer
 from zoo_to_gym_multiagent_adapter.singleagent_zoo_to_gym_adapter import (
     SingleAgentZooToGymAdapter,
 )
@@ -56,19 +55,7 @@ def dqn_model_constructor(env, env_classname, agent_id, cfg):
     # https://github.com/DLR-RM/stable-baselines3/issues/1863
     # Also: make sure your image is in the channel-first format.
 
-    use_imitation_learning = (
-        cfg.agent_params.instinct_bias_epsilon_start > 0
-        or cfg.agent_params.instinct_bias_epsilon_end > 0
-    )
-    if use_imitation_learning:
-        policy_override_class = (
-            CnnPolicy if cfg.agent_params.num_conv_layers > 0 else MlpPolicy
-        )
-        policy = PolicyWithConfigFactory(
-            env_classname, agent_id, cfg, policy_override_class
-        )
-    else:
-        policy = "CnnPolicy" if cfg.agent_params.num_conv_layers > 0 else "MlpPolicy"
+    policy = "CnnPolicy" if cfg.agent_params.num_conv_layers > 0 else "MlpPolicy"
 
     return A2C(
         policy,
@@ -102,12 +89,12 @@ class A2CAgent(SB3BaseAgent):
 
     def __init__(
         self,
-        env: PettingZooEnv = None,
+        agent_id: str,
+        env: Environment = None,
         cfg: DictConfig = None,
         **kwargs,
     ) -> None:
-        super().__init__(env=env, cfg=cfg, **kwargs)
-
+        super().__init__(agent_id=agent_id, env=env, cfg=cfg, **kwargs)
         self.model_constructor = dqn_model_constructor
 
         if (

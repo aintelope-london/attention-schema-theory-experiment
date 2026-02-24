@@ -127,7 +127,7 @@ food_sharing.py
 ## Attribution & License
 
 This repository is a fork and derivative of "Roland Pihlakas. From homeostasis to resource sharing: Biologically and economically aligned multi-objective multi-agent gridworld-based AI safety benchmarks". Please cite the original work (DOI: [`10.48550/arXiv.2410.00081`](https://doi.org/10.48550/arXiv.2410.00081)) — see [`CITATION.cff`](CITATION.cff) for citation metadata.  
-Original upstream repository: https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
+Original upstream repository: https://github.com/aintelope-london/attention-schema-theory-experiment
 
 License: see [`LICENSE.txt`](LICENSE.txt).  
 Code contribution details: see [`AUTHORS.md`](AUTHORS.md).

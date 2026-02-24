@@ -3,7 +3,7 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # Repository:
-# https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
+# https://github.com/aintelope-london/attention-schema-theory-experiment
 
 import os
 
@@ -22,9 +22,8 @@ import datetime
 
 from aintelope.config.config_utils import select_gpu, set_priorities, set_memory_limits
 
-from aintelope.agents import Agent
+from aintelope.agents import AbstractAgent
 from aintelope.aintelope_typing import ObservationFloat, PettingZooEnv
-from aintelope.training.dqn_training import Trainer
 
 from aintelope.environments.savanna_safetygrid import (
     INFO_REWARD_DICT,
@@ -214,7 +213,7 @@ def sb3_agent_train_thread_entry_point(
         print(info)
 
 
-class SB3BaseAgent(Agent):
+class SB3BaseAgent(AbstractAgent):
     """SB3BaseAgent abstract class for stable baselines 3
     https://pettingzoo.farama.org/tutorials/sb3/waterworld/
     https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html
@@ -224,12 +223,8 @@ class SB3BaseAgent(Agent):
     def __init__(
         self,
         agent_id: str,
-        trainer: Trainer,
-        env: Environment,
-        cfg: DictConfig,
-        i_trial: int = 0,
-        events: pd.DataFrame = None,  # TODO: this is no longer a DataFrame, but an EventLog
-        score_dimensions: list = [],
+        env: Environment = None,
+        cfg: DictConfig = None,
         **kwargs,
     ) -> None:
         self.id = agent_id
@@ -241,11 +236,11 @@ class SB3BaseAgent(Agent):
             + env.__class__.__bases__[0].__qualname__
         )
         self.test_mode = self.cfg.run.test_mode
-        self.i_trial = i_trial
+        self.i_trial = 0
         self.next_episode_no = 0
         self.total_steps_across_episodes = 0
-        self.score_dimensions = score_dimensions
-        self.events = events
+        self.score_dimensions = []
+        self.events = None
         self.done = False
         self.last_action = None
         self.info = None
@@ -259,8 +254,7 @@ class SB3BaseAgent(Agent):
 
         stable_baselines3.common.save_util.is_json_serializable = is_json_serializable  # The original function throws many "Pythonic" exceptions which make debugging in Visual Studio too noisy since VS does not have capacity to filter out handled exceptions
 
-    # this method is currently called only in test mode
-    def reset(self, state, info, env_class) -> None:
+    def reset(self, state, info=None, env_class=None, **kwargs) -> None:
         """Resets self and updates the state."""
         self.done = False
         self.last_action = None
@@ -272,19 +266,7 @@ class SB3BaseAgent(Agent):
 
         self.env_class = env_class
 
-    def get_action(
-        self,
-        observation: Tuple[  # TODO: SB3 observation is NOT a Tuple
-            npt.NDArray[ObservationFloat], npt.NDArray[ObservationFloat]
-        ] = None,
-        info: dict = {},
-        step: int = 0,
-        env_layout_seed: int = 0,
-        episode: int = 0,
-        trial: int = 0,
-        *args,
-        **kwargs,
-    ) -> Optional[int]:
+    def get_action(self, observation=None, **kwargs) -> Optional[int]:
         """Given an observation, ask your model what to do.
         Called during test only, not during training.
 
@@ -293,6 +275,12 @@ class SB3BaseAgent(Agent):
         """
         if self.done:
             return None
+
+        info = kwargs.get("info", {})
+        trial = kwargs.get("trial", 0)
+        episode = kwargs.get("episode", 0)
+        env_layout_seed = kwargs.get("env_layout_seed", 0)
+        step = kwargs.get("step", 0)
 
         self.info = info
 
@@ -556,36 +544,16 @@ class SB3BaseAgent(Agent):
             + env_step_info
         )
 
-    def update(
-        self,
-        env: PettingZooEnv = None,
-        observation: Tuple[
-            npt.NDArray[ObservationFloat], npt.NDArray[ObservationFloat]
-        ] = None,
-        info: dict = {},
-        score: float = 0.0,
-        done: bool = False,
-    ) -> list:
+    def update(self, observation=None, **kwargs) -> list:
         """
-        Takes observations and updates trainer on perceived experiences.
-
-        Args:
-            env: Environment
-            observation: Tuple[ObservationArray, ObservationArray]
-            score: Only baseline uses score as a reward
-            done: boolean whether run is done
-        Returns:
-            agent_id (str): same as elsewhere ("agent_0" among them)
-            state (Tuple[npt.NDArray[ObservationFloat], npt.NDArray[ObservationFloat]]): input for the net
-            action (int): index of action
-            reward (float): reward signal
-            done (bool): if agent is done
-            next_state (npt.NDArray[ObservationFloat]): input for the net
+        Takes observations and updates on perceived experiences.
         """
-
         assert self.last_action is not None
 
         next_state = observation
+        score = kwargs.get("score", 0.0)
+        done = kwargs.get("done", False)
+        info = kwargs.get("info", {})
 
         event = [self.id, self.state, self.last_action, score, done, next_state]
         self.state = next_state
@@ -593,6 +561,7 @@ class SB3BaseAgent(Agent):
         return event
 
     def train(self, num_total_steps):
+        self.env._sb3_training = True
         self.env._scalarize_rewards = True
         self.env._pre_reset_callback2 = self.env_pre_reset_callback
         self.env._post_reset_callback2 = self.env_post_reset_callback
@@ -637,6 +606,7 @@ class SB3BaseAgent(Agent):
                 terminate_all_agents_when_one_excepts=True,
                 checkpoint_filenames=checkpoint_filenames,
             )
+        self.env._sb3_training = False
         self.env._scalarize_rewards = False
         self.env._pre_reset_callback2 = None
         self.env._post_reset_callback2 = None
@@ -645,10 +615,10 @@ class SB3BaseAgent(Agent):
         if self.exceptions:
             raise Exception(str(self.exceptions))
 
-    def save_model(self, path: Path):
+    def save_model(self, path, **kwargs):
         models = {self.id: self.model} if self.model is not None else self.models
         for agent_id, model in models.items():
-            torch.save(model.get_parameters(), path.parent / f"{agent_id}.pt")
+            torch.save(model.get_parameters(), Path(path).parent / f"{agent_id}.pt")
 
     def init_model(
         self,

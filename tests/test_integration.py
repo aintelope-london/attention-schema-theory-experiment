@@ -18,12 +18,14 @@ def test_agent_learns(base_test_config):
         base_test_config,
         {
             "train": {
-                "run": {"episodes": 300},  # 500 works for these params at least
+                "run": {"episodes": 300},
                 "agent_params": {
-                    "agent_class": "sb3_ppo_agent",
+                    "agent_0": {
+                        "agent_class": "sb3_ppo_agent",
+                    },
                     "num_conv_layers": 0,
-                    "learning_rate": 0.002,  # 0.001
-                    "ppo_n_steps": 32,  # 32
+                    "learning_rate": 0.002,
+                    "ppo_n_steps": 32,
                 },
                 "env_params": {
                     "map_max": 4,
@@ -35,7 +37,9 @@ def test_agent_learns(base_test_config):
             "test": {
                 "run": {"episodes": 10, "test_mode": True},
                 "agent_params": {
-                    "agent_class": "sb3_ppo_agent",
+                    "agent_0": {
+                        "agent_class": "sb3_ppo_agent",
+                    },
                     "num_conv_layers": 0,
                     "learning_rate": 0.001,
                     "ppo_n_steps": 32,

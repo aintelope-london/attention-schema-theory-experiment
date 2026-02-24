@@ -1,8 +1,11 @@
 """Abstract environment contract.
 
-All environments expose this interface. The orchestration layer
+Minimal multi-agent MDP interface. The orchestration layer
 (experiments.py) depends only on this contract, never on concrete
 environment internals.
+
+All methods exchange dicts keyed by agent_id. The environment
+does not dictate how many agents exist — that comes from config.
 """
 
 from abc import ABC, abstractmethod
@@ -14,10 +17,8 @@ class AbstractEnv(ABC):
         """Reset the environment.
 
         Returns:
-            observations: {agent_id: ndarray}
-            infos:        {agent_id: {"position": (r,c), "direction": (dr,dc), ...}}
-
-        Manifesto is built on reset and accessible via the manifesto property.
+            observations: {agent_id: observation}
+            infos:        {agent_id: dict}
         """
 
     @abstractmethod
@@ -28,8 +29,7 @@ class AbstractEnv(ABC):
             actions: {agent_id: action}
 
         Returns:
-            observations, scores, terminateds, truncateds, infos
-            All dicts keyed by agent_id. scores values are dicts.
+            observations, rewards, terminateds, truncateds, infos
         """
 
     @abstractmethod
@@ -40,8 +40,18 @@ class AbstractEnv(ABC):
             actions: {agent_id: action}
 
         Returns:
-            observations, scores, terminateds, truncateds, infos
-            Same format as step_parallel.
+            observations, rewards, terminateds, truncateds, infos
+        """
+
+    @property
+    @abstractmethod
+    def manifesto(self):
+        """Environment manifesto. Built on reset().
+
+        Returns:
+            dict with at minimum:
+                observation_shapes: {field_name: shape_tuple}
+                action_space: list of action indices
         """
 
     @abstractmethod
@@ -55,22 +65,4 @@ class AbstractEnv(ABC):
     @property
     @abstractmethod
     def score_dimensions(self):
-        """List of score dimension names."""
-
-    @abstractmethod
-    def observation_space(self, agent_id):
-        """Gymnasium Space for the given agent."""
-
-    @abstractmethod
-    def action_space(self, agent_id):
-        """Gymnasium Space for the given agent."""
-
-    @property
-    @abstractmethod
-    def max_num_agents(self):
-        """Maximum number of agents."""
-
-    @property
-    @abstractmethod
-    def agents(self):
-        """List of current agent ids."""
+        """List of score dimension names for event logging."""

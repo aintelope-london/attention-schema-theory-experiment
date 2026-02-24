@@ -3,7 +3,7 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # Repository:
-# https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
+# https://github.com/aintelope-london/attention-schema-theory-experiment
 
 import os
 import copy
@@ -16,7 +16,7 @@ from aintelope.config.config_utils import (
     get_score_dimensions,
     set_console_title,
 )
-from aintelope.experiments import run_experiment
+from aintelope.experiment import run_experiment
 from aintelope.utils.seeding import set_global_seeds
 from aintelope.utils.progress import ProgressReporter
 from aintelope.utils.concurrency import find_workers
@@ -47,12 +47,10 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
         )
         OmegaConf.update(experiment_cfg.run, "seed", trial_seed, force_add=True)
 
-        score_dimensions = get_score_dimensions(experiment_cfg)
         reporter = ProgressReporter(["episode"], on_update=None)
 
         result = run_experiment(
             experiment_cfg,
-            score_dimensions=score_dimensions,
             i_trial=i_trial,
             reporter=reporter,
         )

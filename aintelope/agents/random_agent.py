@@ -1,25 +1,24 @@
-from aintelope.agents.abstract_agent import Agent
+import random
+from aintelope.agents.abstract_agent import AbstractAgent
 
 
-class RandomAgent(Agent):
-    def __init__(self, agent_id, trainer=None, env=None, cfg=None, **kwargs):
+class RandomAgent(AbstractAgent):
+    def __init__(self, agent_id, env=None, cfg=None, **kwargs):
         self.id = agent_id
         self.done = False
+        self.last_action = None
+        self.action_space = env.manifesto["action_space"]
 
-    def reset(self, state, info, env_class):
+    def reset(self, state, **kwargs):
         self.done = False
+        self.last_action = None
 
-    def init_model(self, observation_shape, action_space, checkpoint=None):
-        self.action_space = action_space
-
-    def get_action(self, *args, **kwargs):
-        self.last_action = self.action_space.sample()
+    def get_action(self, observation=None, **kwargs):
+        self.last_action = random.choice(self.action_space)
         return self.last_action
 
-    def update(self, observation=None, score=0.0, done=False, **kwargs):
-        self.state = observation
-        event = [self.id, self.state, self.last_action, score, done, observation]
-        return event
+    def update(self, observation=None, **kwargs):
+        return []
 
-    def save_model(self, path):
+    def save_model(self, path, **kwargs):
         pass

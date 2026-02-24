@@ -3,7 +3,7 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # Repository:
-# https://github.com/biological-alignment-benchmarks/biological-alignment-gridworlds-benchmarks
+# https://github.com/aintelope-london/attention-schema-theory-experiment
 
 import gc
 from pathlib import Path
@@ -17,25 +17,33 @@ from aintelope.analytics.recording import (
     checkpoint_path,
 )
 from aintelope.environments import get_env_class
-from aintelope.training.dqn_training import Trainer
 from aintelope.utils.performance import ResourceMonitor
 from aintelope.utils.roi import compute_roi
 
 
-def _extract_roi_inputs(infos):
-    """Pull positions and directions from augmented infos dict."""
-    positions = {aid: infos[aid]["position"] for aid in infos}
-    directions = {aid: infos[aid]["direction"] for aid in infos}
-    return positions, directions
+def _combine_obs(observations):
+    """Convert dict observations to combined (C+N, H, W) cubes for SB3 compatibility.
+    Each interoception value becomes a constant-filled spatial layer."""
+    import numpy as np
+
+    result = {}
+    for aid, obs in observations.items():
+        vision = obs["vision"]  # (C, H, W)
+        interoception = obs["interoception"]  # (N,)
+        H, W = vision.shape[1], vision.shape[2]
+        intero_layers = np.broadcast_to(
+            interoception[:, None, None], (len(interoception), H, W)
+        ).copy()
+        result[aid] = np.concatenate([vision, intero_layers], axis=0)
+    return result
 
 
 def run_experiment(
     cfg: DictConfig,
-    score_dimensions: list = [],
     i_trial: int = 0,
     reporter=None,
 ) -> None:
-    is_sb3 = cfg.agent_params.agent_class.startswith("sb3_")
+    is_sb3 = cfg.agent_params.agent_0.agent_class.startswith("sb3_")
     mode = cfg.env_params.mode
     roi_mode = cfg.agent_params.roi_mode
     radius = cfg.env_params.render_agent_radius
@@ -51,77 +59,41 @@ def run_experiment(
     # Environment
     env = get_env_class(cfg.env_params.env)(cfg=cfg)
     observations, infos = env.reset()
-    manifesto = env.manifesto
 
-    # Event logging — score dimensions from env, not hardcoded
+    # Event logging — score dimensions from env
     score_dims = env.score_dimensions
     events_columns = list(cfg.run.event_columns) + score_dims
     events = EventLog(events_columns)
     events.experiment_name = cfg.experiment_name
     states = StateLog()
 
-    # Common trainer for each agent's models
-    trainer = None if is_sb3 else Trainer(cfg)
-
     # Agents
     agents = []
     dones = {}
 
-    for i in range(env.max_num_agents):
-        agent_id = f"agent_{i}"
-        agent = get_agent_class(cfg.agent_params.agent_class)(
-            agent_id=agent_id,
-            trainer=trainer,
-            env=env,
-            cfg=cfg,
-            **cfg.agent_params,
+    if is_sb3:
+        agents, dones = _init_sb3_agents(
+            cfg, env, observations, infos, events, score_dims, i_trial
         )
-        agents.append(agent)
-
-        if is_sb3:
-            agent.i_trial = i_trial
-            agent.events = events
-            agent.score_dimensions = score_dims
-
-        observation = observations[agent_id]
-        info = infos[agent_id]
-
-        # Legacy: observation shape depends on combine_interoception_and_vision
-        if not cfg.env_params.combine_interoception_and_vision:
-            obs_shape = (observation[0].shape, observation[1].shape)
-        else:
-            obs_shape = observation.shape
-
-        print(f"\nAgent {agent_id} observation shape: {obs_shape}")
-
-        agent.reset(observation, info, type(env))
-        checkpoint = get_checkpoint(cfg.run.outputs_dir, agent_id)
-
-        # Legacy: model init shape depends on observation format
-        if not cfg.env_params.combine_interoception_and_vision:
-            agent.init_model(
-                (observation[0].shape, observation[1].shape),
-                env.action_space(agent_id),
-                checkpoint=checkpoint,
+    else:
+        for agent_id, agent_cfg in cfg.agent_params.items():
+            if not agent_id.startswith("agent_"):
+                continue
+            agent = get_agent_class(agent_cfg.agent_class)(
+                agent_id=agent_id,
+                env=env,
+                cfg=cfg,
             )
-        else:
-            agent.init_model(
-                observation.shape,
-                env.action_space(agent_id),
-                checkpoint=checkpoint,
-            )
-        dones[agent_id] = False
+            agents.append(agent)
+            agent.reset(observations[agent_id])
+            dones[agent_id] = False
 
     # Main loop
     monitor.sample("init")
 
     # SB3 training has its own loop (special permission — documented in DOCUMENTATION.md)
     if is_sb3 and not cfg.run.test_mode:
-        monitor.sample("sb3_train_start")
-        run_baseline_training(cfg, i_trial, env, agents)
-        monitor.sample("sb3_train_end")
-        gc.collect()
-        monitor.report(Path(cfg.run.outputs_dir) / cfg.experiment_name)
+        _run_sb3_training(cfg, i_trial, env, agents, events, states, monitor)
         return {"events": events.to_dataframe(), "states": states.to_dataframe()}
 
     reporter.set_total("episode", cfg.run.episodes)
@@ -145,8 +117,12 @@ def run_experiment(
         # Reset
         observations, infos = env.reset(env_layout_seed=env_layout_seed)
 
+        # SB3 test mode: convert dict observations to combined ndarray
+        if is_sb3:
+            observations = _combine_obs(observations)
+
         for agent in agents:
-            agent.reset(observations[agent.id], infos[agent.id], type(env))
+            agent.reset(observations[agent.id])
             dones[agent.id] = False
 
         monitor.sample("reset")
@@ -186,10 +162,11 @@ def run_experiment(
             dones = {aid: terminateds[aid] or truncateds[aid] for aid in terminateds}
 
             # ROI
-            positions, directions = _extract_roi_inputs(infos)
-            observations = compute_roi(
-                observations, positions, directions, roi_mode, radius
-            )
+            observations = compute_roi(observations, infos, roi_mode, radius)
+
+            # SB3 test mode: convert dict observations to combined ndarray
+            if is_sb3:
+                observations = _combine_obs(observations)
 
             # Update agents
             for agent in agents:
@@ -198,17 +175,11 @@ def run_experiment(
                 done = dones[agent.id]
                 if terminateds[agent.id]:
                     observation = None
-                agent_step_info = agent.update(
-                    env=env,
-                    observation=observation,
-                    info=infos[agent.id],
-                    score=sum(score.values()),
-                    done=done,
-                )
 
-                # Record event
+                agent.update(observation=observation)
+
+                # Record event — experiments.py owns the log format
                 env_step_info = [score.get(dim, 0) for dim in score_dims]
-                # raw_obs = infos[agent.id]["raw_observation"]
                 events.log_event(
                     [
                         cfg.experiment_name,
@@ -217,10 +188,14 @@ def run_experiment(
                         env_layout_seed,
                         step,
                         cfg.run.test_mode,
+                        agent.id,
+                        None,  # State — TODO: define canonical state representation
+                        agent.last_action,
+                        sum(score.values()),
+                        done,
+                        None,  # Next_state
+                        observation,
                     ]
-                    + agent_step_info
-                    # + [raw_obs]
-                    + [observations[agent.id]]
                     + env_step_info
                 )
 
@@ -229,10 +204,6 @@ def run_experiment(
             states.log(
                 [cfg.experiment_name, i_trial, i_episode, step, (board, layer_order)]
             )
-
-            # Perform one step of the optimization (on the policy network)
-            if not cfg.run.test_mode:
-                trainer.optimize_models()
 
             # Break when all agents are done
             if all(dones.values()):
@@ -249,7 +220,50 @@ def run_experiment(
     return {"events": events.to_dataframe(), "states": states.to_dataframe()}
 
 
-def run_baseline_training(cfg: DictConfig, i_trial: int, env, agents: list):
+# ── SB3 legacy ────────────────────────────────────────────────────────
+
+
+def _init_sb3_agents(cfg, env, observations, infos, events, score_dims, i_trial):
+    """Initialize SB3 agents with legacy interface. Isolated for readability."""
+    agents = []
+    dones = {}
+
+    # Convert dict observations to combined ndarrays for SB3
+    sb3_observations = _combine_obs(observations)
+
+    for i in range(env.max_num_agents):
+        agent_id = f"agent_{i}"
+        agent = get_agent_class(cfg.agent_params[agent_id].agent_class)(
+            agent_id=agent_id,
+            env=env,
+            cfg=cfg,
+            **cfg.agent_params,
+        )
+        agents.append(agent)
+        agent.i_trial = i_trial
+        agent.events = events
+        agent.score_dimensions = score_dims
+
+        observation = sb3_observations[agent_id]
+        info = infos[agent_id]
+        agent.reset(observation, info, type(env))
+        checkpoint = get_checkpoint(cfg.run.outputs_dir, agent_id)
+        agent.init_model(
+            observation.shape,
+            env.action_space(agent_id),
+            checkpoint=checkpoint,
+        )
+        dones[agent_id] = False
+
+    return agents, dones
+
+
+def _run_sb3_training(cfg, i_trial, env, agents, events, states, monitor):
+    """SB3 training loop — special permission documented in DOCUMENTATION.md."""
+    monitor.sample("sb3_train_start")
     num_total_steps = cfg.run.steps * cfg.run.episodes
     agents[0].train(num_total_steps)
     agents[0].save_model(checkpoint_path(cfg.run.outputs_dir, agents[0].id))
+    monitor.sample("sb3_train_end")
+    gc.collect()
+    monitor.report(Path(cfg.run.outputs_dir) / cfg.experiment_name)
