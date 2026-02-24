@@ -254,14 +254,25 @@ class SB3BaseAgent(AbstractAgent):
 
         stable_baselines3.common.save_util.is_json_serializable = is_json_serializable  # The original function throws many "Pythonic" exceptions which make debugging in Visual Studio too noisy since VS does not have capacity to filter out handled exceptions
 
+    def _prepare_obs(self, observation):
+        """Convert multimodal dict observation to combined (C+N, H, W) ndarray.
+        Each interoception value becomes a constant-filled spatial layer."""
+        vision = observation["vision"]  # (C, H, W)
+        interoception = observation["interoception"]  # (N,)
+        H, W = vision.shape[1], vision.shape[2]
+        intero_layers = np.broadcast_to(
+            interoception[:, None, None], (len(interoception), H, W)
+        ).copy()
+        return np.concatenate([vision, intero_layers], axis=0)
+
     def reset(self, state, info=None, env_class=None, **kwargs) -> None:
         """Resets self and updates the state."""
         self.done = False
         self.last_action = None
 
-        self.state = state
+        self.state = self._prepare_obs(state)
         self.info = info
-        self.states = {self.id: state}  # TODO: multi-agent support
+        self.states = {self.id: self.state}  # TODO: multi-agent support
         self.infos = {self.id: info}
 
         self.env_class = env_class
@@ -295,6 +306,7 @@ class SB3BaseAgent(AbstractAgent):
         if self.model and hasattr(self.model.policy, "set_info"):
             self.model.policy.set_info(self.info)
 
+        observation = self._prepare_obs(observation)
         action, _states = self.model.predict(
             observation, deterministic=True
         )  # TODO: config setting for "deterministic" parameter
@@ -550,7 +562,7 @@ class SB3BaseAgent(AbstractAgent):
         """
         assert self.last_action is not None
 
-        next_state = observation
+        next_state = self._prepare_obs(observation)
         score = kwargs.get("score", 0.0)
         done = kwargs.get("done", False)
         info = kwargs.get("info", {})

@@ -174,7 +174,11 @@ class ConfigGUI:
         """Map agent_N paths to agent_0 for schema lookup."""
         parts = path.split(".")
         for i, part in enumerate(parts):
-            if part.startswith(AGENT_PREFIX) and part != "agent_0":
+            if (
+                part.startswith(AGENT_PREFIX)
+                and part[len(AGENT_PREFIX) :].isdigit()
+                and part != "agent_0"
+            ):
                 parts[i] = "agent_0"
         return ".".join(parts)
 

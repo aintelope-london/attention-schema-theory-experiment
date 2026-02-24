@@ -21,23 +21,6 @@ from aintelope.utils.performance import ResourceMonitor
 from aintelope.utils.roi import compute_roi
 
 
-def _combine_obs(observations):
-    """Convert dict observations to combined (C+N, H, W) cubes for SB3 compatibility.
-    Each interoception value becomes a constant-filled spatial layer."""
-    import numpy as np
-
-    result = {}
-    for aid, obs in observations.items():
-        vision = obs["vision"]  # (C, H, W)
-        interoception = obs["interoception"]  # (N,)
-        H, W = vision.shape[1], vision.shape[2]
-        intero_layers = np.broadcast_to(
-            interoception[:, None, None], (len(interoception), H, W)
-        ).copy()
-        result[aid] = np.concatenate([vision, intero_layers], axis=0)
-    return result
-
-
 def run_experiment(
     cfg: DictConfig,
     i_trial: int = 0,
@@ -117,10 +100,6 @@ def run_experiment(
         # Reset
         observations, infos = env.reset(env_layout_seed=env_layout_seed)
 
-        # SB3 test mode: convert dict observations to combined ndarray
-        if is_sb3:
-            observations = _combine_obs(observations)
-
         for agent in agents:
             agent.reset(observations[agent.id])
             dones[agent.id] = False
@@ -164,17 +143,11 @@ def run_experiment(
             # ROI
             observations = compute_roi(observations, infos, roi_mode, radius)
 
-            # SB3 test mode: convert dict observations to combined ndarray
-            if is_sb3:
-                observations = _combine_obs(observations)
-
             # Update agents
             for agent in agents:
                 observation = observations[agent.id]
                 score = scores[agent.id]
                 done = dones[agent.id]
-                # if terminateds[agent.id]:
-                #    observation = None
 
                 agent.update(observation=observation)
 
@@ -228,9 +201,6 @@ def _init_sb3_agents(cfg, env, observations, infos, events, score_dims, i_trial)
     agents = []
     dones = {}
 
-    # Convert dict observations to combined ndarrays for SB3
-    sb3_observations = _combine_obs(observations)
-
     for i in range(env.max_num_agents):
         agent_id = f"agent_{i}"
         agent = get_agent_class(cfg.agent_params[agent_id].agent_class)(
@@ -244,12 +214,12 @@ def _init_sb3_agents(cfg, env, observations, infos, events, score_dims, i_trial)
         agent.events = events
         agent.score_dimensions = score_dims
 
-        observation = sb3_observations[agent_id]
+        observation = observations[agent_id]
         info = infos[agent_id]
         agent.reset(observation, info, type(env))
         checkpoint = get_checkpoint(cfg.run.outputs_dir, agent_id)
         agent.init_model(
-            observation.shape,
+            agent.state.shape,
             env.action_space(agent_id),
             checkpoint=checkpoint,
         )
