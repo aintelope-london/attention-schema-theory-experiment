@@ -56,19 +56,7 @@ def dqn_model_constructor(env, env_classname, agent_id, cfg):
     # https://github.com/DLR-RM/stable-baselines3/issues/1863
     # Also: make sure your image is in the channel-first format
 
-    use_imitation_learning = (
-        cfg.agent_params.instinct_bias_epsilon_start > 0
-        or cfg.agent_params.instinct_bias_epsilon_end > 0
-    )
-    if use_imitation_learning:
-        policy_override_class = (
-            CnnPolicy if cfg.agent_params.num_conv_layers > 0 else MlpPolicy
-        )
-        policy = PolicyWithConfigFactory(
-            env_classname, agent_id, cfg, policy_override_class
-        )
-    else:
-        policy = "CnnPolicy" if cfg.agent_params.num_conv_layers > 0 else "MlpPolicy"
+    policy = "CnnPolicy" if cfg.agent_params.num_conv_layers > 0 else "MlpPolicy"
 
     return DQN(
         policy,
@@ -106,11 +94,12 @@ class DQNAgent(SB3BaseAgent):
 
     def __init__(
         self,
-        env: PettingZooEnv = None,
+        agent_id: str,
+        env: Environment = None,
         cfg: DictConfig = None,
         **kwargs,
     ) -> None:
-        super().__init__(env=env, cfg=cfg, **kwargs)
+        super().__init__(agent_id=agent_id, env=env, cfg=cfg, **kwargs)
 
         self.model_constructor = dqn_model_constructor
 

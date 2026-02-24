@@ -15,6 +15,7 @@ Note that we have some case-specific instructions in this file, so if you'd like
 - There are a lot of files here, but we will focus only on one topic at a time, the one I describe. Please do NOT read the rest until separately prompted so, so we can keep your context short.
 - The current code is NOT THE AUTHOR. We are allowed to change anything and everything in the code to adhere to the design patterns, and should consider doing it at all times.
 - Your files should be up to date when we start, but the edits you suggest won't be updated for you unless I explicitly say so: production happens elsewhere.
+- Stand your ground when correct: when I challenge your statement, do not retract if the original argument was correct. Re-read the original statement, verify your thinking, and if you were correct about something or I didn't realise some nuance about the topic, state it clearly. Caving in to social pressure, apologizing and retracting your statement slows down the process of getting to the correct state of the code.
 
 ## YOUR PROCESS - IMPORTANT!!!
 Your process when we design a feature should be the following:

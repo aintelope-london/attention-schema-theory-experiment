@@ -21,12 +21,29 @@ from aintelope.utils.performance import ResourceMonitor
 from aintelope.utils.roi import compute_roi
 
 
+def _combine_obs(observations):
+    """Convert dict observations to combined (C+N, H, W) cubes for SB3 compatibility.
+    Each interoception value becomes a constant-filled spatial layer."""
+    import numpy as np
+
+    result = {}
+    for aid, obs in observations.items():
+        vision = obs["vision"]  # (C, H, W)
+        interoception = obs["interoception"]  # (N,)
+        H, W = vision.shape[1], vision.shape[2]
+        intero_layers = np.broadcast_to(
+            interoception[:, None, None], (len(interoception), H, W)
+        ).copy()
+        result[aid] = np.concatenate([vision, intero_layers], axis=0)
+    return result
+
+
 def run_experiment(
     cfg: DictConfig,
     i_trial: int = 0,
     reporter=None,
 ) -> None:
-    is_sb3 = cfg.agent_params.agent_class.startswith("sb3_")
+    is_sb3 = cfg.agent_params.agent_0.agent_class.startswith("sb3_")
     mode = cfg.env_params.mode
     roi_mode = cfg.agent_params.roi_mode
     radius = cfg.env_params.render_agent_radius
@@ -59,8 +76,10 @@ def run_experiment(
             cfg, env, observations, infos, events, score_dims, i_trial
         )
     else:
-        for agent_id in observations.keys():
-            agent = get_agent_class(cfg.agent_params.agent_class)(
+        for agent_id, agent_cfg in cfg.agent_params.items():
+            if not agent_id.startswith("agent_"):
+                continue
+            agent = get_agent_class(agent_cfg.agent_class)(
                 agent_id=agent_id,
                 env=env,
                 cfg=cfg,
@@ -97,6 +116,10 @@ def run_experiment(
 
         # Reset
         observations, infos = env.reset(env_layout_seed=env_layout_seed)
+
+        # SB3 test mode: convert dict observations to combined ndarray
+        if is_sb3:
+            observations = _combine_obs(observations)
 
         for agent in agents:
             agent.reset(observations[agent.id])
@@ -140,6 +163,10 @@ def run_experiment(
 
             # ROI
             observations = compute_roi(observations, infos, roi_mode, radius)
+
+            # SB3 test mode: convert dict observations to combined ndarray
+            if is_sb3:
+                observations = _combine_obs(observations)
 
             # Update agents
             for agent in agents:
@@ -198,13 +225,15 @@ def run_experiment(
 
 def _init_sb3_agents(cfg, env, observations, infos, events, score_dims, i_trial):
     """Initialize SB3 agents with legacy interface. Isolated for readability."""
-
     agents = []
     dones = {}
 
+    # Convert dict observations to combined ndarrays for SB3
+    sb3_observations = _combine_obs(observations)
+
     for i in range(env.max_num_agents):
         agent_id = f"agent_{i}"
-        agent = get_agent_class(cfg.agent_params.agent_class)(
+        agent = get_agent_class(cfg.agent_params[agent_id].agent_class)(
             agent_id=agent_id,
             env=env,
             cfg=cfg,
@@ -215,22 +244,15 @@ def _init_sb3_agents(cfg, env, observations, infos, events, score_dims, i_trial)
         agent.events = events
         agent.score_dimensions = score_dims
 
-        observation = observations[agent_id]
+        observation = sb3_observations[agent_id]
         info = infos[agent_id]
         agent.reset(observation, info, type(env))
         checkpoint = get_checkpoint(cfg.run.outputs_dir, agent_id)
-        if not cfg.env_params.combine_interoception_and_vision:
-            agent.init_model(
-                (observation[0].shape, observation[1].shape),
-                env.action_space(agent_id),
-                checkpoint=checkpoint,
-            )
-        else:
-            agent.init_model(
-                observation.shape,
-                env.action_space(agent_id),
-                checkpoint=checkpoint,
-            )
+        agent.init_model(
+            observation.shape,
+            env.action_space(agent_id),
+            checkpoint=checkpoint,
+        )
         dones[agent_id] = False
 
     return agents, dones
