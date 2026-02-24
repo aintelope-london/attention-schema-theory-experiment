@@ -55,7 +55,7 @@ env_params:
   render_agent_radius: ${minus_3:${env_params.map_max}}
   map_randomization_frequency: 3   # @ui int 0 3
   render_mode: null                # @ui str null,human,rgb_array
-  amount_agents: 1                 # @ui int 1 10
+  amount_agents: 1
   amount_grass_patches: 1          # @ui int 0 20
   amount_water_holes: 0            # @ui int 0 20
   amount_danger_tiles: 0           # @ui int 0 20

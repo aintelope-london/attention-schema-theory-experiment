@@ -16,6 +16,7 @@ from aintelope.config.config_utils import (
     get_score_dimensions,
     set_console_title,
 )
+from aintelope.config.config_utils import prepare_experiment_cfg
 from aintelope.experiment import run_experiment
 from aintelope.utils.seeding import set_global_seeds
 from aintelope.utils.progress import ProgressReporter
@@ -40,13 +41,9 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
     all_states = []
 
     for _, experiment_name in enumerate(main_config):
-        experiment_cfg = copy.deepcopy(cfg)
-        experiment_cfg = OmegaConf.merge(cfg, main_config[experiment_name])
-        OmegaConf.update(
-            experiment_cfg, "experiment_name", experiment_name, force_add=True
+        experiment_cfg = prepare_experiment_cfg(
+            cfg, main_config[experiment_name], experiment_name, trial_seed
         )
-        OmegaConf.update(experiment_cfg.run, "seed", trial_seed, force_add=True)
-
         reporter = ProgressReporter(["episode"], on_update=None)
 
         result = run_experiment(
