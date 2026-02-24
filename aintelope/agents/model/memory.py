@@ -14,7 +14,7 @@ class ReplayMemory:
         entry = {field: kwargs.get(field) for field in self.fields}
         if any(v is None for v in entry.values()):
             raise ValueError(
-                f"Missing fields in memory: {[k for k,v in entry.items() if v is None]}"
+                f"Missing fields in memory: {[k for k, v in entry.items() if v is None]}"
             )
         self.memory.append(entry)
 
