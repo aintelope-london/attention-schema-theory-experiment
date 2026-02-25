@@ -28,8 +28,6 @@ def run_experiment(
 ) -> None:
     is_sb3 = cfg.agent_params.agent_0.agent_class.startswith("sb3_")
     mode = cfg.env_params.mode
-    roi_mode = cfg.agent_params.roi_mode
-    radius = cfg.env_params.render_agent_radius
 
     monitor = ResourceMonitor(
         context={
@@ -141,15 +139,17 @@ def run_experiment(
             dones = {aid: terminateds[aid] or truncateds[aid] for aid in terminateds}
 
             # ROI
-            observations = compute_roi(observations, infos, roi_mode, radius)
+            observations, absolute_masks = compute_roi(observations, infos, cfg)
 
             # Update agents
             for agent in agents:
                 observation = observations[agent.id]
                 score = scores[agent.id]
                 done = dones[agent.id]
-
-                agent.update(observation=observation)
+                if terminateds[agent.id]:
+                    observation = None
+                else:
+                    agent.update(observation=observation)
 
                 # Record event — experiments.py owns the log format
                 env_step_info = [score.get(dim, 0) for dim in score_dims]
@@ -175,7 +175,13 @@ def run_experiment(
             # Record global board state once per step
             board, layer_order = env.board_state()
             states.log(
-                [cfg.experiment_name, i_trial, i_episode, step, (board, layer_order)]
+                [
+                    cfg.experiment_name,
+                    i_trial,
+                    i_episode,
+                    step,
+                    (board, layer_order, absolute_masks),
+                ]
             )
 
             # Break when all agents are done

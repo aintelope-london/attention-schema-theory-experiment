@@ -477,7 +477,13 @@ class SB3BaseAgent(AbstractAgent):
         if self.state_log is not None:
             board, layer_order = self.env.board_state()
             self.state_log.log(
-                [self.cfg.experiment_name, i_trial, i_episode, step, (board, layer_order)]
+                [
+                    self.cfg.experiment_name,
+                    i_trial,
+                    i_episode,
+                    step,
+                    (board, layer_order),
+                ]
             )
 
     def sequential_env_post_step_callback(
@@ -564,7 +570,13 @@ class SB3BaseAgent(AbstractAgent):
         if self.state_log is not None:
             board, layer_order = self.env.board_state()
             self.state_log.log(
-                [self.cfg.experiment_name, i_trial, i_episode, step, (board, layer_order)]
+                [
+                    self.cfg.experiment_name,
+                    i_trial,
+                    i_episode,
+                    step,
+                    (board, layer_order),
+                ]
             )
 
     def update(self, observation=None, **kwargs) -> list:

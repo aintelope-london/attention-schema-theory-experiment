@@ -1,20 +1,18 @@
 """Attention Region of Interest computation.
 
-Appends per-agent boolean attention masks to the vision component
-of each agent's observation dict. Geometry functions are stateless
-spatial math.
+Computes per-agent boolean attention masks in absolute board coordinates,
+then crops and rotates them into each observer's viewport for the NN.
 """
 
 import numpy as np
-
 
 _HALF_ARC_RAD = np.pi / 4  # 45° — half of the 90° cone
 
 
 def _cone_mask(h, w, center_r, center_c, dir_r, dir_c, radius):
-    """Boolean cone mask on an (h, w) grid.
+    """Boolean 90° cone mask on an (h, w) grid.
 
-    Cone opens 90° (±45°) from the facing direction.
+    Cone opens ±45° from the facing direction.
     Agent's own cell is always included.
     """
     rows, cols = np.mgrid[0:h, 0:w]
@@ -23,13 +21,15 @@ def _cone_mask(h, w, center_r, center_c, dir_r, dir_c, radius):
     dist_sq = dr * dr + dc * dc
 
     dir_len = np.hypot(dir_r, dir_c)
-    nr, nc = dir_r / dir_len, dir_c / dir_len
+    # Zero direction (NOOP) → only agent's own cell
+    nr = dir_r / max(dir_len, 1e-10)
+    nc = dir_c / max(dir_len, 1e-10)
 
     dist = np.sqrt(dist_sq)
     cos_angle = (dr * nr + dc * nc) / np.maximum(dist, 1e-10)
 
     return (dist_sq <= radius * radius) & (
-        (dist_sq == 0) | (cos_angle >= np.cos(_HALF_ARC_RAD))
+        (dist_sq == 0) | (cos_angle >= np.cos(_HALF_ARC_RAD) - 1e-10)
     )
 
 
@@ -38,101 +38,61 @@ _REGISTRY = {
 }
 
 
-def compute_masks(grid_shape, positions, directions, roi_mode, radius):
-    """Compute boolean masks on a grid.
+def compute_roi(observations, infos, cfg):
+    """Compute ROI masks and append to observations.
 
     Args:
-        grid_shape: (H, W)
-        positions:  {id: (row, col)}
-        directions: {id: (drow, dcol)}
-        roi_mode:   geometry key, e.g. "cone"
-        radius:     vision radius
+        observations: {agent_id: {"vision": ndarray, "interoception": ndarray}}
+        infos:        {agent_id: {"position": (r,c), "direction": (dr,dc),
+                                   "board_shape": (H,W), ...}}
+        cfg:          experiment config
 
     Returns:
-        ndarray [N, H, W] bool — one mask per id, sorted by key.
-        (0, H, W) when positions is empty.
+        (augmented_observations, absolute_masks)
+        absolute_masks: ndarray [N, board_H, board_W] bool — for visualization.
+        Empty [0, H, W] when roi_mode is None.
     """
-    h, w = grid_shape
-    shape_fn = _REGISTRY[roi_mode]
-    ids = sorted(positions.keys())
-    masks = np.empty((len(ids), h, w), dtype=bool)
-    for i, mid in enumerate(ids):
-        r, c = positions[mid]
-        dr, dc = directions[mid]
-        masks[i] = shape_fn(h, w, r, c, dr, dc, radius)
-    return masks
+    roi_mode = cfg.agent_params.roi_mode
+    agent_ids = sorted(observations.keys())
+    board_h, board_w = next(iter(infos.values()))["board_shape"]
 
-
-def append_roi_layers(vision_obs, positions, directions, roi_mode, radius):
-    """Append per-agent ROI mask layers to vision ndarrays.
-
-    Low-level function operating on bare ndarrays. Used by environment
-    wrappers that handle legacy observation formats.
-    Passthrough when roi_mode is None.
-
-    Args:
-        vision_obs: {agent_id: ndarray [layers, H, W]}
-        positions:  {agent_id: (row, col)}
-        directions: {agent_id: (drow, dcol)}
-        roi_mode:   geometry key, or None for passthrough
-        radius:     vision radius
-
-    Returns:
-        {agent_id: ndarray [layers + N_masks, H, W]}
-    """
+    # Null case — identity element
     if roi_mode is None:
-        return vision_obs
-    agent_ids = sorted(vision_obs.keys())
-    viewport_h, viewport_w = next(iter(vision_obs.values())).shape[1:]
-    half_h, half_w = viewport_h // 2, viewport_w // 2
+        return observations, np.zeros((0, board_h, board_w), dtype=bool)
 
+    shape_fn = _REGISTRY[roi_mode]
+    radius = cfg.env_params.render_agent_radius
+
+    positions = {aid: infos[aid]["position"] for aid in agent_ids}
+    directions = {aid: infos[aid]["direction"] for aid in agent_ids}
+
+    # 1. Absolute masks on board grid
+    absolute = np.empty((len(agent_ids), board_h, board_w), dtype=bool)
+    for i, aid in enumerate(agent_ids):
+        r, c = positions[aid]
+        dr, dc = directions[aid]
+        absolute[i] = shape_fn(board_h, board_w, r, c, dr, dc, radius)
+
+    # 2. Crop into each observer's viewport
     result = {}
     for obs_id in agent_ids:
-        obs = vision_obs[obs_id]
+        vision = observations[obs_id]["vision"]
+        vh, vw = vision.shape[1:]
+        half_h, half_w = vh // 2, vw // 2
         obs_r, obs_c = positions[obs_id]
 
-        vp_positions = {
-            aid: (
-                positions[aid][0] - obs_r + half_h,
-                positions[aid][1] - obs_c + half_w,
-            )
-            for aid in agent_ids
+        vp = np.zeros((len(agent_ids), vh, vw), dtype=bool)
+        b_r, b_c = obs_r - half_h, obs_c - half_w
+        # Clipped copy from absolute board → viewport
+        s_r, d_r = max(0, b_r), max(0, -b_r)
+        s_c, d_c = max(0, b_c), max(0, -b_c)
+        h = min(vh - d_r, board_h - s_r)
+        w = min(vw - d_c, board_w - s_c)
+        vp[:, d_r : d_r + h, d_c : d_c + w] = absolute[:, s_r : s_r + h, s_c : s_c + w]
+
+        result[obs_id] = {
+            **observations[obs_id],
+            "vision": np.concatenate([vision, vp], axis=0),
         }
 
-        roi_layers = compute_masks(
-            (viewport_h, viewport_w), vp_positions, directions, roi_mode, radius
-        )
-        result[obs_id] = np.concatenate([obs, roi_layers], axis=0)
-
-    return result
-
-
-def compute_roi(observations, infos, roi_mode, radius):
-    """Apply ROI to observations. Passthrough when roi_mode is None.
-
-    Args:
-        observations: {agent_id: {"vision": ndarray, "interoception": ndarray, ...}}
-        infos:        {agent_id: {"position": (r,c), "direction": (dr,dc), ...}}
-        roi_mode:     geometry key (e.g. "cone"), or None for passthrough
-        radius:       vision radius
-
-    Returns:
-        observations with ROI layers appended to the vision component.
-        Unchanged when roi_mode is None.
-    """
-    if roi_mode is None:
-        return observations
-
-    positions = {aid: infos[aid]["position"] for aid in infos}
-    directions = {aid: infos[aid]["direction"] for aid in infos}
-    vision_obs = {aid: obs["vision"] for aid, obs in observations.items()}
-
-    roi_vision = append_roi_layers(vision_obs, positions, directions, roi_mode, radius)
-
-    return {
-        aid: {
-            **observations[aid],
-            "vision": roi_vision[aid],
-        }
-        for aid in observations
-    }
+    return result, absolute
