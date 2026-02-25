@@ -117,5 +117,7 @@ def frames_to_video(frames, output_path, frame_duration=0.7):
     """
     import imageio
 
-    images = [np.array(frame) for frame in frames]
-    imageio.mimwrite(output_path, images, fps=1.0 / frame_duration)
+    fps = 10
+    repeats = round(frame_duration * fps)
+    images = [np.array(frame) for frame in frames for _ in range(repeats)]
+    imageio.mimwrite(output_path, images, fps=fps)

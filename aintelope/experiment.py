@@ -194,19 +194,20 @@ def run_experiment(
         monitor.sample("steps")
 
         # Periodic checkpoint (overwrites)
-        if not cfg.run.test_mode and save_freq > 0 and (i_episode + 1) % save_freq == 0:
+        if cfg.run.write_outputs and save_freq > 0 and (i_episode + 1) % save_freq == 0:
             for agent in agents:
                 agent.save_model(
                     checkpoint_path(cfg.run.outputs_dir, agent.id, i_trial)
                 )
 
     # Final save
-    if not cfg.run.test_mode:
+    gc.collect()
+    monitor.report()
+    if cfg.run.write_outputs:
+        monitor.save(Path(cfg.run.outputs_dir) / cfg.experiment_name)
         for agent in agents:
             agent.save_model(checkpoint_path(cfg.run.outputs_dir, agent.id, i_trial))
 
-    gc.collect()
-    monitor.report(Path(cfg.run.outputs_dir) / cfg.experiment_name)
     return {"events": events.to_dataframe(), "states": states.to_dataframe()}
 
 
@@ -255,9 +256,11 @@ def _run_sb3_training(cfg, i_trial, env, agents, events, states, monitor):
     num_total_steps = cfg.run.steps * cfg.run.episodes
     agents[0].state_log = states
     agents[0].train(num_total_steps)
-    agents[0].save_model(
-        checkpoint_path(cfg.run.outputs_dir, agents[0].id, i_trial), i_trial=i_trial
-    )
     monitor.sample("sb3_train_end")
     gc.collect()
-    monitor.report(Path(cfg.run.outputs_dir) / cfg.experiment_name)
+    monitor.report()
+    if cfg.run.write_outputs:
+        monitor.save(Path(cfg.run.outputs_dir) / cfg.experiment_name)
+        agents[0].save_model(
+            checkpoint_path(cfg.run.outputs_dir, agents[0].id, i_trial), i_trial=i_trial
+        )

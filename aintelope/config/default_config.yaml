@@ -12,7 +12,7 @@ run:
   event_columns: [
     Run_id, Trial, Episode, Env layout seed, Step, IsTest,
     Agent_id, State, Action, Reward, Done, Next_state, Observation]
-  save_logs: True                  # @ui bool
+  write_outputs: True              # @ui bool
   trials: 1                        # @ui int 1 100
   episodes: 1                      # @ui int 1 100000
   steps: 10                        # @ui int 1 10000

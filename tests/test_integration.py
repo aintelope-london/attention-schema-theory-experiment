@@ -18,7 +18,7 @@ def test_agent_learns(base_test_config):
         base_test_config,
         {
             "train": {
-                "run": {"episodes": 300},
+                "run": {"steps": 10, "episodes": 300},
                 "agent_params": {
                     "agent_0": {
                         "agent_class": "sb3_ppo_agent",
@@ -29,24 +29,6 @@ def test_agent_learns(base_test_config):
                 },
                 "env_params": {
                     "map_max": 4,
-                    "num_iters": 10,
-                    "combine_interoception_and_vision": True,
-                    "env_layout_seed_repeat_sequence_length": 5,
-                },
-            },
-            "test": {
-                "run": {"episodes": 10, "test_mode": True},
-                "agent_params": {
-                    "agent_0": {
-                        "agent_class": "sb3_ppo_agent",
-                    },
-                    "num_conv_layers": 0,
-                    "learning_rate": 0.001,
-                    "ppo_n_steps": 32,
-                },
-                "env_params": {
-                    "map_max": 4,
-                    "num_iters": 10,
                     "combine_interoception_and_vision": True,
                     "env_layout_seed_repeat_sequence_length": 5,
                 },

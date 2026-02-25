@@ -18,7 +18,7 @@ def base_test_config():
                     "trials": 1,
                     "episodes": 1,
                     "steps": 10,
-                    "save_logs": False,
+                    "write_outputs": False,
                     "max_workers": 1,
                 },
                 "env_params": {

@@ -90,7 +90,7 @@ def run_experiments(main_config):
             all_events.extend(result["events"])
             all_states.extend(result["states"])
 
-    if cfg.run.save_logs:
+    if cfg.run.write_outputs:
         write_results(outputs_dir, all_events, all_states)
         archive_code(cfg)
 
