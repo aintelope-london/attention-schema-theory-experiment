@@ -130,8 +130,8 @@ class ResourceMonitor:
             ]
         )
 
-    def report(self, folder):
-        """Print console report and write performance_report.csv."""
+    def report(self):
+        """Print console report."""
         df = pd.DataFrame(self._rows, columns=COLUMNS)
         system = {
             "ram_mb": self._ram_mb,
@@ -139,4 +139,8 @@ class ResourceMonitor:
             "gpu_mb": self._gpu_mb,
         }
         _print_report(df, system, self._context)
+
+    def save(self, folder):
+        """Write performance_report.csv."""
+        df = pd.DataFrame(self._rows, columns=COLUMNS)
         write_csv(Path(folder) / "performance_report.csv", df)

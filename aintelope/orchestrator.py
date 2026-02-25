@@ -6,17 +6,17 @@
 # https://github.com/aintelope-london/attention-schema-theory-experiment
 
 import os
-import copy
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from omegaconf import OmegaConf
 
 from aintelope.config.config_utils import (
     archive_code,
-    get_score_dimensions,
     set_console_title,
+    prepare_experiment_cfg,
+    init_config,
+    to_picklable,
+    from_picklable,
 )
-from aintelope.config.config_utils import prepare_experiment_cfg
 from aintelope.experiment import run_experiment
 from aintelope.utils.seeding import set_global_seeds
 from aintelope.utils.progress import ProgressReporter
@@ -27,11 +27,11 @@ from aintelope.analytics.recording import write_results
 def run_trial(cfg_dict, main_config_dict, i_trial):
     """Run all experiments for a single trial.
 
-    Args must be dicts (not OmegaConf) for multiprocessing pickling.
+    Args must be dicts for multiprocessing pickling.
     Returns dict with configs and events lists.
     """
-    cfg = OmegaConf.create(cfg_dict)
-    main_config = OmegaConf.create(main_config_dict)
+    cfg = from_picklable(cfg_dict)
+    main_config = from_picklable(main_config_dict)
 
     trial_seed = cfg.run.seed + i_trial
     set_global_seeds(trial_seed)
@@ -62,11 +62,7 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
 def run_experiments(main_config):
     """Main orchestrator entry point."""
 
-    cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
-    # resolve timestamp, freeze
-    outputs_dir = cfg.run.outputs_dir
-    OmegaConf.update(cfg, "run.outputs_dir", outputs_dir)
-
+    cfg = init_config(main_config)
     set_console_title(cfg.run.outputs_dir)
 
     configs = []
@@ -75,14 +71,13 @@ def run_experiments(main_config):
 
     workers = find_workers(cfg.run.max_workers, cfg.run.trials)
 
-    cfg_dict = OmegaConf.to_container(cfg, resolve=True)
-    main_config_dict = OmegaConf.to_container(main_config, resolve=True)
+    cfg_dict = to_picklable(cfg)
+    main_config_dict = to_picklable(main_config)
 
     with ProcessPoolExecutor(max_workers=workers) as executor:
-        trials = list(main_config.values())[0].run.trials
         futures = {
             executor.submit(run_trial, cfg_dict, main_config_dict, i_trial): i_trial
-            for i_trial in range(trials)
+            for i_trial in range(cfg.run.trials)
         }
         for future in as_completed(futures):
             result = future.result()
@@ -90,8 +85,8 @@ def run_experiments(main_config):
             all_events.extend(result["events"])
             all_states.extend(result["states"])
 
-    if cfg.run.save_logs:
-        write_results(outputs_dir, all_events, all_states)
+    if cfg.run.write_outputs:
+        write_results(cfg.run.outputs_dir, all_events, all_states)
         archive_code(cfg)
 
     return {

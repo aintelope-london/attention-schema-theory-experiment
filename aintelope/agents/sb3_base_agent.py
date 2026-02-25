@@ -214,7 +214,7 @@ class SB3BaseAgent(AbstractAgent):
             + "."
             + env.__class__.__bases__[0].__qualname__
         )
-        self.test_mode = self.cfg.run.test_mode
+        self.test_mode = self.cfg.run.experiment.test_mode
         self.i_trial = 0
         self.next_episode_no = 0
         self.total_steps_across_episodes = 0
@@ -279,7 +279,7 @@ class SB3BaseAgent(AbstractAgent):
         self.info[INFO_EPISODE] = episode
         self.info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
         self.info[INFO_STEP] = step
-        self.info[INFO_TEST_MODE] = self.cfg.run.test_mode
+        self.info[INFO_TEST_MODE] = self.cfg.run.experiment.test_mode
 
         self.infos[self.id] = self.info
 
@@ -355,7 +355,7 @@ class SB3BaseAgent(AbstractAgent):
             info[INFO_EPISODE] = i_episode
             info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
             info[INFO_STEP] = 0
-            info[INFO_TEST_MODE] = self.cfg.run.test_mode
+            info[INFO_TEST_MODE] = self.cfg.run.experiment.test_mode
 
         if self.model:
             if hasattr(self.model.policy, "my_reset"):
@@ -411,7 +411,7 @@ class SB3BaseAgent(AbstractAgent):
             info[INFO_EPISODE] = i_episode
             info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
             info[INFO_STEP] = step
-            info[INFO_TEST_MODE] = self.cfg.run.test_mode
+            info[INFO_TEST_MODE] = self.cfg.run.experiment.test_mode
 
             agent_step_info = [
                 agent,
@@ -439,7 +439,7 @@ class SB3BaseAgent(AbstractAgent):
                     i_episode,
                     env_layout_seed,
                     step,
-                    self.cfg.run.test_mode,
+                    self.cfg.run.experiment.test_mode,
                 ]
                 + agent_step_info
                 + env_step_info
@@ -527,7 +527,7 @@ class SB3BaseAgent(AbstractAgent):
         self.info[INFO_EPISODE] = i_episode
         self.info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
         self.info[INFO_STEP] = step
-        self.info[INFO_TEST_MODE] = self.cfg.run.test_mode
+        self.info[INFO_TEST_MODE] = self.cfg.run.experiment.test_mode
 
         self.infos[self.id] = self.info
 
@@ -541,7 +541,7 @@ class SB3BaseAgent(AbstractAgent):
                 i_episode,
                 env_layout_seed,
                 step,
-                self.cfg.run.test_mode,
+                self.cfg.run.experiment.test_mode,
             ]
             + agent_step_info
             + env_step_info

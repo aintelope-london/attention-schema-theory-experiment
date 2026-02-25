@@ -28,8 +28,8 @@ def run_experiment(
     monitor = ResourceMonitor(
         context={
             "trial": i_trial,
-            "episodes": cfg.run.episodes,
-            "steps": cfg.run.steps,
+            "episodes": cfg.run.experiment.episodes,
+            "steps": cfg.run.experiment.steps,
         }
     )
 
@@ -39,7 +39,7 @@ def run_experiment(
 
     # Event logging — score dimensions from env
     score_dims = env.score_dimensions
-    events_columns = list(cfg.run.event_columns) + score_dims
+    events_columns = list(cfg.run.experiment.event_columns) + score_dims
     events = EventLog(events_columns)
     events.experiment_name = cfg.experiment_name
     states = StateLog()
@@ -74,14 +74,14 @@ def run_experiment(
     monitor.sample("init")
 
     # SB3 training has its own loop (special permission — documented in DOCUMENTATION.md)
-    if is_sb3 and not cfg.run.test_mode:
+    if is_sb3 and not cfg.run.experiment.test_mode:
         _run_sb3_training(cfg, i_trial, env, agents, events, states, monitor)
         return {"events": events.to_dataframe(), "states": states.to_dataframe()}
 
     save_freq = cfg.agent_params.save_frequency
 
-    reporter.set_total("episode", cfg.run.episodes)
-    for i_episode in range(cfg.run.episodes):
+    reporter.set_total("episode", cfg.run.experiment.episodes)
+    for i_episode in range(cfg.run.experiment.episodes):
         reporter.update("episode", i_episode + 1)
 
         env_layout_seed = (
@@ -95,7 +95,7 @@ def run_experiment(
 
         print(
             f"\ni_trial: {i_trial} episode: {i_episode} "
-            f"env_layout_seed: {env_layout_seed} test_mode: {cfg.run.test_mode}"
+            f"env_layout_seed: {env_layout_seed} test_mode: {cfg.run.experiment.test_mode}"
         )
 
         # Reset
@@ -108,7 +108,7 @@ def run_experiment(
         monitor.sample("reset")
 
         # Iterations within the episode
-        for step in range(cfg.run.steps):
+        for step in range(cfg.run.experiment.steps):
             # Collect actions from all agents
             actions = {}
             for agent in agents:
@@ -163,7 +163,7 @@ def run_experiment(
                         i_episode,
                         env_layout_seed,
                         step,
-                        cfg.run.test_mode,
+                        cfg.run.experiment.test_mode,
                         agent.id,
                         None,  # State — TODO: define canonical state representation
                         agent.last_action,
@@ -194,19 +194,20 @@ def run_experiment(
         monitor.sample("steps")
 
         # Periodic checkpoint (overwrites)
-        if not cfg.run.test_mode and save_freq > 0 and (i_episode + 1) % save_freq == 0:
+        if cfg.run.write_outputs and save_freq > 0 and (i_episode + 1) % save_freq == 0:
             for agent in agents:
                 agent.save_model(
                     checkpoint_path(cfg.run.outputs_dir, agent.id, i_trial)
                 )
 
     # Final save
-    if not cfg.run.test_mode:
+    gc.collect()
+    monitor.report()
+    if cfg.run.write_outputs:
+        monitor.save(Path(cfg.run.outputs_dir) / cfg.experiment_name)
         for agent in agents:
             agent.save_model(checkpoint_path(cfg.run.outputs_dir, agent.id, i_trial))
 
-    gc.collect()
-    monitor.report(Path(cfg.run.outputs_dir) / cfg.experiment_name)
     return {"events": events.to_dataframe(), "states": states.to_dataframe()}
 
 
@@ -252,12 +253,14 @@ def _init_sb3_agents(
 def _run_sb3_training(cfg, i_trial, env, agents, events, states, monitor):
     """SB3 training loop — special permission documented in DOCUMENTATION.md."""
     monitor.sample("sb3_train_start")
-    num_total_steps = cfg.run.steps * cfg.run.episodes
+    num_total_steps = cfg.run.experiment.steps * cfg.run.experiment.episodes
     agents[0].state_log = states
     agents[0].train(num_total_steps)
-    agents[0].save_model(
-        checkpoint_path(cfg.run.outputs_dir, agents[0].id, i_trial), i_trial=i_trial
-    )
     monitor.sample("sb3_train_end")
     gc.collect()
-    monitor.report(Path(cfg.run.outputs_dir) / cfg.experiment_name)
+    monitor.report()
+    if cfg.run.write_outputs:
+        monitor.save(Path(cfg.run.outputs_dir) / cfg.experiment_name)
+        agents[0].save_model(
+            checkpoint_path(cfg.run.outputs_dir, agents[0].id, i_trial), i_trial=i_trial
+        )

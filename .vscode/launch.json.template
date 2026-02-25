@@ -10,7 +10,7 @@
             "request": "launch",
             "module": "aintelope",
             "console": "integratedTerminal",
-            "justMyCode": false,
+            "justMyCode": true,
             "showUncaughtExceptions": true,
             "args": [ "--gui" ],
             "env": {
