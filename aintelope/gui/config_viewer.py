@@ -1,6 +1,7 @@
 """Config editor GUI for creating/editing experiment configs."""
 
 import copy
+import tkinter as tk
 from typing import Optional
 from omegaconf import DictConfig, OmegaConf
 
@@ -16,7 +17,6 @@ from aintelope.gui.gui import (
     Button,
     Entry,
     StringVar,
-    launch_window,
     create_widget,
     get_range_display,
     ask_yes_no,
@@ -52,8 +52,10 @@ class ConfigGUI:
         self.tabs = []
 
         self._create_ui()
-        self._load_config("example_config.yaml")
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        # Deferred: show window shell first, populate tabs on next event tick
+        self.root.after(1, lambda: self._load_config("example_config.yaml"))
 
     def _create_ui(self):
         self.selector = SelectorBar(
@@ -75,6 +77,7 @@ class ConfigGUI:
 
         self.notebook = Notebook(self.root)
         self.notebook.pack(fill=BOTH, expand=True, padx=10, pady=5)
+        self.notebook.bind("<<NotebookTabChanged>>", self._on_tab_changed)
 
         self.actions = ActionBar(
             self.root,
@@ -96,8 +99,8 @@ class ConfigGUI:
     # Tab management
     # =========================================================================
 
-    def _create_tab(self, block_name, overrides=None):
-        """Create a tab for one experiment block."""
+    def _create_tab(self, block_name, overrides=None, build=False):
+        """Create a tab shell. Widgets are built lazily on first selection."""
         if overrides is None:
             overrides = {}
 
@@ -109,12 +112,13 @@ class ConfigGUI:
             "diff": dict(overrides),
             "current": merged,
             "widgets": {},
+            "built": False,
         }
 
         frame = ScrollableFrame(self.notebook, padding=5)
         tab["frame"] = frame
 
-        # Block name field
+        # Block name field (always built — lightweight)
         name_frame = Frame(frame.content)
         name_frame.grid(row=0, column=0, columnspan=3, sticky=W, pady=(5, 10))
         Label(name_frame, text="Experiment name:", width=25, anchor=W).pack(
@@ -129,11 +133,60 @@ class ConfigGUI:
             row=1, column=0, columnspan=3, sticky="ew", pady=(0, 5)
         )
 
-        self._build_param_tree(frame.content, merged, tab, row_offset=2)
-
         self.notebook.add(frame, text=block_name)
         self.tabs.append(tab)
         self.notebook.select(frame)
+
+        if build:
+            self._build_tab(tab)
+
+    def _build_tab(self, tab):
+        """Build the full widget tree for a tab. Called once per tab, lazily."""
+        if tab["built"]:
+            return
+        self._build_param_tree(tab["frame"].content, tab["current"], tab, row_offset=2)
+        tab["built"] = True
+
+    def _on_tab_changed(self, event=None):
+        """Build tab widgets on first selection."""
+        idx = self.notebook.index(self.notebook.select())
+        if idx < len(self.tabs):
+            self._build_tab(self.tabs[idx])
+
+    def _refresh_tab(self, tab, block_name, overrides):
+        """Update an existing tab's values without rebuilding widgets."""
+        if overrides is None:
+            overrides = {}
+
+        merged = OmegaConf.to_container(
+            OmegaConf.merge(self.default_cfg, overrides), resolve=True
+        )
+
+        tab["diff"] = dict(overrides)
+        tab["current"] = merged
+        tab["name_var"].set(block_name)
+
+        if not tab["built"]:
+            return
+
+        # Refresh all registered widgets with new values
+        for path, (widget, refresher) in tab["widgets"].items():
+            value = self._get_nested(merged, path)
+            if value is not None:
+                refresher(value)
+
+        # Rebuild agents area (agent count may differ between configs)
+        if "agents_container" in tab:
+            self._populate_agents(tab)
+
+    def _get_nested(self, d, dotted_path):
+        """Navigate nested dict by dotted path. Returns value or None."""
+        current = d
+        for key in dotted_path.split("."):
+            if not isinstance(current, dict) or key not in current:
+                return None
+            current = current[key]
+        return current
 
     def _update_tab_label(self, tab):
         """Sync notebook tab text with the name field."""
@@ -146,7 +199,7 @@ class ConfigGUI:
         if self.tabs:
             current_idx = self.notebook.index(self.notebook.select())
             overrides = dict(self.tabs[current_idx]["diff"])
-        self._create_tab(name, overrides)
+        self._create_tab(name, overrides, build=True)
         self.status.set(f"Added: {name}")
 
     def _delete_tab(self):
@@ -436,15 +489,19 @@ class ConfigGUI:
     # =========================================================================
 
     def _load_config(self, config_name):
-        """Load config file, creating one tab per block."""
+        """Load config file. Reuses existing tabs when block count matches."""
         blocks = load_experiment_config(config_name)
+        block_items = list(blocks.items())
 
-        for tab in self.tabs:
-            self.notebook.forget(tab["frame"])
-        self.tabs = []
-
-        for block_name, overrides in blocks.items():
-            self._create_tab(block_name, overrides)
+        if len(block_items) == len(self.tabs):
+            for tab, (block_name, overrides) in zip(self.tabs, block_items):
+                self._refresh_tab(tab, block_name, overrides)
+        else:
+            for tab in self.tabs:
+                self.notebook.forget(tab["frame"])
+            self.tabs = []
+            for i, (block_name, overrides) in enumerate(block_items):
+                self._create_tab(block_name, overrides, build=(i == 0))
 
         self.status.set(f"Loaded: {config_name}")
 
@@ -473,4 +530,11 @@ class ConfigGUI:
 
 def run_gui(default_cfg: DictConfig) -> Optional[DictConfig]:
     """Launch config editor GUI. Returns multi-block config or None."""
-    return launch_window(ConfigGUI, default_cfg)
+    root = tk.Tk()
+    root.tk.call("tk", "scaling", 1.0)
+    window = ConfigGUI(root, default_cfg)
+    root.mainloop()
+    result = window.result
+    root.withdraw()
+    root.destroy()
+    return result

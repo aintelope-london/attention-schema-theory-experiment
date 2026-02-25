@@ -18,7 +18,6 @@ from aintelope.config.config_utils import (
     set_memory_limits,
     set_priorities,
 )
-from aintelope.orchestrator import run_experiments
 
 
 def run(config: Union[str, DictConfig] = "default_config.yaml", gui: bool = False):
@@ -40,10 +39,6 @@ def run(config: Union[str, DictConfig] = "default_config.yaml", gui: bool = Fals
 
     set_memory_limits()
 
-    # Start GPU init early — runs underneath GUI if present
-    gpu_thread = threading.Thread(target=select_gpu)
-    gpu_thread.start()
-
     if isinstance(config, str):
         config = OmegaConf.load(os.path.join("aintelope", "config", config))
 
@@ -55,7 +50,12 @@ def run(config: Union[str, DictConfig] = "default_config.yaml", gui: bool = Fals
             print("GUI cancelled.")
             return
 
-    # GPU must be ready before experiments
+    # Start GPU init after GUI — heavy imports happen below, not before
+    gpu_thread = threading.Thread(target=select_gpu)
+    gpu_thread.start()
+
+    from aintelope.orchestrator import run_experiments
+
     gpu_thread.join()
 
     result = run_experiments(config)
