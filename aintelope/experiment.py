@@ -10,12 +10,8 @@ from pathlib import Path
 from omegaconf import DictConfig
 
 from aintelope.agents import get_agent_class
-from aintelope.analytics.recording import (
-    EventLog,
-    StateLog,
-    get_checkpoint,
-    checkpoint_path,
-)
+from aintelope.agents.model.dl_utils import checkpoint_path, select_checkpoint
+from aintelope.analytics.recording import EventLog, StateLog
 from aintelope.environments import get_env_class
 from aintelope.utils.performance import ResourceMonitor
 from aintelope.utils.roi import compute_roi
@@ -51,19 +47,24 @@ def run_experiment(
     # Agents
     agents = []
     dones = {}
+    custom_model = cfg.agent_params.get("custom_model", "")
 
     if is_sb3:
         agents, dones = _init_sb3_agents(
-            cfg, env, observations, infos, events, score_dims, i_trial
+            cfg, env, observations, infos, events, score_dims, i_trial, custom_model
         )
     else:
         for agent_id, agent_cfg in cfg.agent_params.items():
             if not agent_id.startswith("agent_"):
                 continue
+            checkpoint = select_checkpoint(
+                cfg.run.outputs_dir, agent_id, i_trial, custom_model
+            )
             agent = get_agent_class(agent_cfg.agent_class)(
                 agent_id=agent_id,
                 env=env,
                 cfg=cfg,
+                checkpoint=checkpoint,
             )
             agents.append(agent)
             agent.reset(observations[agent_id])
@@ -76,6 +77,8 @@ def run_experiment(
     if is_sb3 and not cfg.run.test_mode:
         _run_sb3_training(cfg, i_trial, env, agents, events, states, monitor)
         return {"events": events.to_dataframe(), "states": states.to_dataframe()}
+
+    save_freq = cfg.agent_params.save_frequency
 
     reporter.set_total("episode", cfg.run.episodes)
     for i_episode in range(cfg.run.episodes):
@@ -190,9 +193,17 @@ def run_experiment(
 
         monitor.sample("steps")
 
+        # Periodic checkpoint (overwrites)
+        if not cfg.run.test_mode and save_freq > 0 and (i_episode + 1) % save_freq == 0:
+            for agent in agents:
+                agent.save_model(
+                    checkpoint_path(cfg.run.outputs_dir, agent.id, i_trial)
+                )
+
+    # Final save
     if not cfg.run.test_mode:
         for agent in agents:
-            agent.save_model(checkpoint_path(cfg.run.outputs_dir, agent.id))
+            agent.save_model(checkpoint_path(cfg.run.outputs_dir, agent.id, i_trial))
 
     gc.collect()
     monitor.report(Path(cfg.run.outputs_dir) / cfg.experiment_name)
@@ -202,7 +213,9 @@ def run_experiment(
 # ── SB3 legacy ────────────────────────────────────────────────────────
 
 
-def _init_sb3_agents(cfg, env, observations, infos, events, score_dims, i_trial):
+def _init_sb3_agents(
+    cfg, env, observations, infos, events, score_dims, i_trial, custom_model
+):
     """Initialize SB3 agents with legacy interface. Isolated for readability."""
     agents = []
     dones = {}
@@ -223,7 +236,9 @@ def _init_sb3_agents(cfg, env, observations, infos, events, score_dims, i_trial)
         observation = observations[agent_id]
         info = infos[agent_id]
         agent.reset(observation, info, type(env))
-        checkpoint = get_checkpoint(cfg.run.outputs_dir, agent_id)
+        checkpoint = select_checkpoint(
+            cfg.run.outputs_dir, agent_id, i_trial, custom_model
+        )
         agent.init_model(
             agent.state.shape,
             env.action_space(agent_id),
@@ -240,7 +255,9 @@ def _run_sb3_training(cfg, i_trial, env, agents, events, states, monitor):
     num_total_steps = cfg.run.steps * cfg.run.episodes
     agents[0].state_log = states
     agents[0].train(num_total_steps)
-    agents[0].save_model(checkpoint_path(cfg.run.outputs_dir, agents[0].id))
+    agents[0].save_model(
+        checkpoint_path(cfg.run.outputs_dir, agents[0].id, i_trial), i_trial=i_trial
+    )
     monitor.sample("sb3_train_end")
     gc.collect()
     monitor.report(Path(cfg.run.outputs_dir) / cfg.experiment_name)

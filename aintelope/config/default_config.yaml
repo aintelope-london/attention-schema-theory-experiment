@@ -18,10 +18,9 @@ run:
   steps: 10                        # @ui int 1 10000
   test_mode: False                 # @ui bool
 agent_params:
-  save_frequency: ${muldiv:${run.episodes},${run.steps},10}
-  roi_mode: "cone"                 # @ui str cone  
-  start_with_model: False          # @ui bool
-  use_previous_model: True         # @ui bool
+  save_frequency: 50
+  custom_model: ""                 # @ui file
+  roi_mode: "cone"                 # @ui str cone
   batch_size: 20                   # @ui int 1 100
   gamma: 0.7                       # @ui float 0.0 1.0
   # Agents

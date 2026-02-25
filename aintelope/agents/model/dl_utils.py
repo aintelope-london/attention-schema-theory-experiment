@@ -1,25 +1,34 @@
-import os
+"""Checkpoint path construction and resolution for model persistence."""
+
 import glob
+from pathlib import Path
 
 
-def select_checkpoint(cfg, agent_id, role):
-    checkpoints = []
+def checkpoint_path(outputs_dir, agent_id, i_trial):
+    """Return the canonical save path for an agent's checkpoint.
 
-    # Find old model if user defined one
-    old_checkpoint = cfg.dl_params.start_with_model
-    if len(checkpoints) == 0 and old_checkpoint:
-        checkpoints = glob.glob(old_checkpoint)
+    Format: {outputs_dir}/checkpoints/{agent_id}_trial_{i_trial}.pt
+    Creates the directory if needed.
+    """
+    path = Path(outputs_dir) / "checkpoints" / f"{agent_id}_trial_{i_trial}.pt"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
 
-    # Overwrite possible old checkpoint if we are already into training
-    # Check for previous model in checkpoints
-    if cfg.dl_params.use_previous_model:
-        checkpoint_dir = os.path.normpath(cfg.addresses.pipeline_dir + "checkpoints/")
-        checkpoint_filename = f"*{agent_id}_{role}*"
-        checkpoint = os.path.join(checkpoint_dir, checkpoint_filename)
-        checkpoints.extend(glob.glob(checkpoint))
 
-    # Return the latest model we have
-    if len(checkpoints) > 0:
-        return max(checkpoints, key=os.path.getctime)
-    else:
-        return False
+def select_checkpoint(outputs_dir, agent_id, i_trial, custom_model=""):
+    """Resolve which checkpoint to load for a given agent and trial.
+
+    Resolution order:
+        1. custom_model path if set → use it directly
+        2. Glob checkpoints/{agent_id}_*.pt → sort alphabetically → index by i_trial % n
+        3. None → fresh initialization
+    """
+    if custom_model:
+        path = Path(custom_model)
+        return path if path.exists() else None
+
+    pattern = str(Path(outputs_dir) / "checkpoints" / f"{agent_id}_*.pt")
+    found = sorted(glob.glob(pattern))
+    if found:
+        return Path(found[i_trial % len(found)])
+    return None

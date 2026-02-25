@@ -404,6 +404,8 @@ class ConfigGUI:
 
         if default is None or value != default:
             self._set_nested(tab["diff"], keys, value)
+        else:
+            self._remove_nested(tab["diff"], keys)
 
         self.status.set(f"Modified: {path}")
 
@@ -414,6 +416,20 @@ class ConfigGUI:
                 d[key] = {}
             d = d[key]
         d[keys[-1]] = value
+
+    def _remove_nested(self, d, keys):
+        """Remove a key from nested dict, pruning empty parents."""
+        stack = []
+        current = d
+        for key in keys[:-1]:
+            if not isinstance(current, dict) or key not in current:
+                return
+            stack.append((current, key))
+            current = current[key]
+        current.pop(keys[-1], None)
+        for parent, key in reversed(stack):
+            if not parent[key]:
+                del parent[key]
 
     # =========================================================================
     # Load / Save / Run
@@ -438,6 +454,7 @@ class ConfigGUI:
 
     def _save_config(self):
         """Save all tabs as a multi-block config."""
+        self.root.focus_set()
         filename = self.actions.get_input("Save As")
         save_experiment_config(self._collect_blocks(), filename)
         self.status.set(f"Saved: {filename}")
@@ -445,6 +462,7 @@ class ConfigGUI:
 
     def _run(self):
         """Return blocks dict and close."""
+        self.root.focus_set()
         self.result = OmegaConf.create(self._collect_blocks())
         self.root.quit()
 

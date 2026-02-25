@@ -13,12 +13,12 @@ from aintelope.agents.model.model import Model
 class MainAgent(AbstractAgent):
     """Canon agent."""
 
-    def __init__(self, agent_id, env=None, cfg=None, **kwargs):
+    def __init__(self, agent_id, env=None, cfg=None, checkpoint=None, **kwargs):
         self.id = agent_id
         self.cfg = cfg
         self.done = False
         self.last_action = None
-        self.model = Model(agent_id, env.manifesto, cfg)
+        self.model = Model(agent_id, env.manifesto, cfg, checkpoint=checkpoint)
 
     def reset(self, state, **kwargs):
         self.done = False

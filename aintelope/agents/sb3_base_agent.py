@@ -18,7 +18,6 @@ from omegaconf import DictConfig, OmegaConf
 import numpy as np
 import numpy.typing as npt
 import sys
-import datetime
 
 from aintelope.config.config_utils import select_gpu, set_priorities, set_memory_limits
 
@@ -36,7 +35,7 @@ from zoo_to_gym_multiagent_adapter.multiagent_zoo_to_gym_adapter import (
 )
 
 import stable_baselines3
-from stable_baselines3.common.callbacks import CheckpointCallback
+from aintelope.agents.model.dl_utils import checkpoint_path
 
 import torch
 import torch.nn as nn
@@ -181,30 +180,10 @@ def sb3_agent_train_thread_entry_point(
         pipe, agent_id, checkpoint_filename, observation_space, action_space
     )
     try:
-        filename_timestamp_sufix_str = datetime.datetime.now().strftime(
-            "%Y_%m_%d_%H_%M_%S_%f"
-        )
-        filename_with_timestamp = (
-            checkpoint_filename + "-" + filename_timestamp_sufix_str
-        )
-
-        # resulting filename looks usually like checkpointfilename_timestamp_100000_steps.zip next checkpointfilename_timestamp_200000_steps.zip etc
-        # note that in case PPO weight sharing is on in multi-agent scenarios, SB3 multiplies the steps count in the checkpoint filename by the number of agents
-        # with weight sharing, the resulting filename looks like checkpointfilename_timestamp_200000_steps.zip next checkpointfilename_timestamp_400000_steps.zip etc
-        checkpoint_callback = (
-            CheckpointCallback(
-                save_freq=cfg.agent_params.save_frequency,  # save frequency in timesteps
-                save_path=os.path.dirname(filename_with_timestamp),
-                name_prefix=os.path.basename(filename_with_timestamp),
-            )
-            if cfg.agent_params.save_frequency > 0
-            else None
-        )
-
         model = model_constructor(env_wrapper, env_classname, agent_id, cfg)
         env_wrapper.set_model(model)
-        model.learn(total_timesteps=num_total_steps, callback=checkpoint_callback)
-        env_wrapper.save_or_return_model(model, filename_timestamp_sufix_str)
+        model.learn(total_timesteps=num_total_steps)
+        env_wrapper.save_or_return_model(model)
     except (
         Exception
     ) as ex:  # NB! need to catch exception so that the env wrapper can signal the training ended
@@ -610,19 +589,7 @@ class SB3BaseAgent(AbstractAgent):
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
         if self.model is not None:  # single-model scenario
-            checkpoint_callback = (
-                CheckpointCallback(
-                    save_freq=self.cfg.agent_params.save_frequency,
-                    save_path=str(checkpoint_dir),
-                    name_prefix=self.id,
-                )
-                if self.cfg.agent_params.save_frequency > 0
-                else None
-            )
-
-            self.model.learn(
-                total_timesteps=num_total_steps, callback=checkpoint_callback
-            )
+            self.model.learn(total_timesteps=num_total_steps)
         else:
             checkpoint_filenames = {
                 agent_id: str(checkpoint_dir / agent_id)
@@ -651,9 +618,17 @@ class SB3BaseAgent(AbstractAgent):
             raise Exception(str(self.exceptions))
 
     def save_model(self, path, **kwargs):
-        models = {self.id: self.model} if self.model is not None else self.models
-        for agent_id, model in models.items():
-            torch.save(model.get_parameters(), Path(path).parent / f"{agent_id}.pt")
+        if self.model is not None:
+            torch.save(self.model.get_parameters(), path)
+        elif self.models:
+            # Multi-model: save each agent to trial-indexed path
+            i_trial = kwargs.get("i_trial", 0)
+            outputs_dir = str(Path(path).parent.parent)
+            for agent_id, model in self.models.items():
+                torch.save(
+                    model.get_parameters(),
+                    checkpoint_path(outputs_dir, agent_id, i_trial),
+                )
 
     def init_model(
         self,
