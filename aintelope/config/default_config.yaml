@@ -9,14 +9,15 @@ run:
   outputs_dir: outputs/${now:%Y%m%d%H%M%S}/
   seed: 0                          # @ui int 0 9999
   max_workers: 0                   # @ui int -1 100
-  event_columns: [
-    Run_id, Trial, Episode, Env layout seed, Step, IsTest,
-    Agent_id, State, Action, Reward, Done, Next_state, Observation]
   write_outputs: True              # @ui bool
   trials: 1                        # @ui int 1 100
-  episodes: 1                      # @ui int 1 100000
-  steps: 10                        # @ui int 1 10000
-  test_mode: False                 # @ui bool
+  experiment:
+    episodes: 1                    # @ui int 1 100000
+    steps: 10                      # @ui int 1 10000
+    test_mode: False               # @ui bool
+    event_columns: [
+      Run_id, Trial, Episode, Env layout seed, Step, IsTest,
+      Agent_id, State, Action, Reward, Done, Next_state, Observation]
 agent_params:
   save_frequency: 50
   custom_model: ""                 # @ui file
@@ -44,7 +45,7 @@ env_params:
   interoception_transformation_mode: 0     # @ui int 0 4
   interoception_embedding_gaussian_centers: [-32, -16, -8, -4, -2, -1, 0, 1, 2, 4]
   interoception_embedding_gaussian_scales: [32, 16, 8, 4, 2, 1, 1, 1, 2, 4]
-  num_iters: ${run.steps}
+  num_iters: ${run.experiment.steps}
   env_experiment: ai_safety_gridworlds.aintelope_savanna
   level: 0                         # @ui int 0 10
   map_max: 5                       # @ui int 3 50

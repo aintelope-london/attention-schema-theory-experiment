@@ -24,6 +24,14 @@ DEFAULT_CONFIG = "default_config.yaml"
 PROTECTED_CONFIGS = {DEFAULT_CONFIG, "example_config.yaml"}
 
 
+def init_config(main_config):
+    """Load defaults, merge orchestrator-level overrides, resolve timestamps."""
+    cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
+    cfg = OmegaConf.merge(cfg, list(main_config.values())[0])
+    OmegaConf.update(cfg, "run.outputs_dir", cfg.run.outputs_dir)
+    return cfg
+
+
 def prepare_experiment_cfg(cfg, overrides, experiment_name, trial_seed):
     """Merge overrides and derive runtime config values."""
     merged = OmegaConf.merge(cfg, overrides)
@@ -35,6 +43,16 @@ def prepare_experiment_cfg(cfg, overrides, experiment_name, trial_seed):
         sum(1 for k in merged.agent_params if k.startswith("agent_")),
     )
     return merged
+
+
+def to_picklable(cfg):
+    """Convert DictConfig to plain dict for multiprocessing."""
+    return OmegaConf.to_container(cfg, resolve=True)
+
+
+def from_picklable(cfg_dict):
+    """Reconstruct DictConfig from plain dict."""
+    return OmegaConf.create(cfg_dict)
 
 
 def list_loadable_configs():

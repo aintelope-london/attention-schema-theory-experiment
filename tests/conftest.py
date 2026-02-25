@@ -16,10 +16,12 @@ def base_test_config():
             "test": {
                 "run": {
                     "trials": 1,
-                    "episodes": 1,
-                    "steps": 10,
                     "write_outputs": False,
                     "max_workers": 1,
+                    "experiment": {
+                        "episodes": 1,
+                        "steps": 10,
+                    },
                 },
                 "env_params": {
                     "map_max": 5,

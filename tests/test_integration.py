@@ -17,8 +17,14 @@ def test_agent_learns(base_test_config):
     learning = OmegaConf.merge(
         base_test_config,
         {
-            "train": {
-                "run": {"steps": 10, "episodes": 300},
+            "test": {
+                "run": {
+                    "experiment": {
+                        "steps": 10,
+                        "episodes": 300,
+                        "write_outputs": False,
+                    },
+                },
                 "agent_params": {
                     "agent_0": {
                         "agent_class": "sb3_ppo_agent",
