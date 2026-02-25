@@ -1,9 +1,7 @@
 import copy
-import datetime
 import os
 import torch
 from aintelope.agents.model.memory import ReplayMemory
-from aintelope.agents.model.dl_utils import select_checkpoint
 from aintelope.agents.model.dl_components import NeuralNet, DQN, ModelBased
 from aintelope.agents.model.reward_inference import RewardInference
 
@@ -15,7 +13,7 @@ class Model:
     Uses a factory pattern to instantiate the components from config.
     """
 
-    def __init__(self, agent_id, env_manifesto, cfg):
+    def __init__(self, agent_id, env_manifesto, cfg, checkpoint=None):
         self.cfg = cfg
         self.agent_id = agent_id
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -23,13 +21,7 @@ class Model:
         action_space = env_manifesto["action_space"]
         self.components = {}
         self.state = {}
-        # self.affects = Affects(cfg, env_manifesto)
 
-        # roles = []
-        # for module_role, module_name in cfg.agent_params[agent_id].architecture.items():
-        #    roles.append(module_role)
-
-        # self.obs_fields = list(obs_shapes.keys())
         assert (
             "action" in cfg.agent_params[agent_id].architecture
         ), "Architecture must include 'action' role"
@@ -40,11 +32,9 @@ class Model:
         memory_field_list = (
             list(obs_shapes.keys())
             + ["next_" + field for field in obs_shapes.keys()]
-            +
-            # ["action", "reward"] +
-            [role for role, _ in cfg.agent_params[agent_id].architecture.items()]
+            + [role for role, _ in cfg.agent_params[agent_id].architecture.items()]
         )
-        self.memory = ReplayMemory(cfg.dl_params.batch_size, memory_field_list)
+        self.memory = ReplayMemory(cfg.agent_params.batch_size, memory_field_list)
 
         context = {
             "cfg": self.cfg,
@@ -62,18 +52,22 @@ class Model:
             context["role"] = module_role
             module_type = "NeuralNet" if "-NN" in module_name else module_name
             module_cls = globals()[module_type]
-            # module_cls = getattr(aintelope.agents.model.dl_components, module_type) or getattr(aintelope.agents.model.affects, module_type)
-            # module_cls = Affects(cfg, env_manifesto)
 
-            # Load checkpoint for this specific role if it's a NeuralNet
-            # role_checkpoint = None
             context["checkpoint"] = None
-            if "-NN" in module_name:  # Only NeuralNets need checkpoints
-                context["checkpoint"] = select_checkpoint(cfg, agent_id, module_role)
             self.components[module_role] = module_cls(context)
-            # self.components[module_role] = module_cls(
-            #    plans, cfg, self.components, device, role_checkpoint, module_role, self.memory
-            # )
+
+        # Load checkpoint after all components are built (bundled format)
+        if checkpoint:
+            self._load_checkpoint(checkpoint)
+
+    def _load_checkpoint(self, path):
+        """Load a bundled checkpoint and distribute to components by role."""
+        data = torch.load(path, map_location=self.device)
+        for role, state_data in data.items():
+            if role in self.components and hasattr(
+                self.components[role], "load_checkpoint_data"
+            ):
+                self.components[role].load_checkpoint_data(state_data)
 
     def get_action(self, observation):
         self.state = dict(observation)
@@ -83,23 +77,16 @@ class Model:
                     0
                 ]  # TODO: handle confidence later, [1]
 
-        # return self.state["policy"]["action"]
         return self.state["action"]
 
     def update(self, next_observation):
-        for field in next_observation.keys():  # was self.obs_fields
+        for field in next_observation.keys():
             self.state[f"next_{field}"] = next_observation[field]
-        # self.state["action"] = self.components["policy"]
-        # self.state["reward"] = np.atleast_1d(self.components["affect"])
         for role in self.components:
-            # reward = 0.0
-            # if "reward" in role: consider multireward here
-            #    reward += self.components[role].activate(self.state)[0]
             if "post_activate" in self.components[role].metadata:
                 self.state[role] = self.components[role].activate(self.state)[
                     0
                 ]  # TODO: handle confidence later, [1]
-            # self.state["reward"] = reward
 
         self.memory.push(**self.state)
         reports = []
@@ -109,12 +96,13 @@ class Model:
         return reports
 
     def save(self, path):
+        """Save all components with checkpoint data into a single bundled file."""
         os.makedirs(os.path.dirname(path), exist_ok=True)
+        data = {}
         for role, component in self.components.items():
-            if isinstance(component, torch.nn.Module):
-                filename = f"{path}_{self.agent_id}_{role}-{datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S_%f')}"
-                checkpoint_data = component.checkpoint_data()
-                torch.save(checkpoint_data, filename)
+            if hasattr(component, "checkpoint_data"):
+                data[role] = component.checkpoint_data()
+        torch.save(data, path)
 
     @staticmethod
     def fill_plans(obs_shapes, action_space, plans):
@@ -150,8 +138,6 @@ class Model:
                 for layer in plans["architecture"]["vision_net"]:
                     if layer["type"] == "conv":
                         kernel = layer["kernel"]
-                        # Formula: output = (input - kernel + 2*padding) / stride + 1
-                        # With padding=0, stride=1: output = input - kernel + 1
                         height = height - kernel + 1
                         width = width - kernel + 1
                         channels = layer["size"]
