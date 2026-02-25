@@ -25,7 +25,7 @@ Your process when we design a feature should be the following:
    b. There is usually only one or two CORRECT WAYS to do these features, as our patterns are quite strict. Take your time to minimize the plan according to our principles.
 3. We agree on the plan on the high level, after which you can start to lay out the actual TODO-list for the specific code snippets.
 4. Ask for the files for their current state, and work with me by giving exact locations for the snippets or the whole file, depending on the situation. IMPORTANT: before submitting the files to me for the first time, REASSESS AND REFLECT ON THE DESIGN PATTERNS ONE MORE TIME, and try to find all the spots that defy them.
-5. Debug the feature with me, and refactor it with me as needed. 
+5. Debug the feature with me, and refactor it with me as needed. When something breaks, do not assume that the first thing that comes to mind fixes the issue: there are multiple genuine features that need to be considered, and its better to simply state the problem, and what's around it. I'll decide on the fix.
 
 ## DESIGN PATTERNS
 - MEDIATOR PATTERN: We have control files, and we have logic modules, and their roles are strict. The control files include orchestrator.py and experiments.py.
@@ -74,3 +74,5 @@ Your process when we design a feature should be the following:
 - No repeated fields that require separate updating when one thing changes: map's description will not have a new self.map_size -field described if the array's .shape or config's cfg.env_params.map_size already contains this information. Similarly we don't take values OUT of the cfg and pass them as parameters if we already pass the cfg too! Also we don't predefine layers like "agent_0_roi" to be added inside places like savanna_wrapper, when we can just append them when the add_roi() function is called a few lines later: if something changes, we don't want to have to update this change in multiple places, and we don't want to leak this kind of logic outside of roi in the first place.  
 - No leaking logic: a function that is used solely to interpret or assist another class from a different file is a red-flag: that logic likely belongs in the respective class instead.
 - Information travels in an obscure, agnostic fashion between the generator and the consumer: red-flag if, say the observation, that comes from the environment, gets checked for its format in the experiment: it is supposed to only be passing it to the agent's neural network / other consumers. Information needs to flow agnostically in the middle, and correct format is left as the responsibility of the contracts within config.
+- Red-flag: Variables, especially cfg, gets unpacked of variables that then move alongside it in the signatures, threading them through multiple functions.
+- Red-flag: Multiple functions handling a process, but they let pass their computation to the next function instead of doing a meaningful packaging.

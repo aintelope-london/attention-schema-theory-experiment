@@ -97,8 +97,8 @@ env_params:
   GOLD_VISITS_LOG_BASE: 1.5        # @ui float 1.0 10.0
   SILVER_VISITS_LOG_BASE: 1.5      # @ui float 1.0 10.0
   PREDATOR_MOVEMENT_PROBABILITY: 0.25  # @ui float 0.0 1.0
-  observation_direction_mode: 0    # @ui int 0 2
-  action_direction_mode: 0         # @ui int 0 2
+  observation_direction_mode: 1    
+  action_direction_mode: 1         
   test_death: False                # @ui bool
   seed: ${run.seed}
 models:

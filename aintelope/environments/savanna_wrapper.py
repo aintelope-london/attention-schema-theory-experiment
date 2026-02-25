@@ -21,7 +21,7 @@ from aintelope.environments.savanna_safetygrid import (
 
 
 from pettingzoo import ParallelEnv
-from aintelope.utils.roi import append_roi_layers
+from aintelope.utils.roi import compute_roi
 
 
 # Savanna agent characters in order — maps agent index to layer key
@@ -42,6 +42,23 @@ _ENV_CLASS = {
 
 # Attributes that belong to the wrapper itself; everything else proxies to _env.
 _OWN_ATTRS = frozenset({"_cfg", "_mode", "_env", "_manifesto", "_sb3_training"})
+
+
+def combine_obs_sb3(observations):
+    """Convert canonical dict observations to SB3 (C+N, H, W) cubes.
+
+    Each interoception value becomes a constant-filled spatial layer.
+    Single definition — used by both experiment.py and this wrapper."""
+    result = {}
+    for aid, obs in observations.items():
+        vision = obs["vision"]  # (C, H, W)
+        interoception = obs["interoception"]  # (N,)
+        H, W = vision.shape[1], vision.shape[2]
+        intero_layers = np.broadcast_to(
+            interoception[:, None, None], (len(interoception), H, W)
+        ).copy()
+        result[aid] = np.concatenate([vision, intero_layers], axis=0)
+    return result
 
 
 class SavannaWrapper(AbstractEnv, ParallelEnv):
@@ -72,9 +89,11 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         raw_obs, raw_infos = self._env.reset(**kwargs)
         self._manifesto = self._build_manifesto(raw_obs, raw_infos)
         self._augment_infos(raw_infos)
+        observations = self._to_dict_obs(raw_obs)
+        observations, _ = compute_roi(observations, raw_infos, self._cfg)
         if self._sb3_training:
-            return self._obs_combined_with_roi(raw_obs), raw_infos
-        return self._obs_with_roi_dict(raw_obs), raw_infos
+            return combine_obs_sb3(observations), raw_infos
+        return observations, raw_infos
 
     def step(self, actions):
         """PettingZoo ParallelEnv interface — used by SB3 training only.
@@ -84,8 +103,15 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
             actions
         )
         self._augment_infos(raw_infos)
-        observations = self._obs_combined_with_roi(raw_obs)
-        return observations, raw_scores, terminateds, truncateds, raw_infos
+        observations = self._to_dict_obs(raw_obs)
+        observations, _ = compute_roi(observations, raw_infos, self._cfg)
+        return (
+            combine_obs_sb3(observations),
+            raw_scores,
+            terminateds,
+            truncateds,
+            raw_infos,
+        )
 
     def step_parallel(self, actions):
         raw_obs, raw_scores, terminateds, truncateds, raw_infos = self._env.step(
@@ -114,7 +140,7 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
 
     def observation_space(self, agent_id):
         """Gymnasium observation space for SB3 compatibility.
-        Matches the combined (C+roi+N, H, W) cube from _obs_combined_with_roi."""
+        Matches the combined (C+roi+N, H, W) cube from combine_obs_sb3."""
         from gymnasium.spaces import Box
 
         sample_obs = self._manifesto["observation_shapes"]
@@ -164,33 +190,6 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
             for agent_id, obs in raw_obs.items()
         }
 
-    def _obs_with_roi_dict(self, raw_obs):
-        """Extract vision, apply ROI, return dict observations."""
-        vision_obs = {aid: obs[0] for aid, obs in raw_obs.items()}
-        roi_vision = self._apply_roi(vision_obs)
-        return {
-            aid: {"vision": roi_vision[aid], "interoception": raw_obs[aid][1]}
-            for aid in raw_obs
-        }
-
-    def _obs_combined_with_roi(self, raw_obs):
-        """Combine vision+interoception into (C+N, H, W) cube with ROI.
-        Replicates the old combine_interoception_and_vision format:
-        each interoception value becomes a constant-filled spatial layer.
-        SB3 legacy format."""
-        vision_obs = {aid: obs[0] for aid, obs in raw_obs.items()}
-        roi_vision = self._apply_roi(vision_obs)
-        result = {}
-        for aid in raw_obs:
-            vision = roi_vision[aid]  # (C+roi, H, W)
-            interoception = raw_obs[aid][1]  # (N,)
-            H, W = vision.shape[1], vision.shape[2]
-            intero_layers = np.broadcast_to(
-                interoception[:, None, None], (len(interoception), H, W)
-            ).copy()
-            result[aid] = np.concatenate([vision, intero_layers], axis=0)
-        return result
-
     # ── Manifesto ─────────────────────────────────────────────────────
 
     def _build_manifesto(self, raw_obs, raw_infos):
@@ -223,30 +222,29 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
 
     def _augment_infos(self, raw_infos):
         """Add generic keys to savanna's info dicts. Original keys preserved."""
-        positions = self._read_absolute_positions()
-        directions = self._read_directions()
-        for agent_id, raw_info in raw_infos.items():
-            raw_info["position"] = positions[agent_id]
-            raw_info["direction"] = directions[agent_id]
-            raw_info["raw_observation"] = (
-                raw_info[INFO_AGENT_OBSERVATION_LAYERS_CUBE],
-                raw_info[INFO_AGENT_INTEROCEPTION_VECTOR],
-            )
-
-    def _read_absolute_positions(self):
-        """Read all agent absolute positions from the global board. One read."""
         board = next(iter(self._env.observe_absolute_bitmaps().values()))
         layer_order = list(
             next(iter(self._env.relative_observation_layers_order().values()))
         )
+        board_shape = board.shape[1:]
+
         positions = {}
         for i in range(self._env.max_num_agents):
             agent_id = f"agent_{i}"
-            agent_chr = _AGENT_CHRS[i]
-            layer_idx = layer_order.index(agent_chr)
+            layer_idx = layer_order.index(_AGENT_CHRS[i])
             ys, xs = np.where(board[layer_idx])
             positions[agent_id] = (int(ys[0]), int(xs[0]))
-        return positions
+
+        directions = self._read_directions()
+
+        for agent_id, raw_info in raw_infos.items():
+            raw_info["position"] = positions[agent_id]
+            raw_info["direction"] = directions[agent_id]
+            raw_info["board_shape"] = board_shape
+            raw_info["raw_observation"] = (
+                raw_info[INFO_AGENT_OBSERVATION_LAYERS_CUBE],
+                raw_info[INFO_AGENT_INTEROCEPTION_VECTOR],
+            )
 
     def _read_directions(self):
         """Read all agent directions from the gridworld engine. SSOT."""
@@ -258,17 +256,3 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
             direction_enum = sprites[agent_chr].observation_direction
             directions[agent_id] = _DIRECTION_VECTORS[direction_enum.value]
         return directions
-
-    def _apply_roi(self, vision_obs):
-        """Apply ROI augmentation to vision ndarrays."""
-        roi_mode = self._cfg.agent_params.roi_mode
-        radius = self._cfg.env_params.render_agent_radius
-        positions = self._read_absolute_positions()
-        directions = self._read_directions()
-        return append_roi_layers(
-            vision_obs,
-            positions,
-            directions,
-            roi_mode,
-            radius,
-        )
