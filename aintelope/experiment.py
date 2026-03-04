@@ -152,7 +152,7 @@ def run_experiment(
                 if terminateds[agent.id]:
                     observation = None
                 else:
-                    agent.update(observation=observation)
+                    agent.update(observation=observation, done=done)
 
                 # Record event — experiments.py owns the log format
                 env_step_info = [score.get(dim, 0) for dim in score_dims]

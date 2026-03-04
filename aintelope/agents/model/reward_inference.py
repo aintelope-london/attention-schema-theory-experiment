@@ -52,5 +52,5 @@ class RewardInference(Component):
 
         activations[self.component_id] = np.atleast_1d(np.float32(reward))
 
-    def update(self):
+    def update(self, signals=None):
         return None

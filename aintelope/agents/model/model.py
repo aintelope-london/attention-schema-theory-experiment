@@ -40,7 +40,8 @@ class Model:
 
         all_inputs = {inp for entry in architecture.values() for inp in entry.inputs}
         memory_field_list = (
-            obs_fields
+            ["done"]
+            + obs_fields
             + ["next_" + field for field in obs_fields]
             + [cid for cid in architecture.keys() if cid not in all_inputs]
         )
@@ -84,14 +85,16 @@ class Model:
         self.components["action"].activate(self.activations)
         return self.activations["action"]
 
-    def update(self, next_observation):
+    def update(self, next_observation, done=False):
         for field, value in next_observation.items():
             self.activations[f"next_{field}"] = value
+        self.activations["done"] = float(done)
         self.components["reward"].activate(self.activations)
         self.memory.push(**self.activations)
-        reports = [c.update() for c in self.components.values()]
+        signals = {}
+        report = self.components["action"].update(signals)
         self.activations.clear()
-        return reports
+        return report
 
     def save(self, path):
         """Save all components into a single bundled file."""

@@ -49,34 +49,54 @@ class NeuralNet(nn.Module, Component):
             k: v[0].detach().cpu().numpy() for k, v in output.items()
         }
 
-    def update(self):
-        return self.optimize()
+    def update(self, signals=None):
+        return self.optimize(signals or {})
 
-    def optimize(self):
+    def optimize(self, signals):
         if len(self.memory) < self.cfg.agent_params.batch_size:
             return None
 
-        batch_data = self.memory.sample(self.cfg.agent_params.batch_size)
-        tensors = {
-            field: np.stack([entry[field] for entry in batch_data])
-            for field in self.net.inputs
-        }
+        batch = self.memory.sample(self.cfg.agent_params.batch_size)
+        custom_loss_fn = signals.get(self.component_id)
 
-        output = self.net(tensors)
-        total_loss = 0
-        for (output_name, output_tensor), target_field in zip(
-            output.items(), self.metadata["target"]
-        ):
-            target_data = np.stack([entry[target_field] for entry in batch_data])
-            target = torch.tensor(target_data, dtype=torch.float32, device=self.device)
-            loss = self.loss_fn(output_tensor, target)
-            total_loss += loss
+        if custom_loss_fn is not None:
+            tensors = {
+                field: torch.tensor(
+                    np.stack(
+                        [
+                            np.array([entry[field]])
+                            if np.isscalar(entry[field])
+                            else np.atleast_1d(entry[field])
+                            for entry in batch
+                        ]
+                    ),
+                    dtype=torch.float32,
+                    device=self.device,
+                )
+                for field in self.memory.fields
+            }
+            loss = custom_loss_fn(self.net, self.target_net, tensors)
+        else:
+            tensors = {
+                field: np.stack([entry[field] for entry in batch])
+                for field in self.net.inputs
+            }
+            output = self.net(tensors)
+            loss = torch.tensor(0.0, device=self.device)
+            for (_, output_tensor), target_field in zip(
+                output.items(), self.metadata["target"]
+            ):
+                target_data = np.stack([entry[target_field] for entry in batch])
+                target = torch.tensor(
+                    target_data, dtype=torch.float32, device=self.device
+                )
+                loss = loss + self.loss_fn(output_tensor, target)
 
         self.optimizer.zero_grad()
-        total_loss.backward()
+        loss.backward()
         self.optimizer.step()
-
-        return {"loss": total_loss.item()}
+        self.latest_loss = loss.item()
+        return {"loss": loss.item()}
 
     def update_target_net(self):
         target_dict = self.target_net.state_dict()
@@ -220,7 +240,10 @@ class Network(nn.Module):
     def forward(self, input_batch):
         """Process input through all network components following config order."""
         activations = {
-            k: torch.tensor(v, dtype=torch.float32) for k, v in input_batch.items()
+            k: torch.tensor(v, dtype=torch.float32)
+            if not isinstance(v, torch.Tensor)
+            else v
+            for k, v in input_batch.items()
         }
         outputs = {}
 
@@ -259,25 +282,30 @@ class Network(nn.Module):
 
 
 class DQN(Component):
-    """DQN — epsilon-greedy action selection over a Q-network."""
+    """DQN — epsilon-greedy action selection with Bellman Q-learning.
+    Passes a loss_fn closure into signals for q_net to execute.
+    All torch mechanics live in the closure but are the strategy's
+    responsibility; NeuralNet handles tensor conversion and optimizer step.
+    """
 
     def __init__(self, context):
         self.component_id = context["component_id"]
         self.inputs = context["inputs"]
         self.components = context["components"]
         self.activations = context["activations"]
+        self.cfg = context["cfg"]
         self.metadata = context["plans"]["metadata"]
 
+        self._q_net_id = self.inputs[0]
         self.eps_start = self.metadata["eps_start"]
         self.eps_end = self.metadata["eps_end"]
         self.eps_decay_steps = self.metadata["eps_decay_steps"]
         self.step_count = 0
+        self.update_count = 0
 
     def activate(self, activations):
-        q_net_id = self.inputs[0]
-        self.components[q_net_id].activate(activations)
-
-        q_values = list(activations[q_net_id].values())[0]
+        self.components[self._q_net_id].activate(activations)
+        q_values = list(activations[self._q_net_id].values())[0]
 
         epsilon = self._compute_epsilon()
         if np.random.random() < epsilon:
@@ -288,8 +316,41 @@ class DQN(Component):
         self.step_count += 1
         activations[self.component_id] = action
 
-    def update(self):
-        return None
+    def update(self, signals=None):
+        if signals is None:
+            signals = {}
+
+        q_net = self.components[self._q_net_id]
+        gamma = self.cfg.agent_params.gamma
+        loss_fn = q_net.loss_fn
+
+        def bellman_loss(net, target_net, tensors):
+            state_inputs = {f: tensors[f] for f in net.inputs}
+            next_state_inputs = {f: tensors[f"next_{f}"] for f in net.inputs}
+
+            q_values = list(net(state_inputs).values())[0]  # (batch, n_actions)
+            q_taken = q_values.gather(1, tensors["action"].long().view(-1, 1)).squeeze(
+                1
+            )
+
+            with torch.no_grad():
+                q_next_max = (
+                    list(target_net(next_state_inputs).values())[0].max(dim=1).values
+                )
+
+            targets = tensors["reward"].squeeze(1) + gamma * q_next_max * (
+                1.0 - tensors["done"].squeeze(1)
+            )
+            return loss_fn(q_taken, targets)
+
+        signals[self._q_net_id] = bellman_loss
+        report = q_net.update(signals)
+
+        self.update_count += 1
+        if self.update_count % q_net.metadata["target_net_update_frequency"] == 0:
+            q_net.update_target_net()
+
+        return report
 
     def _compute_epsilon(self):
         decay_rate = (self.eps_start - self.eps_end) / self.eps_decay_steps
@@ -331,7 +392,7 @@ class ModelBased(Component):
         best_action = self.mcts.search(activations, value_fn, dynamics_fn)
         activations[self.component_id] = best_action
 
-    def update(self):
+    def update(self, signals=None):
         return None
 
 
