@@ -86,7 +86,8 @@ def test_main_agent_model_free_learns(base_test_config):
     events = pd.concat(result["events"], ignore_index=True)
     assert_learning_improvement(events[~events["IsTest"]])
 
-#test_ <- add back when ready to do this
+
+# test_ <- add back when ready to do this
 def main_agent_model_based_learns(base_test_config):
     """main_agent with ModelBased architecture shows learning improvement over training."""
     cfg = OmegaConf.merge(
