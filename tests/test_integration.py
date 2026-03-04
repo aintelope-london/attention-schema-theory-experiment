@@ -45,6 +45,7 @@ def test_agent_learns(base_test_config):
     events = pd.concat(result["events"], ignore_index=True)
     assert_learning_improvement(events[~events["IsTest"]])
 
+
 def test_main_agent_model_free_learns(base_test_config):
     """main_agent with DQN architecture shows learning improvement over training."""
     cfg = OmegaConf.merge(
@@ -54,7 +55,7 @@ def test_main_agent_model_free_learns(base_test_config):
                 "run": {
                     "experiment": {
                         "steps": 11,
-                        "episodes": 300,
+                        "episodes": 500,
                         "write_outputs": False,
                     },
                 },

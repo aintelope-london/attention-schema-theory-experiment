@@ -34,7 +34,7 @@ class MainAgent(AbstractAgent):
         return action
 
     def update(self, observation=None, **kwargs):
-        return self.model.update(observation)
+        return self.model.update(observation, done=kwargs.get("done", False))
 
     def save_model(self, path, **kwargs):
         self.model.save(path)
