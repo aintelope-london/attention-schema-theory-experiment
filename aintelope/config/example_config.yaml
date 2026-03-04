@@ -11,9 +11,6 @@ train:
     experiment:
       episodes: 10
       steps: 10
-  env_params:
-    scores:
-        FOOD_SCORE: '{"FOOD": 10}'
 
 test:
   run:

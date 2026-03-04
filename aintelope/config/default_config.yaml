@@ -27,11 +27,6 @@ agent_params:
   # Agents
   agent_0:
     agent_class: random_agent      # @ui str main_agent,rangom_agent,sb3_ppo_agent,sb3_a2c_agent
-    architecture: 
-      reward: [RewardInference]    # @ui str [RewardInference]
-      dynamic: NextState-NN        # @ui str None,NextState-NN
-      value: StateValue-NN         # @ui str None,StateValue-NN
-      action: ModelBased           # @ui str None,ModelBased
   # SB3 model parameters
   num_conv_layers: 0               # @ui int 0 3
   learning_rate: 0.0003            # @ui float 0.0001 0.01
@@ -144,12 +139,8 @@ models:
           - {type: input, source: interoception}
           - {type: linear, size: 4}
           - {type: relu}
-        audio_net:
-          - {type: input, source: audio}
-          - {type: linear, size: 4}
-          - {type: relu}
         combined_net:
-          - {type: input, source: vision_net+audio_net+interoception_net}
+          - {type: input, source: vision_net+interoception_net}
           - {type: linear, size: 8}
           - {type: relu}
           - {type: linear, source: action}
@@ -175,12 +166,8 @@ models:
           - {type: input, source: interoception}
           - {type: linear, size: 4}
           - {type: relu}
-        audio_net:
-          - {type: input, source: audio}
-          - {type: linear, size: 4}
-          - {type: relu}
         combined_net:
-          - {type: input, source: vision_net+audio_net+interoception_net}
+          - {type: input, source: vision_net+interoception_net}
           - {type: linear, size: 8}
           - {type: relu}
           - {type: linear, size: 1}
@@ -207,12 +194,9 @@ models:
           - {type: input, source: interoception}
           - {type: linear, size: 4}
           - {type: relu}
-        audio_net:
-          - {type: input, source: audio}
-          - {type: linear, size: 4}
-          - {type: relu}
+
         encoder:
-          - {type: input, source: vision_net+audio_net+interoception_net+action}
+          - {type: input, source: vision_net+interoception_net+action}
           - {type: linear, size: 32}
           - {type: relu}
           - {type: linear, size: 16}
@@ -224,7 +208,7 @@ models:
           - {type: unflatten} #, size: [5, 5, 8]}  
           - {type: conv_transpose, size: 8, kernel: 3}  
           - {type: relu}
-          - {type: conv_transpose, size: 3, kernel: 1}  
+          - {type: conv_transpose, source: vision, kernel: 1}
           - {type: output}
         interoception_denet:
           - {type: input, source: encoder}
@@ -232,9 +216,4 @@ models:
           - {type: linear, size: 4}
           - {type: linear, source: interoception}
           - {type: output}
-        audio_denet:
-          - {type: input, source: encoder}
-          - {type: relu}         
-          - {type: linear, size: 4}
-          - {type: linear, source: audio}
-          - {type: output}
+          
