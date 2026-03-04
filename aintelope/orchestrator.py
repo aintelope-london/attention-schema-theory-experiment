@@ -5,8 +5,7 @@
 # Repository:
 # https://github.com/aintelope-london/attention-schema-theory-experiment
 
-import os
-
+import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from aintelope.config.config_utils import (
@@ -61,7 +60,6 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
 
 def run_experiments(main_config):
     """Main orchestrator entry point."""
-
     cfg = init_config(main_config)
     set_console_title(cfg.run.outputs_dir)
 
@@ -74,7 +72,9 @@ def run_experiments(main_config):
     cfg_dict = to_picklable(cfg)
     main_config_dict = to_picklable(main_config)
 
-    with ProcessPoolExecutor(max_workers=workers) as executor:
+    ctx = multiprocessing.get_context("spawn")
+    executor = ProcessPoolExecutor(max_workers=workers, mp_context=ctx)
+    try:
         futures = {
             executor.submit(run_trial, cfg_dict, main_config_dict, i_trial): i_trial
             for i_trial in range(cfg.run.trials)
@@ -84,6 +84,12 @@ def run_experiments(main_config):
             configs.extend(result["configs"])
             all_events.extend(result["events"])
             all_states.extend(result["states"])
+        executor.shutdown(wait=True)
+    except KeyboardInterrupt:
+        for p in executor._processes.values():
+            p.kill()
+        executor.shutdown(wait=False, cancel_futures=True)
+        raise
 
     if cfg.run.write_outputs:
         write_results(cfg.run.outputs_dir, all_events, all_states)

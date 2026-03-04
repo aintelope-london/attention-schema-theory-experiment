@@ -5,23 +5,24 @@ from aintelope.agents.model.component import Component
 
 class RewardInference(Component):
     """
-    Infers reward from observation dict.
+    Infers reward from observation.
     Environment-specific reward logic — hand-crafted for savanna gridworld.
-    Registered as the 'reward' role in the agent's architecture config.
     """
 
     def __init__(self, context):
         self.cfg = context["cfg"]
         self.env_manifesto = context["env_manifesto"]
-        self.role = context["role"]
+        self.component_id = context["component_id"]
+        self.inputs = context["inputs"]
+        self.activations = context["activations"]
         self.metadata = context["plans"]["metadata"]
         self.satiation = 0
 
-    def activate(self, observation):
+    def activate(self, activations):
         reward = 0.0
 
-        interoception = observation.get("interoception", np.array([]))
-        vision = observation.get("vision", None)
+        interoception = activations.get("interoception", np.array([]))
+        vision = activations.get("vision", None)
 
         # Food reward — homeostatic
         if len(interoception) > 0:
@@ -49,7 +50,7 @@ class RewardInference(Component):
             self.satiation -= 1
         reward += -abs(self.satiation)
 
-        return {"reward": np.atleast_1d(np.float32(reward))}, 1.0
+        activations[self.component_id] = np.atleast_1d(np.float32(reward))
 
     def update(self):
         return None

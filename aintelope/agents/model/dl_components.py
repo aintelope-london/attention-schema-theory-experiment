@@ -8,22 +8,20 @@ class NeuralNet(nn.Module, Component):
     """PyTorch component."""
 
     def __init__(self, context):
-        # plans, cfg, components, device, checkpoint, role, memory):
         super().__init__()
         self.cfg = context["cfg"]
         self.device = context["device"]
-        self.role = context["role"]
+        self.component_id = context["component_id"]
+        self.inputs = context["inputs"]
+        self.components = context["components"]
+        self.activations = context["activations"]
         self.memory = context["memory"]
         self.plans = context["plans"]
-        self.checkpoint = context["checkpoint"]
         self.metadata = context["plans"]["metadata"]
 
-        self.step_count = 0
-        self.last_action = None
+        self.component_inputs = [i for i in self.inputs if i in self.components]
 
         self.net = Network(self.plans).to(self.device)
-        if self.checkpoint:
-            self.load_checkpoint(self.checkpoint)
 
         if self.metadata.get("use_target_net", False):
             self.target_net = Network(self.plans).to(self.device)
@@ -38,25 +36,27 @@ class NeuralNet(nn.Module, Component):
         self.loss_fn = getattr(nn, self.metadata["loss_function"])()
         self.latest_loss = None
 
-    def activate(self, observation):
+    def activate(self, activations):
+        for inp in self.component_inputs:
+            self.components[inp].activate(activations)
+
         input_dict = {
-            field: np.expand_dims(observation[field], axis=0)
+            field: np.expand_dims(activations[field], axis=0)
             for field in self.net.inputs
-            if field in observation
         }
         output = self.net(input_dict)
-        confidence = 1.0  # WIP
-        return {k: v[0].detach().cpu().numpy() for k, v in output.items()}, confidence
+        activations[self.component_id] = {
+            k: v[0].detach().cpu().numpy() for k, v in output.items()
+        }
 
     def update(self):
-        # No-op here, needed for MCTS
         return self.optimize()
 
     def optimize(self):
-        if len(self.memory) < self.cfg.dl_params.batch_size:
+        if len(self.memory) < self.cfg.agent_params.batch_size:
             return None
 
-        batch_data = self.memory.sample(self.cfg.dl_params.batch_size)
+        batch_data = self.memory.sample(self.cfg.agent_params.batch_size)
         tensors = {
             field: np.stack([entry[field] for entry in batch_data])
             for field in self.net.inputs
@@ -69,15 +69,14 @@ class NeuralNet(nn.Module, Component):
         ):
             target_data = np.stack([entry[target_field] for entry in batch_data])
             target = torch.tensor(target_data, dtype=torch.float32, device=self.device)
-
             loss = self.loss_fn(output_tensor, target)
             total_loss += loss
-        # NEW END, wrt commented
+
         self.optimizer.zero_grad()
-        loss.backward()
+        total_loss.backward()
         self.optimizer.step()
 
-        return {"loss": loss.item()}
+        return {"loss": total_loss.item()}
 
     def update_target_net(self):
         target_dict = self.target_net.state_dict()
@@ -95,10 +94,8 @@ class NeuralNet(nn.Module, Component):
             "loss": self.latest_loss or 1.0,
         }
 
-    def load_checkpoint(self, path):
-        """Assumes that the network has been initialized with correct sizes."""
-        checkpoint = torch.load(path)
-        self.net.load_state_dict(checkpoint["model_state_dict"])
+    def load_checkpoint_data(self, data):
+        self.net.load_state_dict(data["model_state_dict"])
         self.net.eval()
 
 
@@ -121,9 +118,8 @@ class Network(nn.Module):
                 for field in layer["source"].split("+")
                 if field not in plans["architecture"]
             }
-        )  # ← T
+        )
 
-        # Build each component network
         for plan_name, plan in self.plans["architecture"].items():
             self.compose_network(plan, plan_name)
 
@@ -131,7 +127,7 @@ class Network(nn.Module):
         """Compose a network based on the layer list."""
         subnetwork = nn.ModuleList()
         input_size = None
-        vision_size = None  # Local variable for tracking spatial dimensions
+        vision_size = None
 
         for layer_config in layers:
             if layer_config["type"] in ["input"]:
@@ -148,7 +144,6 @@ class Network(nn.Module):
                 kernel_size = layer_config["kernel"]
                 layer = nn.Conv2d(input_size, output_channels, kernel_size, stride=1)
 
-                # Update spatial dims only if we're tracking them
                 if vision_size is not None:
                     vision_size = self.calc_conv_shape(
                         vision_size, layer, transpose=False
@@ -158,7 +153,6 @@ class Network(nn.Module):
             elif layer_config["type"] == "linear":
                 output_size = layer_config["size"]
 
-                # Check if we need to flatten from conv - look for any Conv2d in the subnetwork
                 has_conv = any(
                     isinstance(layer, nn.Conv2d) for layer in subnetwork[-2:-1]
                 )
@@ -183,7 +177,6 @@ class Network(nn.Module):
                     input_size, output_channels, kernel_size, stride=1
                 )
 
-                # Update spatial dims if we're tracking them
                 if vision_size is not None:
                     vision_size = self.calc_conv_shape(
                         vision_size, layer, transpose=True
@@ -194,9 +187,8 @@ class Network(nn.Module):
                 target_shape = layer_config["size"]
                 unflatten_shape = (target_shape[2], target_shape[0], target_shape[1])
                 layer = nn.Unflatten(1, unflatten_shape)
-                # Resume spatial tracking after unflatten
-                vision_size = target_shape[:2]  # [H, W]
-                input_size = target_shape[2]  # Channels
+                vision_size = target_shape[:2]
+                input_size = target_shape[2]
 
             elif layer_config["type"] == "output":
                 continue
@@ -207,14 +199,6 @@ class Network(nn.Module):
         self.architecture[plan_name] = subnetwork
 
     def calc_conv_shape(self, input_size, layer, transpose=False):
-        """
-        Calculate output spatial dimensions for conv2d or conv_transpose2d.
-
-        Args:
-            input_size: Current spatial dimensions [H, W]
-            layer: The conv or conv_transpose layer
-            transpose: True for conv_transpose, False for regular conv
-        """
         input_size = np.array(input_size)
         kernel = np.array(layer.kernel_size)
         padding = (
@@ -225,10 +209,8 @@ class Network(nn.Module):
         )
 
         if transpose:
-            # ConvTranspose2d: output = (input - 1) * stride - 2*padding + kernel
             output_size = (input_size - 1) * stride - 2 * padding + kernel
         else:
-            # Conv2d: output = floor((input - kernel + 2*padding) / stride) + 1
             output_size = (
                 np.floor((input_size - kernel + 2 * padding) / stride).astype(int) + 1
             )
@@ -246,7 +228,6 @@ class Network(nn.Module):
             input_layer = next(layer for layer in plan if layer["type"] == "input")
             sources = input_layer["source"].split("+")
 
-            # Handle action one-hot encoding inline
             inputs = []
             for src in sources:
                 if src == "action":
@@ -268,44 +249,36 @@ class Network(nn.Module):
 
             activations[component_name] = x
 
-            # Check if this component has an output declaration
             if any(layer["type"] == "output" for layer in plan):
                 outputs[component_name] = x
 
         return outputs
 
 
-# ------------- Other
+# ------------- Strategy components
 
 
 class DQN(Component):
-    """DQN wrapper - selects actions using epsilon-greedy from Q-network."""
+    """DQN — epsilon-greedy action selection over a Q-network."""
 
     def __init__(self, context):
-        # cfg, components, device, checkpoint, role, memory):
-        self.role = context["role"]
-        self.memory = context["memory"]
-        self.cfg = context["cfg"]
+        self.component_id = context["component_id"]
+        self.inputs = context["inputs"]
+        self.components = context["components"]
+        self.activations = context["activations"]
         self.metadata = context["plans"]["metadata"]
 
-        # Reference the Q-network from components
-        self.q_network = context["components"]["q_network"]
-
-        # Epsilon parameters
-        self.eps_start = self.metadata.get("eps_start", self.cfg.rl_params.eps_start)
-        self.eps_end = self.metadata.get("eps_end", self.cfg.rl_params.eps_end)
-        self.eps_decay_steps = self.metadata.get(
-            "eps_decay_steps", self.cfg.rl_params.eps_last_step
-        )
+        self.eps_start = self.metadata["eps_start"]
+        self.eps_end = self.metadata["eps_end"]
+        self.eps_decay_steps = self.metadata["eps_decay_steps"]
         self.step_count = 0
-        self.last_action = None
 
-    def activate(self, observation):
-        # Get Q-values from network
-        output_dict, _ = self.q_network.activate(observation)
-        q_values = list(output_dict.values())[0]
+    def activate(self, activations):
+        q_net_id = self.inputs[0]
+        self.components[q_net_id].activate(activations)
 
-        # Epsilon-greedy selection
+        q_values = list(activations[q_net_id].values())[0]
+
         epsilon = self._compute_epsilon()
         if np.random.random() < epsilon:
             action = np.random.randint(len(q_values))
@@ -313,12 +286,10 @@ class DQN(Component):
             action = int(np.argmax(q_values))
 
         self.step_count += 1
-        self.last_action = action
-        return {"action": action}, 1.0
+        activations[self.component_id] = action
 
     def update(self):
-        # Delegate to underlying Q-network
-        return self.q_network.update()
+        return None
 
     def _compute_epsilon(self):
         decay_rate = (self.eps_start - self.eps_end) / self.eps_decay_steps
@@ -326,60 +297,49 @@ class DQN(Component):
 
 
 class ModelBased(Component):
-    """Model-based RL implementation (V(S), SAE, MCTS)."""
+    """Model-based RL — MCTS over dynamics and value components."""
 
     def __init__(self, context):
-        # cfg, components, device, checkpoint, role, memory):
-        self.role = context["role"]
-        self.memory = context["memory"]
-        self.dynamics_fn = context["components"]["dynamic"]
-        self.value_fn = context["components"]["value"]
-        self.mcts = MCTS(context["plans"], self.dynamics_fn, self.value_fn)
-        self.last_action = None
+        self.component_id = context["component_id"]
+        self.inputs = context["inputs"]
+        self.components = context["components"]
+        self.activations = context["activations"]
         self.metadata = context["plans"]["metadata"]
 
-    def activate(self, observation):
-        def value_fn(observation):
-            output_dict, _ = self.value_fn.activate(observation)
-            return float(list(output_dict.values())[0])
+        self.dynamics_id = self.inputs[0]
+        self.value_id = self.inputs[1]
+        self.mcts = MCTS(context["plans"])
 
-        def dynamics_fn(observation, action_idx):
-            input_dict = {**observation, "action": np.array([action_idx])}
-            output_dict, _ = self.dynamics_fn.activate(input_dict)
-            # NEW, wrt commented below
-            result = {}
-            for output_name, target_field in zip(
-                output_dict.keys(), self.dynamics_fn.metadata["target"]
-            ):
-                obs_field = target_field.replace("next_", "")  # next_vision -> vision
-                result[obs_field] = output_dict[output_name]
+    def activate(self, activations):
+        def value_fn(state):
+            temp = dict(state)
+            self.components[self.value_id].activate(temp)
+            return float(list(temp[self.value_id].values())[0])
 
-            return result
-            """return {
-                'vision': output_dict['vision_denet'],
-                'audio': output_dict['audio_denet'],
-                'interoception': output_dict['interoception_denet']
-            }"""
+        def dynamics_fn(state, action_idx):
+            temp = {**state, "action": np.array([action_idx])}
+            self.components[self.dynamics_id].activate(temp)
+            output = temp[self.dynamics_id]
+            return {
+                target.replace("next_", ""): output[name]
+                for name, target in zip(
+                    output.keys(),
+                    self.components[self.dynamics_id].metadata["target"],
+                )
+            }
 
-        best_action_idx = self.mcts.search(observation, value_fn, dynamics_fn)
-        self.last_action = best_action_idx
-        confidence = 1.0
-        return {"action": best_action_idx}, confidence
+        best_action = self.mcts.search(activations, value_fn, dynamics_fn)
+        activations[self.component_id] = best_action
 
     def update(self):
-        reports = {}
-        reports["dynamic"] = self.dynamics_fn.update()
-        reports["value"] = self.value_fn.update()
-        return {"mcts_reports": reports}
+        return None
 
 
 class MCTS:
-    def __init__(self, plans, dynamics_component, value_component):
+    def __init__(self, plans):
         self.c_puct = plans["metadata"]["c_puct"]
         self.num_simulations = plans["metadata"]["num_simulations"]
         self.max_depth = plans["metadata"]["max_depth"]
-        self.dynamics_component = dynamics_component
-        self.value_component = value_component
         self.n_actions = plans["n_actions"]
 
     def search(self, root_state, value_fn, dynamics_fn):
@@ -387,7 +347,6 @@ class MCTS:
         for _ in range(self.num_simulations):
             node = root
             path = [node]
-            # Selection
             while node.is_expanded() and len(path) < self.max_depth:
                 action_idx = max(
                     node.children.keys(),
@@ -395,36 +354,30 @@ class MCTS:
                 )
                 node = node.children[action_idx]
                 path.append(node)
-            # Expansion & Evaluation
+
             if len(path) < self.max_depth:
                 self._expand(node, dynamics_fn)
                 if node.children:
                     action_idx = np.random.choice(list(node.children.keys()))
                     node = node.children[action_idx]
                     path.append(node)
-            # Simulation
+
             value = self._evaluate(node, value_fn)
-            # Backpropagation
             for node in path:
                 node.visits += 1
                 node.value_sum += value
-        # Select best action
-        best_action_idx = max(
-            root.children.keys(), key=lambda a: root.children[a].visits
-        )
-        return best_action_idx
+
+        return max(root.children.keys(), key=lambda a: root.children[a].visits)
 
     def _expand(self, node, dynamics_fn):
         for action_idx in range(self.n_actions):
-            # Compute state immediately during expansion
             next_state = dynamics_fn(node.state, action_idx)
             node.children[action_idx] = MCTSNode(
                 next_state, parent=node, action=action_idx
             )
 
     def _evaluate(self, node, value_fn):
-        # State always exists, just evaluate
-        return value_fn(node.state) if node.state is not None else 0.0
+        return value_fn(node.state)
 
 
 class MCTSNode:

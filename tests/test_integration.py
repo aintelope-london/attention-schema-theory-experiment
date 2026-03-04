@@ -20,7 +20,7 @@ def test_agent_learns(base_test_config):
             "test": {
                 "run": {
                     "experiment": {
-                        "steps": 10,
+                        "steps": 11,
                         "episodes": 300,
                         "write_outputs": False,
                     },
@@ -31,7 +31,7 @@ def test_agent_learns(base_test_config):
                     },
                     "num_conv_layers": 0,
                     "learning_rate": 0.002,
-                    "ppo_n_steps": 32,
+                    "ppo_n_steps": 10,
                 },
                 "env_params": {
                     "map_max": 4,

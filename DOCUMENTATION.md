@@ -267,4 +267,83 @@ Environments conform to `AbstractEnv`: `reset(**kwargs)`, `step_parallel(actions
 SB3 baselines and the savanna gridworld environment are legacy: maintained for validation, but the system is moving toward new agents and environments. Agents and environments both conform to abstract contracts, making the system agnostic to their implementation. Observations follow a canonical dict format. The environment manifesto pattern provides agents with the structural information they need to self-configure.
 
 
+### 6. Component connectome
+
+The agent's `Model` class manages a **connectome**: a dict of named components that form a directed acyclic graph (DAG) for activation, and a flat collection for learning.
+
+#### Design choices
+
+The connectome is modeled after PyTorch's module composition: components can be arbitrarily chained, stacked, and nested. A NeuralNet component can take observation fields as input, or the output of other components, or both. There is no distinction at the framework level between "observation processors", "planners", or "value estimators" — they are all components with inputs and outputs. The architecture is defined entirely in config.
+
+This means non-sensical architectures can be constructed. Validating cognitive plausibility is the scientist's responsibility, not the framework's. The framework guarantees only that the DAG activates correctly and that learning propagates.
+
+#### Config format
+
+Each agent's `architecture` is a dict of named components. Two keys are reserved: `action` (the activation root, called during `get_action`) and `reward` (called during `update` to compute the reward signal). All other keys are internal components reached through the DAG.
+
+Each entry has two fields:
+
+- `type`: references a library card in the `models:` config section, which defines the Python class, network layers, optimizer, loss function, and other parameters.
+- `inputs`: list of names. If a name matches a sibling key in the architecture, it's a component reference. If it matches `observation`, it expands to the environment's modality list from the manifesto. Otherwise, it's an observation field name.
+```yaml
+architecture:
+  action:
+    type: ModelBased
+    inputs: [dynamic, value]
+  reward:
+    type: RewardInference
+    inputs: [observation]
+  dynamic:
+    type: NextState-NN
+    inputs: [observation]
+  value:
+    type: StateValue-NN
+    inputs: [observation]
+```
+
+The `observation` keyword is expanded at init time via the environment manifesto's `observation_shapes` keys. This is the single source of truth for available modalities.
+
+#### Activation (pull-based, top-down)
+
+`Model.get_action(obs)` seeds the shared `activations` dict with observation data, then calls `components["action"].activate(activations)`. The action component pulls from its declared inputs: if an input is another component, it calls that component's `activate` first. This recurses to leaf components, which read observation fields from activations. Each component writes its output to `activations[self.component_id]`.
+
+There is no iteration over components in Model during activation. The DAG traversal is implicit in the recursive pull. Components that are never reached from the action root are never activated during `get_action`.
+
+Strategy components like MCTS may call their input components (dynamics, value) multiple times with hypothetical states. These calls use temporary dicts to avoid polluting the shared activations namespace.
+
+#### Reward
+
+`Model.update(next_obs)` adds the next observation to activations (prefixed with `next_`), then calls `components["reward"].activate(activations)`. The reward component computes an internal reward signal from observation state. Reward and action are two separate sub-graphs that can share components but are called at different times.
+
+The reward signal enters learning through shared memory. Value components learn to predict the reward that RewardInference computed; dynamics components learn to predict S' from S+A. The coupling is through data in memory, not through gradient flow between components.
+
+This is multi-reward RL: the reward component produces a dict of reward types, parameterized in its library card. Each learning component knows which reward keys it trains against. Summing rewards for a scalar signal is available as a library function, but components may attend to individual reward dimensions.
+
+#### Learning
+
+After reward activation, Model pushes the full transition (observations, next_observations, component outputs) to shared memory, then calls `update()` on every component. Each component either trains from memory (NeuralNets sample batches and run gradient steps) or no-ops (strategy components, reward inference). Update order does not matter — components learn independently from shared memory.
+
+`activations` is cleared after update completes.
+
+#### Shared state
+
+- `activations`: flat dict, step-scoped. Populated with observation data at `get_action`, cleared after `update`. Components read inputs from it and write outputs to it. This is the short-term memory of the connectome within a single step.
+- `components`: the persistent dict of component objects. Components can access siblings through this dict (received at init via context). This enables strategy components to call input components directly during planning.
+- `memory`: shared replay memory. All components read from it during learning. The field list is derived from observation shapes and architecture keys.
+
+#### Library cards (`models:` config section)
+
+Each component type has a library card defining its class, parameters, and (for NeuralNets) layer architecture. The `type` field in the architecture entry references a key in this section. Class resolution uses the naming convention: names containing `-NN` map to `NeuralNet`; others map to the class matching the type name.
+
+Library cards are defined separately from the architecture so that multiple components can share the same card (e.g. two NeuralNets with identical topology but different roles), and so that scientists can develop new cards without modifying the connectome framework.
+
+#### Component contract
+
+All components implement the `Component` ABC:
+
+- `activate(activations: dict) -> None`: compute output from inputs in activations dict, write result to `activations[self.component_id]`.
+- `update() -> report or None`: learn from shared memory, return a report dict or None.
+
+Components receive a `context` dict at init containing: `cfg`, `device`, `components`, `memory`, `activations`, `env_manifesto`, `agent_id`, `component_id`, `inputs` (expanded), and `plans` (the library card).
+
 <!-- Entries to be added step by step -->

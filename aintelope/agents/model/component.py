@@ -1,17 +1,17 @@
 from abc import ABC, abstractmethod
-from typing import Tuple, Dict, Any
+from typing import Dict, Any
 
 
 class Component(ABC):
     """
-    Lightweight abstract mixin for model components.
-    - No __init__ to avoid nn.Module / MRO initializer conflicts (NeuralNet can inherit as nn.Module, Component).
-    - activate(...) returns (outputs_dict, confidence: float).
-    - update() performs maintenance / learning and returns a report (dict or None).
+    Abstract mixin for connectome components.
+    - No __init__ to avoid nn.Module / MRO conflicts.
+    - activate() writes to the shared activations dict.
+    - update() performs learning and returns a report (dict or None).
     """
 
     @abstractmethod
-    def activate(self, observation: Dict[str, Any]) -> Tuple[Dict[str, Any], float]:
+    def activate(self, activations: Dict[str, Any]) -> None:
         raise NotImplementedError
 
     @abstractmethod
