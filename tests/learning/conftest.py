@@ -1,3 +1,7 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 import os
 import pytest
 from omegaconf import OmegaConf
@@ -7,16 +11,16 @@ register_resolvers()
 
 
 @pytest.fixture
-def base_test_config():
-    """Minimal single-block config for fast test execution.
-    Ready to pass to run(). Tests merge their own overrides on top.
+def base_learning_config():
+    """Minimal single-block config for learning tests.
+    write_outputs=True so diagnostics and reports are written to outputs/.
     """
     return OmegaConf.create(
         {
             "test": {
                 "run": {
                     "trials": 1,
-                    "write_outputs": False,
+                    "write_outputs": True,
                     "max_workers": 1,
                     "experiment": {
                         "episodes": 1,
@@ -36,9 +40,3 @@ def base_env_cfg():
     """Full resolved cfg for direct environment construction in tests."""
     cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
     return OmegaConf.merge(cfg, {"env_params": {"num_iters": 10, "map_max": 5}})
-
-
-@pytest.fixture
-def base_env_params(base_env_cfg):
-    """Flat env_params dict for tests that need raw params."""
-    return dict(base_env_cfg.env_params)

@@ -102,7 +102,7 @@ class CustomCNN(BaseFeaturesExtractor):
         #   Conv3: kernel_size=3, stride=2, padding=1 - downsamples from 5x5 -> 3x3
         #   Flatten into a linear layer
 
-        print("num_conv_layers: " + str(num_conv_layers))
+        #print("num_conv_layers: " + str(num_conv_layers))
 
         if num_conv_layers == 2:
             self.cnn = nn.Sequential(
