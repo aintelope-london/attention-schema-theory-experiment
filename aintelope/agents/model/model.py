@@ -45,7 +45,9 @@ class Model:
             + ["next_" + field for field in obs_fields]
             + [cid for cid in architecture.keys() if cid not in all_inputs]
         )
-        self.memory = ReplayMemory(cfg.agent_params.replay_buffer_size, memory_field_list)
+        self.memory = ReplayMemory(
+            cfg.agent_params.replay_buffer_size, memory_field_list
+        )
 
         context = {
             "cfg": self.cfg,

@@ -64,11 +64,7 @@ def sample_episodes(
     Generic over metric column, aggregation function, and sampling frequency.
     Returns a Series indexed by episode number.
     """
-    episode_totals = (
-        events.groupby("Episode")[metric_col]
-        .agg(agg)
-        .sort_index()
-    )
+    episode_totals = events.groupby("Episode")[metric_col].agg(agg).sort_index()
     return episode_totals.iloc[::every_n]
 
 
@@ -101,7 +97,11 @@ def format_run_report(analytics: dict, context: dict) -> str:
 
     # Env
     env_parts = []
-    for k in ("map_max", "combine_interoception_and_vision", "env_layout_seed_repeat_sequence_length"):
+    for k in (
+        "map_max",
+        "combine_interoception_and_vision",
+        "env_layout_seed_repeat_sequence_length",
+    ):
         if k in context:
             env_parts.append(f"{k}={context[k]}")
     if env_parts:
@@ -160,6 +160,7 @@ def _write_learning_curve(events: pd.DataFrame, folder: Path) -> None:
     """Plot per-episode reward curves per phase and write learning_curve.png."""
     try:
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
@@ -178,8 +179,11 @@ def _write_learning_curve(events: pd.DataFrame, folder: Path) -> None:
         window = max(1, len(episode_rewards) // 10)
         rolling = episode_rewards.rolling(window).mean()
         ax.plot(
-            rolling.index, rolling.values,
-            color=color, label=phase.capitalize(), linewidth=2,
+            rolling.index,
+            rolling.values,
+            color=color,
+            label=phase.capitalize(),
+            linewidth=2,
         )
     ax.set_xlabel("Episode")
     ax.set_ylabel("Total Reward")

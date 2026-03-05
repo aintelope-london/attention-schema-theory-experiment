@@ -169,7 +169,7 @@ class Network(nn.Module):
                         vision_size, layer, transpose=False
                     )
                 input_size = output_channels
-            
+
             elif layer_config["type"] == "linear":
                 output_size = layer_config["size"]
 

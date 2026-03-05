@@ -67,9 +67,7 @@ class FoodSmell(RewardScheme):
         if not food_coords:
             return 0.0
         closest = min(
-            math.sqrt(
-                (fc[0] - agent_center[0]) ** 2 + (fc[1] - agent_center[1]) ** 2
-            )
+            math.sqrt((fc[0] - agent_center[0]) ** 2 + (fc[1] - agent_center[1]) ** 2)
             for fc in food_coords
         )
         return 10.0 - closest
@@ -135,8 +133,7 @@ class RewardInference(Component):
 
     def activate(self, activations: dict) -> None:
         total = sum(
-            scheme.activate(activations, self.env_manifesto)
-            for scheme in self.rewards
+            scheme.activate(activations, self.env_manifesto) for scheme in self.rewards
         )
         activations[self.component_id] = np.atleast_1d(np.float32(total))
 

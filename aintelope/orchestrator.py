@@ -125,14 +125,20 @@ def run_experiments(main_config):
             cid: {"type": entry.type, "inputs": list(entry.inputs)}
             for cid, entry in agent_cfg.architecture.items()
         }
-    for k in ("map_max", "combine_interoception_and_vision", "env_layout_seed_repeat_sequence_length"):
+    for k in (
+        "map_max",
+        "combine_interoception_and_vision",
+        "env_layout_seed_repeat_sequence_length",
+    ):
         if hasattr(cfg.env_params, k):
             context[k] = getattr(cfg.env_params, k)
 
     if cfg.run.write_outputs:
         write_results(cfg.run.outputs_dir, all_events, all_states)
         archive_code(cfg)
-        write_run_report(analytics, combined_events, context, folder=cfg.run.outputs_dir)
+        write_run_report(
+            analytics, combined_events, context, folder=cfg.run.outputs_dir
+        )
 
     return {
         "outputs_dir": cfg.run.outputs_dir,

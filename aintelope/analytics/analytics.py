@@ -13,12 +13,14 @@ def assert_learning_threshold(
     events: pd.DataFrame, threshold: float, phase: str = "test"
 ) -> bool:
     """Check if average episode reward exceeds threshold."""
-    phase_events = events[events["IsTest"]] if phase == "test" else events[~events["IsTest"]]
+    phase_events = (
+        events[events["IsTest"]] if phase == "test" else events[~events["IsTest"]]
+    )
     episode_rewards = phase_events.groupby("Episode")["Reward"].sum()
     avg_reward = episode_rewards.mean()
-    assert avg_reward >= threshold, (
-        f"Learning failed: {phase} avg reward {avg_reward:.3f} < threshold {threshold:.3f}"
-    )
+    assert (
+        avg_reward >= threshold
+    ), f"Learning failed: {phase} avg reward {avg_reward:.3f} < threshold {threshold:.3f}"
     return True
 
 
