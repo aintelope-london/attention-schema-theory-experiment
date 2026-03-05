@@ -31,9 +31,12 @@ install-all: install install-dev ## install all packages
 #	pip install -e .
 
 # ---------- testing ----------
-.PHONY: tests-local
-tests-local: ## Run tests locally
-	python -m pytest --tb=native --cov=$(CODEBASE)
+.PHONY: tests-local tests-learning
+tests-local: ## Run fast unit tests (no learning, no file output)
+	python -m pytest tests/ --ignore=tests/learning --tb=native --cov=$(CODEBASE)
+
+tests-learning: ## Run learning diagnostics — slow, writes outputs/
+	python -m pytest tests/learning/ --tb=native -v
 
 # ---------- type checking ----------
 .PHONY: typecheck-local

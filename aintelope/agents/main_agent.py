@@ -24,6 +24,7 @@ class MainAgent(AbstractAgent):
         self.done = False
         self.last_action = None
         self.observation = state
+        self.model.reset()
 
     def get_action(self, observation=None, **kwargs) -> Optional[int]:
         if self.done:

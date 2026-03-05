@@ -5,35 +5,19 @@
 """Core analytics functions for evaluating learning outcomes."""
 
 import pandas as pd
+from aintelope.analytics.diagnostics import compute_learning_analytics
 
 
-# TODO DEPRECATED, make a better threshold-checker. agnostic to IsTest, etc.
+# TODO DEPRECATED — use compute_learning_analytics + assert_learning_improvement
 def assert_learning_threshold(
     events: pd.DataFrame, threshold: float, phase: str = "test"
 ) -> bool:
-    """Check if average episode reward exceeds threshold.
-
-    Args:
-        events: DataFrame with columns Episode, Reward, IsTest
-        threshold: Minimum average reward per episode to consider learning successful
-        phase: "test" or "train" - which phase to evaluate
-
-    Returns:
-        True if learning threshold met
-
-    Raises:
-        AssertionError if threshold not met
-    """
-    # Filter to requested phase
-    if phase == "test":
-        phase_events = events[events["IsTest"]]
-    else:
-        phase_events = events[~events["IsTest"]]
-
-    # Calculate per-episode rewards
+    """Check if average episode reward exceeds threshold."""
+    phase_events = (
+        events[events["IsTest"]] if phase == "test" else events[~events["IsTest"]]
+    )
     episode_rewards = phase_events.groupby("Episode")["Reward"].sum()
     avg_reward = episode_rewards.mean()
-
     assert (
         avg_reward >= threshold
     ), f"Learning failed: {phase} avg reward {avg_reward:.3f} < threshold {threshold:.3f}"
@@ -41,51 +25,36 @@ def assert_learning_threshold(
 
 
 def assert_learning_improvement(
-    events: pd.DataFrame,
-    episode_fraction: float = 0.15,
-    min_improvement_ratio: float = 1.3,
+    analytics: dict,
+    phase: str = "train",
 ) -> None:
-    """Check if agent improved from early to late episodes.
+    """Assert learning improvement from a pre-computed analytics dict.
 
     Args:
-        events: DataFrame with columns Episode, Reward, IsTest
-        episode_fraction: Fraction of episodes to compare at start/end (0.15 = 15%)
-        min_improvement_ratio: end_avg must be >= start_avg * this ratio
+        analytics: dict returned by compute_learning_analytics()
+        phase: which phase to assert on — 'train' or 'test'
 
     Raises:
-        AssertionError if improvement not detected
+        AssertionError if improvement criterion not met
     """
-    # Aggregate to per-episode reward totals
-    episode_rewards = events.groupby("Episode")["Reward"].sum().sort_index()
+    metrics = analytics.get(phase)
+    assert metrics is not None, f"No '{phase}' phase data in analytics"
 
-    n_episodes = len(episode_rewards)
-    window = max(1, int(n_episodes * episode_fraction))
-
-    start_avg = episode_rewards.iloc[:window].mean()
-    end_avg = episode_rewards.iloc[-window:].mean()
-
-    if start_avg <= 0:
-        assert (
-            end_avg > start_avg
-        ), f"No improvement: start_avg={start_avg:.3f}, end_avg={end_avg:.3f}"
-    else:
-        ratio = end_avg / start_avg
-        assert ratio >= min_improvement_ratio, (
-            f"Insufficient improvement: ratio={ratio:.2f}x < {min_improvement_ratio}x "
-            f"(start={start_avg:.3f}, end={end_avg:.3f}, window={window} episodes)"
-        )
+    if not metrics["passed"]:
+        if metrics["ratio"] is not None:
+            raise AssertionError(
+                f"Insufficient improvement: ratio={metrics['ratio']:.2f}x"
+                f" < {metrics['min_improvement_ratio']}x"
+                f" (start={metrics['start_avg']:.3f}, end={metrics['end_avg']:.3f},"
+                f" window={metrics['window']} episodes)"
+            )
+        else:
+            raise AssertionError(
+                f"No improvement: start_avg={metrics['start_avg']:.3f},"
+                f" end_avg={metrics['end_avg']:.3f}"
+            )
 
 
 def calculate_optimal_steps(agent_positions: list, food_positions: list) -> list:
-    """Calculate optimal (beeline) steps from agent to food for each spawn.
-
-    Stub for future implementation.
-
-    Args:
-        agent_positions: List of (x, y) tuples for agent spawn positions
-        food_positions: List of (x, y) tuples for food spawn positions
-
-    Returns:
-        List of optimal step counts for each spawn
-    """
+    """Stub for future implementation."""
     raise NotImplementedError("Optimal steps calculation not yet implemented")

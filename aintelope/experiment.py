@@ -1,9 +1,6 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
-#
-# Repository:
-# https://github.com/aintelope-london/attention-schema-theory-experiment
 
 import gc
 from pathlib import Path
@@ -11,9 +8,9 @@ from omegaconf import DictConfig
 
 from aintelope.agents import get_agent_class
 from aintelope.agents.model.dl_utils import checkpoint_path, select_checkpoint
+from aintelope.analytics.diagnostics import DiagnosticsMonitor
 from aintelope.analytics.recording import EventLog, StateLog
 from aintelope.environments import get_env_class
-from aintelope.utils.performance import ResourceMonitor
 from aintelope.utils.roi import compute_roi
 
 
@@ -25,7 +22,7 @@ def run_experiment(
     is_sb3 = cfg.agent_params.agent_0.agent_class.startswith("sb3_")
     mode = cfg.env_params.mode
 
-    monitor = ResourceMonitor(
+    monitor = DiagnosticsMonitor(
         context={
             "trial": i_trial,
             "episodes": cfg.run.experiment.episodes,
@@ -93,11 +90,6 @@ def run_experiment(
         if cfg.env_params.env_layout_seed_modulo > 0:
             env_layout_seed = env_layout_seed % cfg.env_params.env_layout_seed_modulo
 
-        print(
-            f"\ni_trial: {i_trial} episode: {i_episode} "
-            f"env_layout_seed: {env_layout_seed} test_mode: {cfg.run.experiment.test_mode}"
-        )
-
         # Reset
         observations, infos = env.reset(env_layout_seed=env_layout_seed)
 
@@ -152,7 +144,8 @@ def run_experiment(
                 if terminateds[agent.id]:
                     observation = None
                 else:
-                    agent.update(observation=observation, done=done)
+                    report = agent.update(observation=observation, done=done)
+                    monitor.sample_learning(i_episode, step, report)
 
                 # Record event — experiments.py owns the log format
                 env_step_info = [score.get(dim, 0) for dim in score_dims]
@@ -200,7 +193,7 @@ def run_experiment(
                     checkpoint_path(cfg.run.outputs_dir, agent.id, i_trial)
                 )
 
-    # Final save
+    # Final output
     gc.collect()
     monitor.report()
     if cfg.run.write_outputs:

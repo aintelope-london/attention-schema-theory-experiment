@@ -45,7 +45,9 @@ class Model:
             + ["next_" + field for field in obs_fields]
             + [cid for cid in architecture.keys() if cid not in all_inputs]
         )
-        self.memory = ReplayMemory(cfg.agent_params.batch_size, memory_field_list)
+        self.memory = ReplayMemory(
+            cfg.agent_params.replay_buffer_size, memory_field_list
+        )
 
         context = {
             "cfg": self.cfg,
@@ -70,6 +72,11 @@ class Model:
 
         if checkpoint:
             self._load_checkpoint(checkpoint)
+
+    def reset(self):
+        """Episode boundary reset — propagates to all components."""
+        for component in self.components.values():
+            component.reset()
 
     def _load_checkpoint(self, path):
         """Load a bundled checkpoint and distribute to components."""

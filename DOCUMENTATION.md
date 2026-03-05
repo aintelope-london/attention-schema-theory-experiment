@@ -34,7 +34,8 @@ All execution flows through a single function: `aintelope.__main__.run()`.
 | `make install` | Install the project and its gridworld dependencies in editable mode |
 | `make install-dev` | Install development tooling (pytest, black, mypy, etc.) |
 | `make install-all` | Run both `install` and `install-dev` |
-| `make tests-local` | Run the test suite with coverage |
+| `make tests-local` | Run fast unit tests — no learning tests, no file output |
+| `make tests-learning` | Run learning diagnostics — slow, writes outputs/ |
 | `make typecheck-local` | Run mypy type checking |
 | `make format` | Apply black code formatter |
 | `make format-check` | Check formatting without changing files |
@@ -97,7 +98,7 @@ Control files: `__main__.py`, `orchestrator.py`, `experiments.py`.
 | `agents/` | Agent implementations and registry |
 | `agents/model/` | Component-based agent model: neural networks, memory, reward inference |
 | `environments/` | Environment wrappers and registry |
-| `analytics/` | Event recording, run discovery, result analysis |
+| `analytics/` | Event recording, run discovery, result analysis, diagnostics |
 | `config/` | Config loading, OmegaConf resolvers, system setup |
 | `gui/` | Experiment config editor, results viewer |
 | `utils/` | Seeding, progress reporting, concurrency helpers, ROI |
@@ -129,8 +130,10 @@ Config (yaml)
     → orchestrator distributes trials across workers
       → each experiment produces an EventLog
         → EventLog.to_dataframe() → pandas DataFrame
-          → write_results() serializes to CSV per run
-            → results viewer reads CSVs for analysis/playback
+          → compute_learning_analytics() → analytics dict
+            → write_results() serializes to CSV per run
+            → write_run_report() writes report.txt + learning_curve.png
+              → results viewer reads CSVs for analysis/playback
 ```
 
 ---
@@ -166,15 +169,88 @@ test_mode: false      # @ui bool
 map_max: 1            # (no annotation → locked/read-only in GUI)
 ```
 
+### Analytics config block
+
+Under `run:`, the `analytics:` block controls the learning improvement thresholds used by both the run report and `assert_learning_improvement()`:
+
+```yaml
+run:
+  write_outputs: True
+  analytics:
+    episode_fraction: 0.15
+    min_improvement_ratio: 1.3
+```
+
+These values travel with the analytics dict returned by `compute_learning_analytics()`, so the same threshold that produced the data is the one used to assert against it. Tests that override these params do so through the same config merge path as everything else.
+
 ---
 
 ## Test Fixtures
 
-### `base_test_config`
-Loads `default_config.yaml` and applies test-specific overrides for fast test execution.
+### Test suites
 
-### `test_agent_learns`
-Uses SB3 PPO agent with inline config overrides. Runs a train block followed by a test block, then asserts learning improvement via `assert_learning_improvement`.
+Two separate test suites with different purposes:
+
+**`tests/`** — fast unit tests, collected by default pytest sweep and CI:
+- `write_outputs: False` — no filesystem side effects
+- Runs in seconds per test
+- Entry point: `make tests-local`
+
+**`tests/learning/`** — learning diagnostics, excluded from default sweep and CI:
+- `write_outputs: True` — writes `outputs/` for post-run inspection
+- Runs in minutes per test
+- Entry point: `make tests-learning`
+
+### `base_test_config` / `base_learning_config`
+
+Each suite has its own base fixture in its own `conftest.py`. Both provide a minimal single-block config diff on top of `default_config.yaml`. The only meaningful difference is `write_outputs`. Each test merges its own episode count, architecture, and env params on top of the base fixture — two config layers total, no third layer.
+
+### Return value from `run()`
+
+`run()` returns a dict including an `analytics` key populated from `compute_learning_analytics()` applied to the combined EventLog DataFrame:
+
+```python
+result = run(cfg)
+assert_learning_improvement(result["analytics"])  # reads pre-computed metrics
+```
+
+`assert_learning_improvement` reads from the analytics dict rather than recomputing — the threshold used to generate the data is the same one being asserted against.
+
+---
+
+## Analytics and Diagnostics
+
+### `compute_learning_analytics(events, episode_fraction, min_improvement_ratio)`
+
+Pure function in `analytics/diagnostics.py`. Takes the EventLog DataFrame and returns a dict keyed by phase (`"train"`, `"test"`), each containing `ratio`, `start_avg`, `end_avg`, `window`, `passed`, and `min_improvement_ratio`. Called unconditionally in the orchestrator after all trials complete; result is always present in the `run()` return value.
+
+### `assert_learning_improvement(analytics, phase)`
+
+Thin assertion wrapper in `analytics/analytics.py`. Reads from the pre-computed analytics dict and raises `AssertionError` with a descriptive message if the improvement criterion is not met. Used directly in learning tests.
+
+### `DiagnosticsMonitor`
+
+Coordinates resource and learning diagnostics for a single experiment block. Lives in `analytics/diagnostics.py`. Replaces the direct `ResourceMonitor` usage in `experiment.py`.
+
+- `sample(label)` — resource snapshot, same interface as the former `ResourceMonitor`
+- `sample_learning(episode, step, report)` — accepts the report dict returned by `agent.update()`, extracts loss
+- `report()` — prints resource report to terminal
+- `save(folder)` — writes `performance_report.csv` and `learning.csv` to the experiment block's output folder
+
+`ResourceMonitor` continues to exist in `utils/performance.py` as the resource-sampling implementation; `DiagnosticsMonitor` owns it as a member.
+
+### Run outputs (gated by `write_outputs`)
+
+All file writes are gated under a single `if cfg.run.write_outputs:` check in the orchestrator. When enabled, the run's timestamp folder contains:
+
+| File | Source | Contents |
+|------|--------|----------|
+| `report.txt` | `write_run_report()` | Learning improvement summary across phases |
+| `learning_curve.png` | `_write_learning_curve()` | Per-episode reward with rolling average, per phase |
+| `{block}/events.csv` | `write_results()` | Full event log per experiment block |
+| `{block}/states.csv` | `write_results()` | Board state per step |
+| `{block}/performance_report.csv` | `DiagnosticsMonitor.save()` | Resource snapshots |
+| `{block}/learning.csv` | `DiagnosticsMonitor.save()` | Per-step loss from component update reports |
 
 ---
 
@@ -258,7 +334,7 @@ This is also the reason the environment manifesto exists as a feature. The manif
 
 ### 14. Abstract contracts
 
-Agents conform to `AbstractAgent`: `reset(state, **kwargs)`, `get_action(observation, **kwargs)`, `update(observation, **kwargs)`, `save_model(path, **kwargs)`. The `**kwargs` pattern allows the orchestrator to pass context (step, episode, trial, info) uniformly without the abstract class prescribing what each agent needs.
+Agents conform to `AbstractAgent`: `reset(state, **kwargs)`, `get_action(observation, **kwargs)`, `update(observation, **kwargs)`, `save_model(path, **kwargs)`. The `**kwargs` pattern allows the orchestrator to pass context (step, episode, trial, info, done) uniformly without the abstract class prescribing what each agent needs.
 
 Environments conform to `AbstractEnv`: `reset(**kwargs)`, `step_parallel(actions)`, `step_sequential(actions)`, `manifesto` property, `board_state()`, `score_dimensions` property. The contract is a minimal multi-agent MDP interface. It does not prescribe agent enumeration, observation spaces, or action spaces — that information lives in the manifesto and config.
 
@@ -267,9 +343,9 @@ Environments conform to `AbstractEnv`: `reset(**kwargs)`, `step_parallel(actions
 SB3 baselines and the savanna gridworld environment are legacy: maintained for validation, but the system is moving toward new agents and environments. Agents and environments both conform to abstract contracts, making the system agnostic to their implementation. Observations follow a canonical dict format. The environment manifesto pattern provides agents with the structural information they need to self-configure.
 
 
-### 6. Component connectome
+### 15. Component connectome
 
-The agent's `Model` class manages a **connectome**: a dict of named components that form a directed acyclic graph (DAG) for activation, and a flat collection for learning.
+The agent's `Model` class manages a **connectome**: a dict of named components that form a directed acyclic graph (DAG) for both activation and learning.
 
 #### Design choices
 
@@ -285,19 +361,17 @@ Each entry has two fields:
 
 - `type`: references a library card in the `models:` config section, which defines the Python class, network layers, optimizer, loss function, and other parameters.
 - `inputs`: list of names. If a name matches a sibling key in the architecture, it's a component reference. If it matches `observation`, it expands to the environment's modality list from the manifesto. Otherwise, it's an observation field name.
+
 ```yaml
 architecture:
   action:
-    type: ModelBased
-    inputs: [dynamic, value]
+    type: DQN
+    inputs: [q_net]
   reward:
     type: RewardInference
     inputs: [observation]
-  dynamic:
-    type: NextState-NN
-    inputs: [observation]
-  value:
-    type: StateValue-NN
+  q_net:
+    type: DQN-NN
     inputs: [observation]
 ```
 
@@ -309,27 +383,30 @@ The `observation` keyword is expanded at init time via the environment manifesto
 
 There is no iteration over components in Model during activation. The DAG traversal is implicit in the recursive pull. Components that are never reached from the action root are never activated during `get_action`.
 
-Strategy components like MCTS may call their input components (dynamics, value) multiple times with hypothetical states. These calls use temporary dicts to avoid polluting the shared activations namespace.
+Strategy components like DQN or MCTS may call their input components multiple times with hypothetical states. These calls use temporary dicts to avoid polluting the shared activations namespace.
 
-#### Reward
+#### Reward and `done`
 
-`Model.update(next_obs)` adds the next observation to activations (prefixed with `next_`), then calls `components["reward"].activate(activations)`. The reward component computes an internal reward signal from observation state. Reward and action are two separate sub-graphs that can share components but are called at different times.
+`Model.update(next_obs, done)` adds the next observation to activations (prefixed with `next_`), injects `done` as a plain float, then calls `components["reward"].activate(activations)`. The reward component computes an internal reward signal from observation state. `done` is passed through the `**kwargs` chain from `experiment.py` → `MainAgent.update()` → `Model.update()` — the same pattern as other step-context fields (episode, step, trial).
 
-The reward signal enters learning through shared memory. Value components learn to predict the reward that RewardInference computed; dynamics components learn to predict S' from S+A. The coupling is through data in memory, not through gradient flow between components.
+The reward signal and `done` enter learning through shared memory. `done` is used by strategy components to correctly mask terminal states in the Bellman equation.
 
-This is multi-reward RL: the reward component produces a dict of reward types, parameterized in its library card. Each learning component knows which reward keys it trains against. Summing rewards for a scalar signal is available as a library function, but components may attend to individual reward dimensions.
+#### Learning (push-based, top-down via signals)
 
-#### Learning
+After reward activation, `Model` pushes the full transition to shared memory, then calls `components["action"].update(signals)` where `signals` is an initially empty dict. The learning DAG mirrors the activation DAG exactly: strategy components propagate training signals down to their subnetworks through `signals`.
 
-After reward activation, Model pushes the full transition (observations, next_observations, component outputs) to shared memory, then calls `update()` on every component. Each component either trains from memory (NeuralNets sample batches and run gradient steps) or no-ops (strategy components, reward inference). Update order does not matter — components learn independently from shared memory.
+**Strategy components** (e.g., `DQN`) own the training logic for their subnetworks. `DQN.update(signals)` computes a Bellman loss closure and writes it into `signals[q_net_id]`, then calls `q_net.update(signals)`. The closure captures the RL algorithm's logic — action indexing, discount factor, target network bootstrap — but is agnostic to the network's shape and device.
 
-`activations` is cleared after update completes.
+**NeuralNet components** own their own training mechanics: batch sampling from shared memory, tensor conversion, forward passes, optimizer step. When a custom loss closure is present in `signals`, `NeuralNet` executes it against its own batch. When no closure is present, `NeuralNet` falls back to self-supervised training using the targets declared in its library card.
+
+This design keeps responsibilities cleanly separated: strategy components define *what* to optimize, NeuralNet defines *how* to optimize. A strategy component can be swapped for a different RL algorithm without touching the NeuralNet implementation, and vice versa.
 
 #### Shared state
 
-- `activations`: flat dict, step-scoped. Populated with observation data at `get_action`, cleared after `update`. Components read inputs from it and write outputs to it. This is the short-term memory of the connectome within a single step.
-- `components`: the persistent dict of component objects. Components can access siblings through this dict (received at init via context). This enables strategy components to call input components directly during planning.
-- `memory`: shared replay memory. All components read from it during learning. The field list is derived from observation shapes and architecture keys.
+- `activations`: flat dict, step-scoped. Populated with observation data at `get_action`, cleared after `update`. Components read inputs from it and write outputs to it.
+- `signals`: flat dict, update-scoped. Passed top-down through `update()` calls. Strategy components write loss closures into it; NeuralNets read from it.
+- `components`: the persistent dict of component objects. Components can access siblings through this dict (received at init via context).
+- `memory`: shared replay memory. All components read from it during learning. The field list is derived from observation shapes, architecture keys, and `done`.
 
 #### Library cards (`models:` config section)
 
@@ -342,7 +419,7 @@ Library cards are defined separately from the architecture so that multiple comp
 All components implement the `Component` ABC:
 
 - `activate(activations: dict) -> None`: compute output from inputs in activations dict, write result to `activations[self.component_id]`.
-- `update() -> report or None`: learn from shared memory, return a report dict or None.
+- `update(signals: dict = None) -> report or None`: propagate learning. Strategy components write loss closures into signals and call subcomponent `update`. NeuralNets execute training. Non-learning components return None.
 
 Components receive a `context` dict at init containing: `cfg`, `device`, `components`, `memory`, `activations`, `env_manifesto`, `agent_id`, `component_id`, `inputs` (expanded), and `plans` (the library card).
 

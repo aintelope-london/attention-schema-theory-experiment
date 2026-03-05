@@ -8,11 +8,8 @@ def checkpoint_path(outputs_dir, agent_id, i_trial):
     """Return the canonical save path for an agent's checkpoint.
 
     Format: {outputs_dir}/checkpoints/{agent_id}_trial_{i_trial}.pt
-    Creates the directory if needed.
     """
-    path = Path(outputs_dir) / "checkpoints" / f"{agent_id}_trial_{i_trial}.pt"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    return path
+    return Path(outputs_dir) / "checkpoints" / f"{agent_id}_trial_{i_trial}.pt"
 
 
 def select_checkpoint(outputs_dir, agent_id, i_trial, custom_model=""):

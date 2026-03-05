@@ -173,20 +173,15 @@ class Network(nn.Module):
             elif layer_config["type"] == "linear":
                 output_size = layer_config["size"]
 
-                has_conv = any(
-                    isinstance(layer, nn.Conv2d) for layer in subnetwork[-2:-1]
-                )
-
-                if has_conv and vision_size is not None:
-                    actual_input_size = input_size * np.prod(vision_size)
-                    subnetwork.append(nn.Flatten())
+                if vision_size is not None:
+                    actual_input_size = input_size * int(np.prod(vision_size))
+                    subnetwork.append(nn.Flatten(start_dim=1))
                     vision_size = None
                 else:
                     actual_input_size = input_size
 
                 layer = nn.Linear(actual_input_size, output_size)
                 input_size = output_size
-
             elif layer_config["type"] == "relu":
                 layer = nn.ReLU()
 
