@@ -24,13 +24,36 @@ run:
 agent_params:
   save_frequency: 50
   custom_model: ""                 # @ui file
-  roi_mode: "cone"                 # @ui str cone
+  roi_mode: "cone"                 # @ui str cone null
   batch_size: 32                   # @ui int 1 100
-  replay_buffer_size: 10000         # @ui int 0 1000
+  replay_buffer_size: 10000        # @ui int 0 1000
   gamma: 0.99                      # @ui float 0.0 1.0
   # Agents
   agent_0:
-    agent_class: random_agent      # @ui str main_agent,rangom_agent,sb3_ppo_agent,sb3_a2c_agent
+    agent_class: main_agent        # @ui str main_agent,random_agent,sb3_ppo_agent,sb3_a2c_agent
+    architecture:
+      # roi: pre-filters vision before any network sees it.
+      #   - Reads activations["extra_action"] from previous step (persists between steps).
+      #   - Darkens vision[:-1] outside cone, writes cone mask into vision[-1].
+      #   - Writes activations["roi"] (the viewport mask) for env blit via outputs below.
+      #   - n_extra_actions=3 (left/stay/right) is declared on the class; fill_plans
+      #     picks it up automatically to extend q_net's output vector.
+      roi:
+        type: ROI
+        inputs: [extra_action]       # extra_action: written by DQN, persists in activations
+        outputs: [roi]             # surfaces activations["roi"] in get_action return dict
+      # q_net: "roi" in inputs triggers ROI.activate() before the network runs.
+      #   Tensor inputs to the network are defined by DQN-NN plan source fields
+      #   (vision, interoception) — vision is already ROI-ified at that point.
+      q_net:
+        type: DQN-NN
+        inputs: [roi, observation] # roi → DAG trigger; observation → expands to modalities
+      action:
+        type: DQN
+        inputs: [q_net]
+      reward:
+        type: RewardInference
+        inputs: [observation]
   # SB3 model parameters
   num_conv_layers: 0               # @ui int 0 3
   learning_rate: 0.0003            # @ui float 0.0001 0.01
@@ -185,7 +208,7 @@ models:
         loss_function: MSELoss
         target: [next_observation]
         use_target_net: False
-        post_activate: True # cannot be processed without action during get_action! TEMP 
+        post_activate: True 
       architecture:
         vision_net:
           - {type: input, source: vision}
@@ -199,7 +222,6 @@ models:
           - {type: input, source: interoception}
           - {type: linear, size: 4}
           - {type: relu}
-
         encoder:
           - {type: input, source: vision_net+interoception_net+action}
           - {type: linear, size: 32}
@@ -210,7 +232,7 @@ models:
         vision_denet:
           - {type: input, source: encoder}
           - {type: linear, source: vision_encoded}
-          - {type: unflatten} #, size: [5, 5, 8]}  
+          - {type: unflatten}
           - {type: conv_transpose, size: 8, kernel: 3}  
           - {type: relu}
           - {type: conv_transpose, source: vision, kernel: 1}
@@ -221,4 +243,3 @@ models:
           - {type: linear, size: 4}
           - {type: linear, source: interoception}
           - {type: output}
-          

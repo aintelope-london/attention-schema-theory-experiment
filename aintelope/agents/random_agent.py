@@ -15,7 +15,7 @@ class RandomAgent(AbstractAgent):
 
     def get_action(self, observation=None, **kwargs):
         self.last_action = random.choice(self.action_space)
-        return self.last_action
+        return {"action": self.last_action}
 
     def update(self, observation=None, **kwargs):
         return []

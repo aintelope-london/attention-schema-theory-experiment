@@ -1,9 +1,7 @@
+# abstract_agent.py
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
-#
-# Repository:
-# https://github.com/aintelope-london/attention-schema-theory-experiment
 
 from abc import ABC, abstractmethod
 from typing import Optional
@@ -16,7 +14,10 @@ class AbstractAgent(ABC):
         ...
 
     @abstractmethod
-    def get_action(self, observation=None, **kwargs) -> Optional[int]:
+    def get_action(self, observation=None, **kwargs) -> Optional[dict]:
+        """Returns a dict with at least {"action": int}. Additional keys
+        (e.g. viewport masks, auxiliary outputs) are architecture-dependent
+        and defined by the component connectome's output declarations."""
         ...
 
     @abstractmethod

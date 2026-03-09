@@ -4,6 +4,7 @@ import torch
 from aintelope.agents.model.memory import ReplayMemory
 from aintelope.agents.model.dl_components import NeuralNet, DQN, ModelBased
 from aintelope.agents.model.reward_inference import RewardInference
+from aintelope.agents.model.roi import ROI
 
 
 def expand_keywords(entries, obs_fields):
@@ -38,16 +39,47 @@ class Model:
         architecture = cfg.agent_params[agent_id].architecture
         obs_fields = list(obs_shapes.keys())
 
-        all_inputs = {inp for entry in architecture.values() for inp in entry.inputs}
+        # Sum extra actions declared by any component class in the architecture.
+        # Duck-typed: components that contribute extra action outputs declare
+        # n_extra_actions as a class attribute (e.g. ROI).
+        extra_actions = sum(
+            getattr(
+                globals().get("NeuralNet" if "-NN" in e.type else e.type),
+                "n_extra_actions",
+                0,
+            )
+            for e in architecture.values()
+        )
+
+        # Inputs that are not component ids and not observation keywords are
+        # extra activations keys written by strategy components (e.g. "extra_action").
+        # These must be tracked in memory for training.
+        all_inputs_flat = {inp for e in architecture.values() for inp in e.inputs}
+        expand_kw = {"observation", "next_observation"}
+        extra_activation_keys = list(
+            all_inputs_flat - set(architecture.keys()) - set(obs_fields) - expand_kw
+        )
+
+        root_component_ids = [cid for cid in architecture if cid not in all_inputs_flat]
+
         memory_field_list = (
             ["done"]
             + obs_fields
-            + ["next_" + field for field in obs_fields]
-            + [cid for cid in architecture.keys() if cid not in all_inputs]
+            + ["next_" + f for f in obs_fields]
+            + root_component_ids
+            + extra_activation_keys
         )
         self.memory = ReplayMemory(
             cfg.agent_params.replay_buffer_size, memory_field_list
         )
+
+        # Output keys returned from get_action:
+        #   - root component ids (not consumed by any sibling)
+        #   - explicitly declared outputs (consumed by siblings but also needed externally)
+        explicit_output_keys = {
+            k for e in architecture.values() for k in getattr(e, "outputs", [])
+        }
+        self._output_keys = set(root_component_ids) | explicit_output_keys
 
         context = {
             "cfg": self.cfg,
@@ -60,21 +92,30 @@ class Model:
         }
 
         for component_id, entry in architecture.items():
-            plans = copy.deepcopy(cfg.models[entry.type])
-            self.fill_plans(obs_shapes, action_space, plans, obs_fields)
+            module_type = "NeuralNet" if "-NN" in entry.type else entry.type
+            module_cls = globals()[module_type]
+
+            if hasattr(module_cls, "n_extra_actions"):
+                # Component with no network config — reads what it needs from cfg.
+                plans = {}
+            else:
+                plans = copy.deepcopy(cfg.models[entry.type])
+                self.fill_plans(
+                    obs_shapes, action_space, plans, obs_fields, extra_actions
+                )
+
             context["plans"] = plans
             context["component_id"] = component_id
             context["inputs"] = expand_keywords(list(entry.inputs), obs_fields)
 
-            module_type = "NeuralNet" if "-NN" in entry.type else entry.type
-            module_cls = globals()[module_type]
             self.components[component_id] = module_cls(context)
 
         if checkpoint:
             self._load_checkpoint(checkpoint)
 
     def reset(self):
-        """Episode boundary reset — propagates to all components."""
+        """Episode boundary reset — clears all activations and propagates to components."""
+        self.activations.clear()
         for component in self.components.values():
             component.reset()
 
@@ -90,7 +131,9 @@ class Model:
     def get_action(self, observation):
         self.activations.update(observation)
         self.components["action"].activate(self.activations)
-        return self.activations["action"]
+        return {
+            k: self.activations[k] for k in self._output_keys if k in self.activations
+        }
 
     def update(self, next_observation, done=False):
         for field, value in next_observation.items():
@@ -100,7 +143,12 @@ class Model:
         self.memory.push(**self.activations)
         signals = {}
         report = self.components["action"].update(signals)
-        self.activations.clear()
+        # Partial clear: remove transient fields only. Action outputs (e.g.
+        # "extra_action") persist so stateful components can read them next step.
+        for key in [
+            k for k in self.activations if k.startswith("next_") or k == "done"
+        ]:
+            del self.activations[key]
         return report
 
     def save(self, path):
@@ -114,17 +162,21 @@ class Model:
         torch.save(data, path)
 
     @staticmethod
-    def fill_plans(obs_shapes, action_space, plans, obs_fields):
+    def fill_plans(obs_shapes, action_space, plans, obs_fields, extra_actions=0):
         """
         Expand string size references in architecture to actual values from dynamic fields.
         Normalize formats before adding them into the plans.
         """
         lookup = dict(obs_shapes)
         lookup.update({k: v[0] for k, v in lookup.items()})
-        lookup["action"] = len(action_space)
+        # lookup["action"] = len(action_space)
         lookup["observation"] = "+".join(obs_fields)
         lookup["next_observation"] = "+".join("next_" + f for f in obs_fields)
-        plans["n_actions"] = len(action_space)
+
+        plans["n_env_actions"] = len(action_space)
+        plans["n_actions"] = len(action_space) + extra_actions
+        lookup["action"] = plans["n_actions"]
+
         if "vision" in obs_shapes:
             plans["vision_size"] = obs_shapes["vision"][1:]
 
