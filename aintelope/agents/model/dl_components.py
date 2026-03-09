@@ -278,9 +278,21 @@ class Network(nn.Module):
 
 class DQN(Component):
     """DQN — epsilon-greedy action selection with Bellman Q-learning.
+
+    When ROI (or any component with n_extra_actions) is present in the
+    architecture, n_actions = n_env_actions + extra. The q_net output is
+    split at n_env_actions:
+      activations["action"]     ← env action (int), epsilon-greedy over [:n_env_actions]
+      activations["extra_action"] ← roi action (int), epsilon-greedy over [n_env_actions:]
+
+    Both slices train against the same reward signal via independent Bellman
+    targets. extra_action persists in activations between steps so that ROI
+    components can read it on the next get_action call.
+
+    When no extra actions exist (n_env_actions == n_actions), activations
+    ["extra_action"] is not written — nothing else reads it.
+
     Passes a loss_fn closure into signals for q_net to execute.
-    All torch mechanics live in the closure but are the strategy's
-    responsibility; NeuralNet handles tensor conversion and optimizer step.
     """
 
     def __init__(self, context):
@@ -290,6 +302,8 @@ class DQN(Component):
         self.activations = context["activations"]
         self.cfg = context["cfg"]
         self.metadata = context["plans"]["metadata"]
+        self.n_env_actions = context["plans"]["n_env_actions"]
+        self.n_actions = context["plans"]["n_actions"]
 
         self._q_net_id = self.inputs[0]
         self.eps_start = self.metadata["eps_start"]
@@ -303,13 +317,19 @@ class DQN(Component):
         q_values = list(activations[self._q_net_id].values())[0]
 
         epsilon = self._compute_epsilon()
-        if np.random.random() < epsilon:
-            action = np.random.randint(len(q_values))
-        else:
-            action = int(np.argmax(q_values))
+        n = self.n_env_actions
+
+        def _eps_greedy(q_slice):
+            if np.random.random() < epsilon:
+                return np.random.randint(len(q_slice))
+            return int(np.argmax(q_slice))
+
+        activations[self.component_id] = _eps_greedy(q_values[:n])
+
+        if n < self.n_actions:
+            activations["extra_action"] = _eps_greedy(q_values[n:])
 
         self.step_count += 1
-        activations[self.component_id] = action
 
     def update(self, signals=None):
         if signals is None:
@@ -318,25 +338,40 @@ class DQN(Component):
         q_net = self.components[self._q_net_id]
         gamma = self.cfg.agent_params.gamma
         loss_fn = q_net.loss_fn
+        n = self.n_env_actions
+        n_actions = self.n_actions
 
         def bellman_loss(net, target_net, tensors):
             state_inputs = {f: tensors[f] for f in net.inputs}
             next_state_inputs = {f: tensors[f"next_{f}"] for f in net.inputs}
 
             q_values = list(net(state_inputs).values())[0]  # (batch, n_actions)
-            q_taken = q_values.gather(1, tensors["action"].long().view(-1, 1)).squeeze(
-                1
+            q_next = list(target_net(next_state_inputs).values())[0]
+
+            reward = tensors["reward"].squeeze(1)
+            mask = 1.0 - tensors["done"].squeeze(1)
+
+            env_taken = (
+                q_values[:, :n]
+                .gather(1, tensors["action"].long().view(-1, 1))
+                .squeeze(1)
+            )
+            total_loss = loss_fn(
+                env_taken, reward + gamma * q_next[:, :n].max(dim=1).values * mask
             )
 
-            with torch.no_grad():
-                q_next_max = (
-                    list(target_net(next_state_inputs).values())[0].max(dim=1).values
+            if n < n_actions:
+                roi_taken = (
+                    q_values[:, n:]
+                    .gather(1, tensors["extra_action"].long().view(-1, 1))
+                    .squeeze(1)
+                )
+                total_loss = total_loss + loss_fn(
+                    roi_taken,
+                    reward + gamma * q_next[:, n:].max(dim=1).values * mask,
                 )
 
-            targets = tensors["reward"].squeeze(1) + gamma * q_next_max * (
-                1.0 - tensors["done"].squeeze(1)
-            )
-            return loss_fn(q_taken, targets)
+            return total_loss
 
         signals[self._q_net_id] = bellman_loss
         report = q_net.update(signals)
@@ -353,7 +388,11 @@ class DQN(Component):
 
 
 class ModelBased(Component):
-    """Model-based RL — MCTS over dynamics and value components."""
+    """Model-based RL — MCTS over dynamics and value components.
+
+    TODO: ROI joint action search — MCTS must search the joint
+    (env_action × extra_action) space. Deferred until ROI baseline is stable.
+    """
 
     def __init__(self, context):
         self.component_id = context["component_id"]

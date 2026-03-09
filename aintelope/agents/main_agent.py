@@ -26,13 +26,13 @@ class MainAgent(AbstractAgent):
         self.observation = state
         self.model.reset()
 
-    def get_action(self, observation=None, **kwargs) -> Optional[int]:
+    def get_action(self, observation=None, **kwargs) -> Optional[dict]:
         if self.done:
-            return None
+            return {"action": None}
         self.observation = observation
-        action = self.model.get_action(observation)
-        self.last_action = action
-        return action
+        result = self.model.get_action(observation)
+        self.last_action = result["action"]
+        return result
 
     def update(self, observation=None, **kwargs):
         return self.model.update(observation, done=kwargs.get("done", False))

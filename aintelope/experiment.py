@@ -11,7 +11,6 @@ from aintelope.agents.model.dl_utils import checkpoint_path, select_checkpoint
 from aintelope.analytics.diagnostics import DiagnosticsMonitor
 from aintelope.analytics.recording import EventLog, StateLog
 from aintelope.environments import get_env_class
-from aintelope.utils.roi import compute_roi
 
 
 def run_experiment(
@@ -101,16 +100,21 @@ def run_experiment(
 
         # Iterations within the episode
         for step in range(cfg.run.experiment.steps):
-            # Collect actions from all agents
+            # Collect actions. Each agent returns a dict with at least {"action": int}.
+            # Additional keys (e.g. viewport masks) flow to the env via step_parallel.
+            # Legacy SB3 agents return a plain int — wrapped here for uniform contract.
             actions = {}
             for agent in agents:
-                actions[agent.id] = agent.get_action(
+                result = agent.get_action(
                     observation=observations[agent.id],
                     info=infos[agent.id],
                     step=step,
                     env_layout_seed=env_layout_seed,
                     episode=i_episode,
                     trial=i_trial,
+                )
+                actions[agent.id] = (
+                    result if isinstance(result, dict) else {"action": result}
                 )
 
             # Step — one permitted branch on mode
@@ -132,9 +136,6 @@ def run_experiment(
                 ) = env.step_sequential(actions)
 
             dones = {aid: terminateds[aid] or truncateds[aid] for aid in terminateds}
-
-            # ROI
-            observations, absolute_masks = compute_roi(observations, infos, cfg)
 
             # Update agents
             for agent in agents:
@@ -168,15 +169,17 @@ def run_experiment(
                     + env_step_info
                 )
 
-            # Record global board state once per step
-            board, layer_order = env.board_state()
+            # Record global board state once per step.
+            # aux_mask is assembled by the env from agents' returned masks —
+            # no ROI geometry logic lives in experiment.
+            board, layer_order, aux_mask = env.board_state()
             states.log(
                 [
                     cfg.experiment_name,
                     i_trial,
                     i_episode,
                     step,
-                    (board, layer_order, absolute_masks),
+                    (board, layer_order, aux_mask),
                 ]
             )
 

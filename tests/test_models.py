@@ -2,7 +2,7 @@
 
 import os
 import pytest
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, open_dict
 from aintelope.agents.model.model import Model
 from aintelope.environments import get_env_class
 
@@ -10,7 +10,7 @@ from aintelope.environments import get_env_class
 @pytest.fixture
 def model_free_cfg():
     cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
-    return OmegaConf.merge(
+    cfg = OmegaConf.merge(
         cfg,
         {
             "env_params": {
@@ -19,20 +19,19 @@ def model_free_cfg():
             },
             "agent_params": {
                 "roi_mode": None,
-                "agent_0": {
-                    "agent_class": "main_agent",
-                    "architecture": {
-                        "action": {"type": "DQN", "inputs": ["q_net"]},
-                        "reward": {
-                            "type": "RewardInference",
-                            "inputs": ["observation"],
-                        },
-                        "q_net": {"type": "DQN-NN", "inputs": ["observation"]},
-                    },
-                },
+                "agent_0": {"agent_class": "main_agent"},
             },
         },
     )
+    with open_dict(cfg):
+        cfg.agent_params.agent_0.architecture = OmegaConf.create(
+            {
+                "action": {"type": "DQN", "inputs": ["q_net"]},
+                "reward": {"type": "RewardInference", "inputs": ["observation"]},
+                "q_net": {"type": "DQN-NN", "inputs": ["observation"]},
+            }
+        )
+    return cfg
 
 
 @pytest.fixture
@@ -46,7 +45,7 @@ def model_free_env(model_free_cfg):
 @pytest.fixture
 def model_based_cfg():
     cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
-    return OmegaConf.merge(
+    cfg = OmegaConf.merge(
         cfg,
         {
             "env_params": {
@@ -55,24 +54,20 @@ def model_based_cfg():
             },
             "agent_params": {
                 "roi_mode": None,
-                "agent_0": {
-                    "agent_class": "main_agent",
-                    "architecture": {
-                        "action": {
-                            "type": "ModelBased",
-                            "inputs": ["dynamic", "value"],
-                        },
-                        "reward": {
-                            "type": "RewardInference",
-                            "inputs": ["observation"],
-                        },
-                        "dynamic": {"type": "NextState-NN", "inputs": ["observation"]},
-                        "value": {"type": "StateValue-NN", "inputs": ["observation"]},
-                    },
-                },
+                "agent_0": {"agent_class": "main_agent"},
             },
         },
     )
+    with open_dict(cfg):
+        cfg.agent_params.agent_0.architecture = OmegaConf.create(
+            {
+                "action": {"type": "ModelBased", "inputs": ["dynamic", "value"]},
+                "reward": {"type": "RewardInference", "inputs": ["observation"]},
+                "dynamic": {"type": "NextState-NN", "inputs": ["observation"]},
+                "value": {"type": "StateValue-NN", "inputs": ["observation"]},
+            }
+        )
+    return cfg
 
 
 @pytest.fixture
@@ -99,12 +94,14 @@ class TestModelFree:
 
         for _ in range(3):
             action = model.get_action(obs)
-            assert isinstance(action, int)
+            assert isinstance(action["action"], int)
 
             observations, _, _, _, _ = model_free_env.step_parallel({"agent_0": action})
             next_obs = observations["agent_0"]
             model.update(next_obs)
-            assert len(model.activations) == 0
+            assert not any(
+                k.startswith("next_") or k == "done" for k in model.activations
+            )
             obs = next_obs
 
 
@@ -125,12 +122,14 @@ class TestModelBased:
 
         for _ in range(3):
             action = model.get_action(obs)
-            assert isinstance(action, int)
+            assert isinstance(action["action"], int)
 
             observations, _, _, _, _ = model_based_env.step_parallel(
                 {"agent_0": action}
             )
             next_obs = observations["agent_0"]
             model.update(next_obs)
-            assert len(model.activations) == 0
+            assert not any(
+                k.startswith("next_") or k == "done" for k in model.activations
+            )
             obs = next_obs
