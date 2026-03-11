@@ -6,7 +6,11 @@ import pytest
 from omegaconf import OmegaConf
 
 from aintelope.__main__ import run
-from aintelope.analytics.analytics import assert_learning_improvement
+from aintelope.analytics.analytics import assert_learning_improvement, report_optimal_policy
+
+TRAIN_EPISODES = 500
+EVAL_EPISODES = 50
+MIN_EFFICIENCY_PCT = 70.0
 
 
 def test_sb3_ppo_learns(base_learning_config):
@@ -142,3 +146,64 @@ def test_model_based_learns(base_learning_config):
     )
     result = run(cfg)
     assert_learning_improvement(result["analytics"])
+
+
+
+def test_main_agent_dqn_optimal(base_learning_config):
+    """DQN agent reaches near-optimal policy on simple scenario.
+
+    Two-block run: train block builds the policy, eval block measures it
+    at zero epsilon (pure exploitation) so efficiency is not noise-floored.
+    """
+    cfg = OmegaConf.merge(
+        base_learning_config,
+        {
+            "test": {
+                "run": {
+                    "experiment": {
+                        "steps": 11,
+                        "episodes": TRAIN_EPISODES,
+                    },
+                },
+                "agent_params": {
+                    "agent_0": {
+                        "agent_class": "main_agent",
+                        "architecture": {
+                            "action": {"type": "DQN", "inputs": ["q_net"]},
+                            "reward": {
+                                "type": "RewardInference",
+                                "inputs": ["observation"],
+                            },
+                            "q_net": {"type": "DQN-NN", "inputs": ["observation"]},
+                        },
+                    },
+                    "roi_mode": None,
+                    "learning_rate": 0.002,
+                },
+                "env_params": {
+                    "map_max": 4,
+                    "combine_interoception_and_vision": False,
+                    "env_layout_seed_repeat_sequence_length": 5,
+                },
+            },
+            "eval": {
+                "run": {
+                    "experiment": {
+                        "steps": 11,
+                        "episodes": EVAL_EPISODES,
+                        "test_mode": True,
+                    },
+                },
+                "models": {
+                    "DQN": {
+                        "metadata": {
+                            "eps_start": 0.0,
+                            "eps_end": 0.0,
+                        },
+                    },
+                },
+            },
+        },
+    )
+    result = run(cfg)
+    report_optimal_policy(result["analytics"]["optimal"], MIN_EFFICIENCY_PCT)

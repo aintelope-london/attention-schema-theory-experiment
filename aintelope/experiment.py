@@ -76,6 +76,7 @@ def run_experiment(
             "events": events.to_dataframe(),
             "states": states.to_dataframe(),
             "learning_df": monitor.learning_dataframe(),
+            "manifesto": env.manifesto,
         }
 
     save_freq = cfg.agent_params.save_frequency
@@ -218,6 +219,7 @@ def run_experiment(
         "events": events.to_dataframe(),
         "states": states.to_dataframe(),
         "learning_df": monitor.learning_dataframe(),
+        "manifesto": env.manifesto,
     }
 
 

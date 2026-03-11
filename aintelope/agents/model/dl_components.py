@@ -1,3 +1,7 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 import numpy as np
 import torch
 from torch import nn
@@ -182,6 +186,7 @@ class Network(nn.Module):
 
                 layer = nn.Linear(actual_input_size, output_size)
                 input_size = output_size
+
             elif layer_config["type"] == "relu":
                 layer = nn.ReLU()
 
@@ -277,20 +282,20 @@ class Network(nn.Module):
 
 
 class DQN(Component):
-    """DQN — epsilon-greedy action selection with Bellman Q-learning.
+    """DQN -- epsilon-greedy action selection with Bellman Q-learning.
 
-    When ROI (or any component with n_extra_actions) is present in the
-    architecture, n_actions = n_env_actions + extra. The q_net output is
+    When any component in the architecture declares n_internal_actions > 0,
+    n_actions = n_env_actions + internal_actions. The q_net output is
     split at n_env_actions:
-      activations["action"]     ← env action (int), epsilon-greedy over [:n_env_actions]
-      activations["extra_action"] ← roi action (int), epsilon-greedy over [n_env_actions:]
+      activations["action"]          <- env action (int), eps-greedy over [:n_env_actions]
+      activations["internal_action"] <- internal action (int), eps-greedy over [n_env_actions:]
 
     Both slices train against the same reward signal via independent Bellman
-    targets. extra_action persists in activations between steps so that ROI
-    components can read it on the next get_action call.
+    targets. internal_action persists in activations between steps so that
+    components (e.g. ROI) can read it on the next get_action call.
 
-    When no extra actions exist (n_env_actions == n_actions), activations
-    ["extra_action"] is not written — nothing else reads it.
+    When no internal actions exist (n_env_actions == n_actions),
+    activations["internal_action"] is not written.
 
     Passes a loss_fn closure into signals for q_net to execute.
     """
@@ -327,7 +332,7 @@ class DQN(Component):
         activations[self.component_id] = _eps_greedy(q_values[:n])
 
         if n < self.n_actions:
-            activations["extra_action"] = _eps_greedy(q_values[n:])
+            activations["internal_action"] = _eps_greedy(q_values[n:])
 
         self.step_count += 1
 
@@ -361,13 +366,13 @@ class DQN(Component):
             )
 
             if n < n_actions:
-                roi_taken = (
+                internal_taken = (
                     q_values[:, n:]
-                    .gather(1, tensors["extra_action"].long().view(-1, 1))
+                    .gather(1, tensors["internal_action"].long().view(-1, 1))
                     .squeeze(1)
                 )
                 total_loss = total_loss + loss_fn(
-                    roi_taken,
+                    internal_taken,
                     reward + gamma * q_next[:, n:].max(dim=1).values * mask,
                 )
 
@@ -388,10 +393,10 @@ class DQN(Component):
 
 
 class ModelBased(Component):
-    """Model-based RL — MCTS over dynamics and value components.
+    """Model-based RL -- MCTS over dynamics and value components.
 
-    TODO: ROI joint action search — MCTS must search the joint
-    (env_action × extra_action) space. Deferred until ROI baseline is stable.
+    TODO: ROI joint action search -- MCTS must search the joint
+    (env_action x internal_action) space. Deferred until ROI baseline is stable.
     """
 
     def __init__(self, context):
@@ -429,69 +434,5 @@ class ModelBased(Component):
     def update(self, signals=None):
         return None
 
-
-class MCTS:
-    def __init__(self, plans):
-        self.c_puct = plans["metadata"]["c_puct"]
-        self.num_simulations = plans["metadata"]["num_simulations"]
-        self.max_depth = plans["metadata"]["max_depth"]
-        self.n_actions = plans["n_actions"]
-
-    def search(self, root_state, value_fn, dynamics_fn):
-        root = MCTSNode(root_state)
-        for _ in range(self.num_simulations):
-            node = root
-            path = [node]
-            while node.is_expanded() and len(path) < self.max_depth:
-                action_idx = max(
-                    node.children.keys(),
-                    key=lambda a: node.children[a].ucb_score(self.c_puct),
-                )
-                node = node.children[action_idx]
-                path.append(node)
-
-            if len(path) < self.max_depth:
-                self._expand(node, dynamics_fn)
-                if node.children:
-                    action_idx = np.random.choice(list(node.children.keys()))
-                    node = node.children[action_idx]
-                    path.append(node)
-
-            value = self._evaluate(node, value_fn)
-            for node in path:
-                node.visits += 1
-                node.value_sum += value
-
-        return max(root.children.keys(), key=lambda a: root.children[a].visits)
-
-    def _expand(self, node, dynamics_fn):
-        for action_idx in range(self.n_actions):
-            next_state = dynamics_fn(node.state, action_idx)
-            node.children[action_idx] = MCTSNode(
-                next_state, parent=node, action=action_idx
-            )
-
-    def _evaluate(self, node, value_fn):
-        return value_fn(node.state)
-
-
-class MCTSNode:
-    def __init__(self, state, parent=None, action=None):
-        self.state = state
-        self.parent = parent
-        self.action = action
-        self.children = {}
-        self.visits = 0
-        self.value_sum = 0.0
-
-    def is_expanded(self):
-        return len(self.children) > 0
-
-    def value(self):
-        return self.value_sum / self.visits if self.visits > 0 else 0.0
-
-    def ucb_score(self, c_puct):
-        if self.visits == 0:
-            return float("inf")
-        exploration = c_puct * np.sqrt(np.log(self.parent.visits) / self.visits)
-        return self.value() + exploration
+    def reset(self):
+        pass
