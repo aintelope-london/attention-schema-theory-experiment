@@ -1,3 +1,7 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 """ROI (Region of Interest) attention component.
 
 Sits in the connectome DAG as a pre-filter for vision. Triggered by any
@@ -10,14 +14,14 @@ Mechanics:
   - Updates roi_state from that value.
   - Applies darkening to vision[:-1] (original channels) outside the cone.
   - Writes own boolean mask into vision[-1] (the ROI layer slot the env
-    pre-appended as zeros) and into activations[self.component_id].
+    always appends as zeros) and into activations[self.component_id].
 
-The env is responsible for:
-  - Adding the blank ROI layer slot to each observation before the agent
-    sees it (vision[-1] = zeros).
-  - Reading activations[component_id] from the returned action dict (via
-    the architecture's explicit outputs declaration) to blit into the
-    absolute board layer for visualization and multi-agent sharing.
+When roi_mode is null in cfg, activate() is a NOOP: vision[-1] is left as
+zeros and activations[self.component_id] receives a zero mask. The component
+is vestigial — present in the architecture, occupying its channel slot,
+but producing no signal. This keeps observation shapes consistent across
+roi_mode=cone and roi_mode=null runs so the same architecture config works
+for both without modification.
 
 Module-level constants — promote to config when stable:
 """
@@ -30,17 +34,17 @@ extra_action_MODE = "cone"  # future: "circle"
 DARKENING_MODE = "noise"  # future: "shadow"
 DARKENING_FACTOR = 0.1
 
-_CONE_HALF_ARC = np.pi / 4  # ±45° cone opening
-_ROI_TURN_STEP = np.pi / 4  # 45° per action step
+_CONE_HALF_ARC = np.pi / 4  # +-45deg cone opening
+_ROI_TURN_STEP = np.pi / 4  # 45deg per action step
 
-# left / stay / right — indexed by extra_action integer
+# left / stay / right -- indexed by extra_action integer
 _ROI_ANGLE_DELTAS = (-_ROI_TURN_STEP, 0.0, _ROI_TURN_STEP)
 
 
 def _cone_mask(h, w, center_r, center_c, angle, radius):
-    """Boolean 90° cone mask in viewport coordinates.
+    """Boolean 90deg cone mask in viewport coordinates.
 
-    angle=0.0 → north (up in viewport, matching agent's relative orientation).
+    angle=0.0 -> north (up in viewport, matching agent's relative orientation).
     Increases clockwise. Agent's own cell always included.
     """
     dr_dir = -np.cos(angle)
@@ -63,10 +67,10 @@ class ROI(Component):
     """Attention ROI component.
 
     n_extra_actions is a class-level constant read by Model during init to
-    extend the q_net output vector. No network plans config is needed —
+    extend the q_net output vector. No network plans config is needed --
     radius is read from cfg directly.
 
-    roi_state for cone: {"angle": float} — 0.0 = north in viewport space.
+    roi_state for cone: {"angle": float} -- 0.0 = north in viewport space.
     Future shapes extend roi_state naturally (circle adds radius, offsets).
     """
 
@@ -75,6 +79,7 @@ class ROI(Component):
     def __init__(self, context):
         self.component_id = context["component_id"]
         self.inputs = context["inputs"]
+        self.cfg = context["cfg"]
         self.radius = context["cfg"].env_params.render_agent_radius
         self.roi_state = {"angle": 0.0}
 
@@ -82,17 +87,23 @@ class ROI(Component):
         self.roi_state = {"angle": 0.0}
 
     def activate(self, activations):
+        vision = activations["vision"]  # (C, H, W); vision[-1] is ROI layer slot
+        h, w = vision.shape[1], vision.shape[2]
+
+        if self.cfg.agent_params.roi_mode is None:
+            # Vestigial: leave vision[-1] as zeros, write zero mask.
+            activations[self.component_id] = np.zeros((h, w), dtype=bool)
+            return
+
         # extra_action from the PREVIOUS step persists in activations.
-        # Absent on step 0 and after episode reset — angle stays at 0.0.
+        # Absent on step 0 and after episode reset -- angle stays at 0.0.
         extra_action = activations.get("extra_action")
         if extra_action is not None:
             self.roi_state["angle"] += _ROI_ANGLE_DELTAS[extra_action]
 
-        vision = activations["vision"]  # (C, H, W); vision[-1] is ROI layer slot
-        h, w = vision.shape[1], vision.shape[2]
         mask = _cone_mask(h, w, h // 2, w // 2, self.roi_state["angle"], self.radius)
 
-        # Two independent operations on the same mask — mask is never derived
+        # Two independent operations on the same mask -- mask is never derived
         # from vision and neither operation feeds the other.
         vision[:-1] *= np.where(mask, 1.0, DARKENING_FACTOR)  # darken original channels
         vision[-1] = mask.astype(np.float32)  # write ROI layer slot

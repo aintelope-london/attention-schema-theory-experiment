@@ -6,7 +6,6 @@
 # https://github.com/aintelope-london/attention-schema-theory-experiment
 
 import os
-
 import traceback
 from typing import Optional, Tuple
 from gymnasium.spaces import Discrete
@@ -102,8 +101,6 @@ class CustomCNN(BaseFeaturesExtractor):
         #   Conv3: kernel_size=3, stride=2, padding=1 - downsamples from 5x5 -> 3x3
         #   Flatten into a linear layer
 
-        # print("num_conv_layers: " + str(num_conv_layers))
-
         if num_conv_layers == 2:
             self.cnn = nn.Sequential(
                 nn.Conv2d(num_channels, 32, kernel_size=3, stride=1, padding=1),
@@ -118,75 +115,41 @@ class CustomCNN(BaseFeaturesExtractor):
                 nn.ReLU(),
                 nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
                 nn.ReLU(),
-                # TODO: test whether adding this third layer helps. It would make the output shape to 3x3.
-                nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
+                nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1),
                 nn.ReLU(),
                 nn.Flatten(),
             )
         else:
-            raise ValueError("num_conv_layers")
+            self.cnn = nn.Sequential(
+                nn.Flatten(),
+            )
 
-        # TODO, experiment with:
-        # * BatchNorm / LayerNorm: Try adding normalization layers if training stability is an issue.
-        # * Residual connections: In case of a deeper network, sometimes adding skip connections (resnets) helps performance, though it's more advanced.
-
-        # Figure out the output shape of self.cnn:
-        # 1) With the above, input: (batch_size, num_channels, 9, 9)
-        # 2) After Conv1: (batch_size, 32, 9, 9)
-        # 3) After Conv2: (batch_size, 64, 5, 5) => 64*5*5=1600
-        # 4) After Conv3: (batch_size, 128, 3, 3) => 128*3*3=1152
-        # We feed that into a linear layer to get features_dim=256
+        # Compute shape by doing one forward pass
         with torch.no_grad():
-            sample_input = torch.zeros(1, num_channels, height, width)
-            n_flatten = self.cnn(sample_input).shape[1]
+            sample = torch.zeros(1, num_channels, height, width)
+            n_flatten = self.cnn(sample).shape[1]
 
-        self.linear = nn.Sequential(
-            nn.Linear(n_flatten, features_dim),
-            nn.ReLU(),
-        )
+        self.linear = nn.Sequential(nn.Linear(n_flatten, features_dim), nn.ReLU())
 
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
         return self.linear(self.cnn(observations))
 
 
-def sb3_agent_train_thread_entry_point(
-    pipe,
-    gpu_index,
-    num_total_steps,
-    model_constructor,
-    env_classname,
-    agent_id,
-    checkpoint_filename,
-    cfg,
-    observation_space,
-    action_space,
-    *args,
-    **kwargs,
-):
-    if (
-        sys.gettrace() is None
-    ):  # do not set low priority while debugging. Note that unit tests also set sys.gettrace() to not-None
-        set_priorities()
-
-    if (
-        os.name != "nt"
-    ):  # Under Windows, the memory limit is shared with parent process as a job object
-        set_memory_limits()
-
-    # activate selected GPU
-    select_gpu(gpu_index)
-
-    env_wrapper = MultiAgentZooToGymAdapterGymSide(
-        pipe, agent_id, checkpoint_filename, observation_space, action_space
-    )
+def sb3_agent_train_thread_entry_point(env_wrapper, agent_id, model_constructor, cfg):
+    # need to catch exception so that the env wrapper can signal the training ended
     try:
-        model = model_constructor(env_wrapper, env_classname, agent_id, cfg)
-        env_wrapper.set_model(model)
-        model.learn(total_timesteps=num_total_steps)
-        env_wrapper.save_or_return_model(model)
-    except (
-        Exception
-    ) as ex:  # NB! need to catch exception so that the env wrapper can signal the training ended
+        select_gpu(cfg)
+        set_priorities(cfg)
+        set_memory_limits(cfg)
+
+        env_gym_side = MultiAgentZooToGymAdapterGymSide(env_wrapper, agent_id)
+        model = model_constructor(
+            env_gym_side, env_wrapper.env_classname, agent_id, cfg
+        )
+        model.learn(total_timesteps=env_wrapper.num_total_steps)
+        env_wrapper.set_model(agent_id, model)
+    except Exception as ex:
+        # need to catch exception so that the env wrapper can signal the training ended
         info = str(ex) + os.linesep + traceback.format_exc()
         env_wrapper.terminate_with_exception(info)
         print(info)
@@ -306,6 +269,89 @@ class SB3BaseAgent(AbstractAgent):
 
         self.last_action = action
         return action
+
+    def update(self, observation=None, **kwargs) -> list:
+        """Takes observations and updates on perceived experiences."""
+        assert self.last_action is not None
+
+        next_state = self._prepare_obs(observation)
+        score = kwargs.get("score", 0.0)
+        done = kwargs.get("done", False)
+        info = kwargs.get("info", {})
+
+        event = [self.id, self.state, self.last_action, score, done, next_state]
+        self.state = next_state
+        self.info = info
+        return event
+
+    def train(self, num_total_steps):
+        self.env._sb3_training = True
+        self.env._scalarize_rewards = True
+        self.env._pre_reset_callback2 = self.env_pre_reset_callback
+        self.env._post_reset_callback2 = self.env_post_reset_callback
+        self.env._pre_step_callback2 = self.env_pre_step_callback
+        if isinstance(self.env, ParallelEnv):
+            self.env._post_step_callback2 = self.parallel_env_post_step_callback
+        else:
+            self.env._post_step_callback2 = self.sequential_env_post_step_callback
+
+        checkpoint_dir = Path(self.cfg.run.outputs_dir) / "checkpoints"
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+        if self.model is not None:  # single-model scenario
+            self.model.learn(total_timesteps=num_total_steps)
+        else:
+            checkpoint_filenames = {
+                agent_id: str(checkpoint_dir / agent_id)
+                for agent_id in self.env.possible_agents
+            }
+
+            OmegaConf.resolve(self.cfg)
+
+            env_wrapper = MultiAgentZooToGymAdapterZooSide(
+                self.env, self.cfg, self.env_classname
+            )
+            self.models, self.exceptions = env_wrapper.train(
+                num_total_steps=num_total_steps,
+                agent_thread_entry_point=sb3_agent_train_thread_entry_point,
+                model_constructor=self.model_constructor,
+                terminate_all_agents_when_one_excepts=True,
+                checkpoint_filenames=checkpoint_filenames,
+            )
+        self.env._sb3_training = False
+        self.env._scalarize_rewards = False
+        self.env._pre_reset_callback2 = None
+        self.env._post_reset_callback2 = None
+        self.env._post_step_callback2 = None
+
+        if self.exceptions:
+            raise Exception(str(self.exceptions))
+
+    def save_model(self, path, **kwargs):
+        if self.model is not None:
+            torch.save(self.model.get_parameters(), path)
+        elif self.models:
+            # Multi-model: save each agent to trial-indexed path
+            i_trial = kwargs.get("i_trial", 0)
+            outputs_dir = str(Path(path).parent.parent)
+            for agent_id, model in self.models.items():
+                torch.save(
+                    model.get_parameters(),
+                    checkpoint_path(outputs_dir, agent_id, i_trial),
+                )
+
+    def init_model(
+        self,
+        observation_shape,
+        action_space,
+        checkpoint: Optional[str] = None,
+    ):
+        if checkpoint:
+            use_cuda = torch.cuda.is_available() and torch.cuda.device_count() > 0
+            device = torch.device("cuda" if use_cuda else "cpu")
+
+            params = torch.load(checkpoint, map_location=device)
+            self.model.set_parameters(params, device=device)
 
     def env_pre_reset_callback(self, seed, options, *args, **kwargs):
         assert seed is None
@@ -442,6 +488,7 @@ class SB3BaseAgent(AbstractAgent):
                     self.cfg.run.experiment.test_mode,
                 ]
                 + agent_step_info
+                + [info.get("position"), info.get("food_position"), None]
                 + env_step_info
             )
 
@@ -451,10 +498,10 @@ class SB3BaseAgent(AbstractAgent):
         if self.model and hasattr(self.model.policy, "set_info"):
             self.state = next_states[self.id]
             self.info = infos[self.id]
-
             self.model.policy.set_info(self.info)
+
         if self.state_log is not None:
-            board, layer_order = self.env.board_state()
+            board, layer_order, _ = self.env.board_state()
             self.state_log.log(
                 [
                     self.cfg.experiment_name,
@@ -544,10 +591,12 @@ class SB3BaseAgent(AbstractAgent):
                 self.cfg.run.experiment.test_mode,
             ]
             + agent_step_info
+            + [info.get("position"), info.get("food_position"), None]
             + env_step_info
         )
+
         if self.state_log is not None:
-            board, layer_order = self.env.board_state()
+            board, layer_order, _ = self.env.board_state()
             self.state_log.log(
                 [
                     self.cfg.experiment_name,
@@ -557,88 +606,3 @@ class SB3BaseAgent(AbstractAgent):
                     (board, layer_order),
                 ]
             )
-
-    def update(self, observation=None, **kwargs) -> list:
-        """
-        Takes observations and updates on perceived experiences.
-        """
-        assert self.last_action is not None
-
-        next_state = self._prepare_obs(observation)
-        score = kwargs.get("score", 0.0)
-        done = kwargs.get("done", False)
-        info = kwargs.get("info", {})
-
-        event = [self.id, self.state, self.last_action, score, done, next_state]
-        self.state = next_state
-        self.info = info
-        return event
-
-    def train(self, num_total_steps):
-        self.env._sb3_training = True
-        self.env._scalarize_rewards = True
-        self.env._pre_reset_callback2 = self.env_pre_reset_callback
-        self.env._post_reset_callback2 = self.env_post_reset_callback
-        self.env._pre_step_callback2 = self.env_pre_step_callback
-        if isinstance(self.env, ParallelEnv):
-            self.env._post_step_callback2 = self.parallel_env_post_step_callback
-        else:
-            self.env._post_step_callback2 = self.sequential_env_post_step_callback
-
-        checkpoint_dir = Path(self.cfg.run.outputs_dir) / "checkpoints"
-        checkpoint_dir.mkdir(parents=True, exist_ok=True)
-
-        if self.model is not None:  # single-model scenario
-            self.model.learn(total_timesteps=num_total_steps)
-        else:
-            checkpoint_filenames = {
-                agent_id: str(checkpoint_dir / agent_id)
-                for agent_id in self.env.possible_agents
-            }
-
-            OmegaConf.resolve(self.cfg)
-
-            env_wrapper = MultiAgentZooToGymAdapterZooSide(
-                self.env, self.cfg, self.env_classname
-            )
-            self.models, self.exceptions = env_wrapper.train(
-                num_total_steps=num_total_steps,
-                agent_thread_entry_point=sb3_agent_train_thread_entry_point,
-                model_constructor=self.model_constructor,
-                terminate_all_agents_when_one_excepts=True,
-                checkpoint_filenames=checkpoint_filenames,
-            )
-        self.env._sb3_training = False
-        self.env._scalarize_rewards = False
-        self.env._pre_reset_callback2 = None
-        self.env._post_reset_callback2 = None
-        self.env._post_step_callback2 = None
-
-        if self.exceptions:
-            raise Exception(str(self.exceptions))
-
-    def save_model(self, path, **kwargs):
-        if self.model is not None:
-            torch.save(self.model.get_parameters(), path)
-        elif self.models:
-            # Multi-model: save each agent to trial-indexed path
-            i_trial = kwargs.get("i_trial", 0)
-            outputs_dir = str(Path(path).parent.parent)
-            for agent_id, model in self.models.items():
-                torch.save(
-                    model.get_parameters(),
-                    checkpoint_path(outputs_dir, agent_id, i_trial),
-                )
-
-    def init_model(
-        self,
-        observation_shape,
-        action_space,
-        checkpoint: Optional[str] = None,
-    ):
-        if checkpoint:
-            use_cuda = torch.cuda.is_available() and torch.cuda.device_count() > 0
-            device = torch.device("cuda" if use_cuda else "cpu")
-
-            params = torch.load(checkpoint, map_location=device)
-            self.model.set_parameters(params, device=device)

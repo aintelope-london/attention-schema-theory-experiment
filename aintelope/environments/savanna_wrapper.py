@@ -1,3 +1,7 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 """Savanna environment wrapper.
 
 Translates savanna's interface to the AbstractEnv contract.
@@ -23,10 +27,10 @@ from pettingzoo import ParallelEnv
 from aintelope.utils.roi import compute_roi
 
 
-# Savanna agent characters in order — maps agent index to layer key
+# Savanna agent characters in order -- maps agent index to layer key
 _AGENT_CHRS = [AGENT_CHR1, AGENT_CHR2]
 
-# Directions enum from gridworld engine → (row_delta, col_delta)
+# Directions enum from gridworld engine -> (row_delta, col_delta)
 _DIRECTION_VECTORS = {
     0: (0, -1),  # LEFT
     1: (0, 1),  # RIGHT
@@ -89,7 +93,7 @@ def combine_obs_sb3(observations):
     """Convert canonical dict observations to SB3 (C+N, H, W) cubes.
 
     Each interoception value becomes a constant-filled spatial layer.
-    Single definition — used by both experiment.py and this wrapper."""
+    Single definition -- used by both experiment.py and this wrapper."""
     result = {}
     for aid, obs in observations.items():
         vision = obs["vision"]  # (C, H, W)
@@ -106,7 +110,7 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
     def __init__(self, cfg):
         self._cfg = cfg
         self._mode = cfg.env_params.mode
-        # Inner env always produces separate modalities — wrapper owns the format
+        # Inner env always produces separate modalities -- wrapper owns the format
         with open_dict(cfg):
             cfg.env_params.combine_interoception_and_vision = False
         self._env = _ENV_CLASS[self._mode](cfg=cfg)
@@ -137,18 +141,23 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         self._augment_infos(raw_infos)
         observations = self._to_dict_obs(raw_obs)
 
+        board_h, board_w = next(iter(raw_infos.values()))["board_shape"]
+        self._last_aux_mask = np.zeros((1, board_h, board_w), dtype=np.float32)
+        self._last_infos = raw_infos
+
+        # Blit active ROI masks if roi_mode is set; otherwise the zero slot
+        # remains zeros (vestigial channel kept for consistent observation shape).
         if self._cfg.agent_params.roi_mode is not None:
-            board_h, board_w = next(iter(raw_infos.values()))["board_shape"]
-            self._last_aux_mask = np.zeros((1, board_h, board_w), dtype=np.float32)
-            self._last_infos = raw_infos
             observations = self._append_roi_layer(observations, raw_infos)
+        else:
+            observations = self._append_zero_roi_layer(observations)
 
         if self._sb3_training:
             return combine_obs_sb3(observations), raw_infos
         return observations, raw_infos
 
     def step(self, actions):
-        """PettingZoo ParallelEnv interface — used by SB3 training only.
+        """PettingZoo ParallelEnv interface -- used by SB3 training only.
         Adds ROI and combines to flat ndarray for SB3 compatibility.
         Remove when SB3 agents are deprecated."""
         raw_obs, raw_scores, terminateds, truncateds, raw_infos = self._env.step(
@@ -168,9 +177,10 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
     def step_parallel(self, actions):
         """actions: {agent_id: {"action": int, ...}}
 
-        Any "roi_mask" key present in an agent's dict is blitted into the
-        absolute ROI layer using that agent's last known position.
-        Guarded by roi_mode so non-ROI runs are unaffected.
+        Any "roi" key present in an agent's dict is blitted into the absolute
+        ROI layer using that agent's last known position.
+        Guarded by roi_mode so non-ROI runs skip the blit but still append
+        the zero slot for consistent observation shape.
         """
         env_actions = {aid: a["action"] for aid, a in actions.items()}
         raw_obs, raw_scores, terminateds, truncateds, raw_infos = self._env.step(
@@ -179,8 +189,10 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         self._augment_infos(raw_infos)
         observations = self._to_dict_obs(raw_obs)
 
+        board_h, board_w = next(iter(raw_infos.values()))["board_shape"]
+        self._last_infos = raw_infos
+
         if self._cfg.agent_params.roi_mode is not None:
-            board_h, board_w = next(iter(raw_infos.values()))["board_shape"]
             aux_mask = np.zeros((board_h, board_w), dtype=bool)
             for aid, packed in actions.items():
                 mask = packed.get("roi")
@@ -189,13 +201,14 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
                         mask, self._last_infos[aid]["position"], aux_mask
                     )
             self._last_aux_mask = aux_mask[np.newaxis]
-            self._last_infos = raw_infos
             observations = self._append_roi_layer(observations, raw_infos)
+        else:
+            observations = self._append_zero_roi_layer(observations)
 
         return observations, raw_scores, terminateds, truncateds, raw_infos
 
     def step_sequential(self, actions):
-        # TODO: sequential stepping — iterate agents internally,
+        # TODO: sequential stepping -- iterate agents internally,
         # collecting intermediate observations. For now, delegate to
         # parallel (savanna sequential env handles ordering).
         raise NotImplementedError("Sequential wrapper pending design decision")
@@ -214,12 +227,12 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
     def observation_space(self, agent_id):
         """Gymnasium observation space for SB3 compatibility.
         Matches the combined (C+N, H, W) cube from combine_obs_sb3.
-        Vision shape already reflects the ROI layer when roi_mode is active."""
+        Vision always includes the ROI slot regardless of roi_mode."""
         from gymnasium.spaces import Box
 
         sample_obs = self._manifesto["observation_shapes"]
-        vision_shape = sample_obs["vision"]  # (C, H, W) — includes ROI layer
-        interoception_shape = sample_obs["interoception"]  # (N,)
+        vision_shape = sample_obs["vision"]
+        interoception_shape = sample_obs["interoception"]
 
         total_channels = vision_shape[0] + interoception_shape[0]
         H, W = vision_shape[1], vision_shape[2]
@@ -271,6 +284,19 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
             )
         return observations
 
+    def _append_zero_roi_layer(self, observations):
+        """Append a zero ROI slot to each agent's vision.
+
+        Keeps observation shape consistent with the roi_mode=cone path so
+        the same architecture config works for both without modification.
+        """
+        for obs in observations.values():
+            h, w = obs["vision"].shape[1], obs["vision"].shape[2]
+            obs["vision"] = np.concatenate(
+                [obs["vision"], np.zeros((1, h, w), dtype=np.float32)], axis=0
+            )
+        return observations
+
     # ── Manifesto ─────────────────────────────────────────────────────
 
     def _build_manifesto(self, raw_obs, raw_infos):
@@ -283,13 +309,11 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         vision = sample_obs[0]
         interoception = sample_obs[1]
 
-        # Vision gains one ROI layer slot when roi_mode is active.
-        # This is the single source of truth for the agent's vision channel count.
-        vision_channels = vision.shape[0] + (
-            1 if self._cfg.agent_params.roi_mode is not None else 0
-        )
+        # Vision always gains one ROI slot -- zero when roi_mode is null
+        # (vestigial), cone-masked when roi_mode is active. This is the
+        # single source of truth for the agent's vision channel count.
         observation_shapes = {
-            "vision": (vision_channels, *vision.shape[1:]),
+            "vision": (vision.shape[0] + 1, *vision.shape[1:]),
             "interoception": interoception.shape,
         }
 
@@ -322,10 +346,16 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
 
         directions = self._read_directions()
 
+        food_pos = None
+        if FOOD_CHR in layer_order:
+            ys, xs = np.where(board[layer_order.index(FOOD_CHR)])
+            food_pos = (int(ys[0]), int(xs[0])) if len(ys) > 0 else None
+
         for agent_id, raw_info in raw_infos.items():
             raw_info["position"] = positions[agent_id]
             raw_info["direction"] = directions[agent_id]
             raw_info["board_shape"] = board_shape
+            raw_info["food_position"] = food_pos
             raw_info["raw_observation"] = (
                 raw_info[INFO_AGENT_OBSERVATION_LAYERS_CUBE],
                 raw_info[INFO_AGENT_INTEROCEPTION_VECTOR],

@@ -17,7 +17,7 @@ def run_experiment(
     cfg: DictConfig,
     i_trial: int = 0,
     reporter=None,
-) -> None:
+) -> dict:
     is_sb3 = cfg.agent_params.agent_0.agent_class.startswith("sb3_")
     mode = cfg.env_params.mode
 
@@ -72,7 +72,11 @@ def run_experiment(
     # SB3 training has its own loop (special permission — documented in DOCUMENTATION.md)
     if is_sb3 and not cfg.run.experiment.test_mode:
         _run_sb3_training(cfg, i_trial, env, agents, events, states, monitor)
-        return {"events": events.to_dataframe(), "states": states.to_dataframe()}
+        return {
+            "events": events.to_dataframe(),
+            "states": states.to_dataframe(),
+            "learning_df": monitor.learning_dataframe(),
+        }
 
     save_freq = cfg.agent_params.save_frequency
 
@@ -103,6 +107,8 @@ def run_experiment(
             # Collect actions. Each agent returns a dict with at least {"action": int}.
             # Additional keys (e.g. viewport masks) flow to the env via step_parallel.
             # Legacy SB3 agents return a plain int — wrapped here for uniform contract.
+            pre_step_infos = infos
+
             actions = {}
             for agent in agents:
                 result = agent.get_action(
@@ -148,7 +154,8 @@ def run_experiment(
                     report = agent.update(observation=observation, done=done)
                     monitor.sample_learning(i_episode, step, report)
 
-                # Record event — experiments.py owns the log format
+                # Record event — experiment.py owns the log format.
+                agent_pre_info = pre_step_infos.get(agent.id, {})
                 env_step_info = [score.get(dim, 0) for dim in score_dims]
                 events.log_event(
                     [
@@ -165,6 +172,9 @@ def run_experiment(
                         done,
                         None,  # Next_state
                         observation,
+                        agent_pre_info.get("position"),
+                        agent_pre_info.get("food_position"),
+                        actions[agent.id].get("extra_action"),
                     ]
                     + env_step_info
                 )
@@ -200,11 +210,15 @@ def run_experiment(
     gc.collect()
     monitor.report()
     if cfg.run.write_outputs:
-        monitor.save(Path(cfg.run.outputs_dir) / cfg.experiment_name)
+        monitor.save_performance(Path(cfg.run.outputs_dir) / cfg.experiment_name)
         for agent in agents:
             agent.save_model(checkpoint_path(cfg.run.outputs_dir, agent.id, i_trial))
 
-    return {"events": events.to_dataframe(), "states": states.to_dataframe()}
+    return {
+        "events": events.to_dataframe(),
+        "states": states.to_dataframe(),
+        "learning_df": monitor.learning_dataframe(),
+    }
 
 
 # ── SB3 legacy ────────────────────────────────────────────────────────
@@ -256,7 +270,7 @@ def _run_sb3_training(cfg, i_trial, env, agents, events, states, monitor):
     gc.collect()
     monitor.report()
     if cfg.run.write_outputs:
-        monitor.save(Path(cfg.run.outputs_dir) / cfg.experiment_name)
+        monitor.save_performance(Path(cfg.run.outputs_dir) / cfg.experiment_name)
         agents[0].save_model(
             checkpoint_path(cfg.run.outputs_dir, agents[0].id, i_trial), i_trial=i_trial
         )
