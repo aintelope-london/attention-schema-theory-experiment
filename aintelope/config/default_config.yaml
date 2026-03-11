@@ -16,11 +16,15 @@ run:
     test_mode: False               # @ui bool
     event_columns: [
       Run_id, Trial, Episode, Env layout seed, Step, IsTest,
-      Agent_id, State, Action, Reward, Done, Next_state, Observation]
+      Agent_id, State, Action, Reward, Done, Next_state, Observation,
+      Position, Food_position, Extra_action]
   write_outputs: True              # @ui bool
   analytics:
     episode_fraction: 0.15         # @ui 0.0 1.0
     min_improvement_ratio: 1.3     # @ui 0.0 100.0
+    loss_curve: True               # @ui bool
+    steps_to_reward: True          # @ui bool
+    optimal_policy_pct: True       # @ui bool
 agent_params:
   save_frequency: 50
   custom_model: ""                 # @ui file
@@ -47,7 +51,7 @@ agent_params:
       #   (vision, interoception) — vision is already ROI-ified at that point.
       q_net:
         type: DQN-NN
-        inputs: [roi, observation] # roi → DAG trigger; observation → expands to modalities
+        inputs: [roi, observation] # roi -> DAG trigger; observation -> expands to modalities
       action:
         type: DQN
         inputs: [q_net]
