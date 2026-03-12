@@ -390,24 +390,19 @@ def archive_code_in_dir(directory_path, zip_path):
                     )
 
 
-# used for disabling context objects like multiprocessing pool
-class DummyContext(object):
-    def __init__(self, *args, **kwargs):
-        pass
+class TeeStream:
+    """Writes to multiple streams simultaneously. Used to tee stdout to a file."""
 
-    # context manager functionality requires this method to be explicitly implemented
-    def __enter__(self):
-        return self
+    def __init__(self, *streams):
+        self.streams = streams
 
-    # context manager functionality requires this method to be explicitly implemented
-    def __exit__(self, type, value, traceback):
-        return
+    def write(self, data):
+        for s in self.streams:
+            s.write(data)
 
-    def _blackHoleMethod(*args, **kwargs):
-        return
-
-    def __getattr__(self, attr):
-        return self._blackHoleMethod
+    def flush(self):
+        for s in self.streams:
+            s.flush()
 
 
-# / class DummyContext(object):
+register_resolvers()

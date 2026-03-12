@@ -5,9 +5,6 @@
 import os
 import pytest
 from omegaconf import OmegaConf
-from aintelope.config.config_utils import register_resolvers
-
-register_resolvers()
 
 
 @pytest.fixture
