@@ -30,7 +30,7 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
     """Run all experiments for a single trial.
 
     Args must be dicts for multiprocessing pickling.
-    Returns dict with configs, events, states, and learning_dfs.
+    Returns dict with configs, events, states, learning_dfs, and manifestos.
     """
     cfg = from_picklable(cfg_dict)
     main_config = from_picklable(main_config_dict)
@@ -42,6 +42,7 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
     all_events = []
     all_states = []
     all_learning = []
+    all_manifestos = []
 
     for _, experiment_name in enumerate(main_config):
         experiment_cfg = prepare_experiment_cfg(
@@ -58,6 +59,7 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
         all_events.append(result["events"])
         all_states.append(result["states"])
         all_learning.append(result["learning_df"])
+        all_manifestos.append(result["manifesto"])
         configs.append(experiment_cfg)
 
     return {
@@ -65,6 +67,7 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
         "events": all_events,
         "states": all_states,
         "learning": all_learning,
+        "manifestos": all_manifestos,
     }
 
 
@@ -77,6 +80,7 @@ def run_experiments(main_config):
     all_events = []
     all_states = []
     all_learning = []
+    all_manifestos = []
 
     workers = find_workers(cfg.run.max_workers, cfg.run.trials)
 
@@ -96,6 +100,7 @@ def run_experiments(main_config):
             all_events.extend(result["events"])
             all_states.extend(result["states"])
             all_learning.extend(result["learning"])
+            all_manifestos.extend(result["manifestos"])
         executor.shutdown(wait=True)
     except KeyboardInterrupt:
         for p in executor._processes.values():
@@ -108,7 +113,8 @@ def run_experiments(main_config):
         pd.concat(all_learning, ignore_index=True) if all_learning else pd.DataFrame()
     )
 
-    analytics_result = analyze(cfg, combined_events, combined_learning)
+    manifesto = all_manifestos[0] if all_manifestos else None
+    analytics_result = analyze(cfg, combined_events, combined_learning, manifesto)
 
     if cfg.run.write_outputs:
         write_results(cfg.run.outputs_dir, all_events, all_states)

@@ -20,6 +20,7 @@ analytic, registered with @register_analytic.
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from aintelope.analytics.plotting import (
@@ -149,6 +150,137 @@ def assert_learning_improvement(analytics: dict, phase: str = "train") -> None:
             )
 
 
+def _dist_to_nearest(vision, channel) -> int | None:
+    """Min Manhattan distance from viewport center to nearest target in given channel.
+
+    Args:
+        vision: (C, H, W) numpy array.
+        channel: index of the target channel (e.g. food_ind from manifesto).
+
+    Returns:
+        Integer Manhattan distance, or None if no target visible.
+    """
+    h, w = vision.shape[1], vision.shape[2]
+    cr, cc = h // 2, w // 2
+    coords = list(zip(*np.where(vision[channel] > 0)))
+    if not coords:
+        return None
+    return min(abs(r - cr) + abs(c - cc) for r, c in coords)
+
+
+def compute_optimal_analytics(
+    events: pd.DataFrame,
+    target_channel: int,
+    phase: str = "test",
+) -> dict:
+    """Per-episode efficiency of reaching the nearest target for the first time.
+
+    Efficiency is defined as spawn_dist / steps_to_first_reward, where:
+      - spawn_dist: Manhattan distance from agent to nearest target at step 0
+        (read from the vision channel; approximate spawn distance).
+      - steps_to_first_reward: step index of first positive reward in episode.
+
+    efficiency = 1.0 means the agent took the minimum possible steps.
+    efficiency = 0.0 means the agent never reached the target.
+
+    The target_channel argument is agnostic — any goal visible in the vision
+    array can be evaluated by passing the appropriate channel index.
+
+    Args:
+        events: Combined events DataFrame from run().
+        target_channel: Vision channel index for the goal (e.g. manifesto["food_ind"]).
+        phase: "test" or "train".
+
+    Returns:
+        dict with efficiency_pct (mean %), per_episode list, n_episodes.
+    """
+    mask = events["IsTest"] if phase == "test" else ~events["IsTest"]
+    phase_events = events[mask]
+    if phase_events.empty:
+        return {"efficiency_pct": None, "per_episode": [], "n_episodes": 0}
+
+    per_episode = []
+
+    for episode, ep_events in phase_events.groupby("Episode"):
+        step0_rows = ep_events[ep_events["Step"] == 0]
+        spawn_dist = None
+        if not step0_rows.empty:
+            obs = step0_rows.iloc[0]["Observation"]
+            if obs is not None:
+                spawn_dist = _dist_to_nearest(obs["vision"], target_channel)
+
+        rewarded = ep_events[ep_events["Reward"] > 0]
+        steps_to_goal = int(rewarded.iloc[0]["Step"]) if not rewarded.empty else None
+
+        if spawn_dist is None:
+            efficiency = None
+        elif steps_to_goal is None:
+            efficiency = 0.0
+        elif steps_to_goal == 0 or spawn_dist == 0:
+            efficiency = 1.0
+        else:
+            efficiency = min(1.0, spawn_dist / steps_to_goal)
+
+        per_episode.append(
+            {
+                "episode": int(episode),
+                "spawn_dist": spawn_dist,
+                "steps_to_goal": steps_to_goal,
+                "efficiency": efficiency,
+            }
+        )
+
+    valid = [e["efficiency"] for e in per_episode if e["efficiency"] is not None]
+    mean_eff = float(np.mean(valid)) * 100 if valid else 0.0
+
+    return {
+        "efficiency_pct": mean_eff,
+        "per_episode": per_episode,
+        "n_episodes": len(per_episode),
+    }
+
+
+def report_optimal_policy(optimal: dict, min_efficiency_pct: float) -> float:
+    """Print per-episode optimality table and assert mean efficiency >= threshold.
+
+    Always prints — designed for test output visibility.
+
+    Args:
+        optimal: dict returned by compute_optimal_analytics().
+        min_efficiency_pct: Minimum acceptable mean efficiency (0–100).
+
+    Returns:
+        Mean efficiency %.
+
+    Raises:
+        AssertionError if mean efficiency < min_efficiency_pct.
+    """
+    print("\n── Optimal Policy Report ─────────────────────────────")
+    for ep in optimal["per_episode"]:
+        dist = ep["spawn_dist"] if ep["spawn_dist"] is not None else "?"
+        steps = ep["steps_to_goal"] if ep["steps_to_goal"] is not None else "never"
+        eff = (
+            f"{ep['efficiency'] * 100:.0f}%" if ep["efficiency"] is not None else "N/A"
+        )
+        print(
+            f"  Episode {ep['episode']:>4}: spawn_dist={dist}, steps_to_goal={steps}, efficiency={eff}"
+        )
+
+    mean_eff = optimal["efficiency_pct"]
+    n = optimal["n_episodes"]
+    suffix = f"(mean over {n} episodes)"
+    if mean_eff is None:
+        print(f"\n  Efficiency: N/A {suffix}")
+    else:
+        print(f"\n  Efficiency: {mean_eff:.1f}% {suffix}")
+    print("──────────────────────────────────────────────────────\n")
+
+    assert (
+        mean_eff is not None and mean_eff >= min_efficiency_pct
+    ), f"Policy efficiency {mean_eff:.1f}% < required {min_efficiency_pct:.1f}%"
+    return mean_eff
+
+
 def compute_steps_to_first_reward(events: pd.DataFrame) -> pd.DataFrame:
     """Per-episode step index of first positive reward.
 
@@ -204,12 +336,16 @@ def sample_episodes(
 
 
 def analyze(
-    cfg, events: pd.DataFrame, learning_df: pd.DataFrame = None
+    cfg,
+    events: pd.DataFrame,
+    learning_df: pd.DataFrame = None,
+    manifesto: dict = None,
 ) -> AnalyticsResult:
     """Run all configured analytics. Returns AnalyticsResult.
 
-    Always computes metrics (improvement ratio).
-    Per-analytic flags in cfg.run.analytics gate optional outputs.
+    Always computes learning improvement metrics.
+    Computes optimal policy metrics when manifesto provides a target channel.
+    Per-analytic flags in cfg.run.analytics gate optional plot/text outputs.
     """
     result = AnalyticsResult()
     result.metrics = compute_learning_analytics(
@@ -217,6 +353,12 @@ def analyze(
         episode_fraction=cfg.run.analytics.episode_fraction,
         min_improvement_ratio=cfg.run.analytics.min_improvement_ratio,
     )
+
+    if manifesto is not None and manifesto.get("food_ind") is not None:
+        result.metrics["optimal"] = compute_optimal_analytics(
+            events, manifesto["food_ind"]
+        )
+
     analytics_cfg = cfg.run.analytics
     for name, fn, flag in _ANALYTICS:
         if flag is None or getattr(analytics_cfg, flag, False):
