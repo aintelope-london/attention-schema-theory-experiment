@@ -436,3 +436,70 @@ class ModelBased(Component):
 
     def reset(self):
         pass
+
+
+class MCTS:
+    def __init__(self, plans):
+        self.c_puct = plans["metadata"]["c_puct"]
+        self.num_simulations = plans["metadata"]["num_simulations"]
+        self.max_depth = plans["metadata"]["max_depth"]
+        self.n_actions = plans["n_actions"]
+
+    def search(self, root_state, value_fn, dynamics_fn):
+        root = MCTSNode(root_state)
+        for _ in range(self.num_simulations):
+            node = root
+            path = [node]
+            while node.is_expanded() and len(path) < self.max_depth:
+                action_idx = max(
+                    node.children.keys(),
+                    key=lambda a: node.children[a].ucb_score(self.c_puct),
+                )
+                node = node.children[action_idx]
+                path.append(node)
+
+            if len(path) < self.max_depth:
+                self._expand(node, dynamics_fn)
+                if node.children:
+                    action_idx = np.random.choice(list(node.children.keys()))
+                    node = node.children[action_idx]
+                    path.append(node)
+
+            value = self._evaluate(node, value_fn)
+            for node in path:
+                node.visits += 1
+                node.value_sum += value
+
+        return max(root.children.keys(), key=lambda a: root.children[a].visits)
+
+    def _expand(self, node, dynamics_fn):
+        for action_idx in range(self.n_actions):
+            next_state = dynamics_fn(node.state, action_idx)
+            node.children[action_idx] = MCTSNode(
+                next_state, parent=node, action=action_idx
+            )
+
+    def _evaluate(self, node, value_fn):
+        return value_fn(node.state)
+
+
+class MCTSNode:
+    def __init__(self, state, parent=None, action=None):
+        self.state = state
+        self.parent = parent
+        self.action = action
+        self.children = {}
+        self.visits = 0
+        self.value_sum = 0.0
+
+    def is_expanded(self):
+        return len(self.children) > 0
+
+    def value(self):
+        return self.value_sum / self.visits if self.visits > 0 else 0.0
+
+    def ucb_score(self, c_puct):
+        if self.visits == 0:
+            return float("inf")
+        exploration = c_puct * np.sqrt(np.log(self.parent.visits) / self.visits)
+        return self.value() + exploration
