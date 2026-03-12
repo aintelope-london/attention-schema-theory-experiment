@@ -17,7 +17,7 @@ def base_learning_config():
     """
     return OmegaConf.create(
         {
-            "test": {
+            "train": {
                 "run": {
                     "trials": 1,
                     "write_outputs": True,

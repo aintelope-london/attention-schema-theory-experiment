@@ -33,8 +33,8 @@ from aintelope.agents.model.component import Component
 
 DARKENING_FACTOR = 0.1
 
-_CONE_HALF_ARC = np.pi / 4    # +- 45 deg cone opening
-_ROI_TURN_STEP = np.pi / 4    # 45 deg per action step
+_CONE_HALF_ARC = np.pi / 4  # +- 45 deg cone opening
+_ROI_TURN_STEP = np.pi / 4  # 45 deg per action step
 
 # left / stay / right -- indexed by internal_action integer
 _ROI_ANGLE_DELTAS = (-_ROI_TURN_STEP, 0.0, _ROI_TURN_STEP)
@@ -101,7 +101,7 @@ class ROI(Component):
         # Two independent operations on the same mask -- mask is never derived
         # from vision and neither operation feeds the other.
         vision[:-1] *= np.where(mask, 1.0, DARKENING_FACTOR)  # darken original channels
-        vision[-1] = mask.astype(np.float32)                   # write ROI layer slot
+        vision[-1] = mask.astype(np.float32)  # write ROI layer slot
         activations[self.component_id] = mask
 
     def update(self, signals=None):

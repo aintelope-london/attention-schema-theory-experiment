@@ -259,8 +259,12 @@ def report_optimal_policy(optimal: dict, min_efficiency_pct: float) -> float:
     for ep in optimal["per_episode"]:
         dist = ep["spawn_dist"] if ep["spawn_dist"] is not None else "?"
         steps = ep["steps_to_goal"] if ep["steps_to_goal"] is not None else "never"
-        eff = f"{ep['efficiency'] * 100:.0f}%" if ep["efficiency"] is not None else "N/A"
-        print(f"  Episode {ep['episode']:>4}: spawn_dist={dist}, steps_to_goal={steps}, efficiency={eff}")
+        eff = (
+            f"{ep['efficiency'] * 100:.0f}%" if ep["efficiency"] is not None else "N/A"
+        )
+        print(
+            f"  Episode {ep['episode']:>4}: spawn_dist={dist}, steps_to_goal={steps}, efficiency={eff}"
+        )
 
     mean_eff = optimal["efficiency_pct"]
     n = optimal["n_episodes"]
@@ -271,9 +275,9 @@ def report_optimal_policy(optimal: dict, min_efficiency_pct: float) -> float:
         print(f"\n  Efficiency: {mean_eff:.1f}% {suffix}")
     print("──────────────────────────────────────────────────────\n")
 
-    assert mean_eff is not None and mean_eff >= min_efficiency_pct, (
-        f"Policy efficiency {mean_eff:.1f}% < required {min_efficiency_pct:.1f}%"
-    )
+    assert (
+        mean_eff is not None and mean_eff >= min_efficiency_pct
+    ), f"Policy efficiency {mean_eff:.1f}% < required {min_efficiency_pct:.1f}%"
     return mean_eff
 
 

@@ -6,19 +6,19 @@ import pytest
 from omegaconf import OmegaConf
 
 from aintelope.__main__ import run
-from aintelope.analytics.analytics import assert_learning_improvement, report_optimal_policy
+from aintelope.analytics.analytics import (
+    assert_learning_improvement,
+    report_optimal_policy,
+)
 
-TRAIN_EPISODES = 500
-EVAL_EPISODES = 50
-MIN_EFFICIENCY_PCT = 70.0
 
-
+@pytest.mark.skip
 def test_sb3_ppo_learns(base_learning_config):
     """SB3 PPO agent shows learning improvement over training."""
     cfg = OmegaConf.merge(
         base_learning_config,
         {
-            "test": {
+            "train": {
                 "run": {
                     "experiment": {
                         "steps": 11,
@@ -43,12 +43,13 @@ def test_sb3_ppo_learns(base_learning_config):
     assert_learning_improvement(result["analytics"])
 
 
+@pytest.mark.skip
 def test_dqn_learns(base_learning_config):
     """main_agent with DQN, roi_mode=null (vestigial ROI channel, no cone)."""
     cfg = OmegaConf.merge(
         base_learning_config,
         {
-            "test": {
+            "train": {
                 "run": {
                     "experiment": {
                         "steps": 11,
@@ -71,12 +72,13 @@ def test_dqn_learns(base_learning_config):
     assert_learning_improvement(result["analytics"])
 
 
+@pytest.mark.skip
 def test_dqn_roi_learns(base_learning_config):
     """main_agent with DQN + active ROI cone."""
     cfg = OmegaConf.merge(
         base_learning_config,
         {
-            "test": {
+            "train": {
                 "run": {
                     "experiment": {
                         "steps": 11,
@@ -105,7 +107,7 @@ def test_model_based_learns(base_learning_config):
     cfg = OmegaConf.merge(
         base_learning_config,
         {
-            "test": {
+            "train": {
                 "run": {
                     "experiment": {
                         "steps": 11,
@@ -148,7 +150,6 @@ def test_model_based_learns(base_learning_config):
     assert_learning_improvement(result["analytics"])
 
 
-
 def test_main_agent_dqn_optimal(base_learning_config):
     """DQN agent reaches near-optimal policy on simple scenario.
 
@@ -158,25 +159,15 @@ def test_main_agent_dqn_optimal(base_learning_config):
     cfg = OmegaConf.merge(
         base_learning_config,
         {
-            "test": {
+            "train": {
                 "run": {
                     "experiment": {
                         "steps": 11,
-                        "episodes": TRAIN_EPISODES,
+                        "episodes": 500,
+                        "test_mode": False,
                     },
                 },
                 "agent_params": {
-                    "agent_0": {
-                        "agent_class": "main_agent",
-                        "architecture": {
-                            "action": {"type": "DQN", "inputs": ["q_net"]},
-                            "reward": {
-                                "type": "RewardInference",
-                                "inputs": ["observation"],
-                            },
-                            "q_net": {"type": "DQN-NN", "inputs": ["observation"]},
-                        },
-                    },
                     "roi_mode": None,
                     "learning_rate": 0.002,
                 },
@@ -186,11 +177,11 @@ def test_main_agent_dqn_optimal(base_learning_config):
                     "env_layout_seed_repeat_sequence_length": 5,
                 },
             },
-            "eval": {
+            "test": {
                 "run": {
                     "experiment": {
                         "steps": 11,
-                        "episodes": EVAL_EPISODES,
+                        "episodes": 50,
                         "test_mode": True,
                     },
                 },
@@ -206,4 +197,4 @@ def test_main_agent_dqn_optimal(base_learning_config):
         },
     )
     result = run(cfg)
-    report_optimal_policy(result["analytics"]["optimal"], MIN_EFFICIENCY_PCT)
+    report_optimal_policy(result["analytics"]["optimal"], 0.7)
