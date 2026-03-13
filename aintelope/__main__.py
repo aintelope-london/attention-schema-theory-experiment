@@ -47,7 +47,7 @@ def run(config: Union[str, DictConfig] = "default_config.yaml", gui: bool = Fals
 
         gpu_thread.join()
 
-        result = run_experiments(config)
+        result = run_experiments(first_cfg, config)
     finally:
         if first_cfg.run.write_outputs:
             sys.stdout = sys.__stdout__

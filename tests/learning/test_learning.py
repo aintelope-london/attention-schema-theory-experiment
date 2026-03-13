@@ -4,6 +4,7 @@
 
 import pytest
 from omegaconf import OmegaConf
+import os
 
 from aintelope.__main__ import run
 from aintelope.analytics.analytics import (
@@ -187,14 +188,15 @@ def test_main_agent_dqn_optimal(base_learning_config):
                 },
                 "models": {
                     "DQN": {
-                        "metadata": {
-                            "eps_start": 0.0,
-                            "eps_end": 0.0,
-                        },
+                        "metadata": {"greedy_until": 0.0},
                     },
                 },
             },
         },
     )
     result = run(cfg)
-    report_optimal_policy(result["analytics"]["optimal"], 0.7)
+    report_optimal_policy(result["analytics"]["optimal"], 70.0)
+
+
+if __name__ == "__main__":
+    pytest.main([__file__])

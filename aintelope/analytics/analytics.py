@@ -31,7 +31,11 @@ from aintelope.analytics.plotting import (
     plot_band,
     save_figure,
 )
-from aintelope.analytics.recording import write_csv
+from aintelope.analytics.recording import (
+    write_csv,
+    SERIALIZABLE_COLUMNS,
+    deserialize_state,
+)
 
 # ── Result container ──────────────────────────────────────────────────────────
 
@@ -98,6 +102,24 @@ def text(title, rows):
 # ── Core compute functions ────────────────────────────────────────────────────
 
 
+def _dist_to_nearest(vision, channel) -> int | None:
+    """Min Manhattan distance from viewport center to nearest target in given channel.
+
+    Args:
+        vision: (C, H, W) numpy array.
+        channel: index of the target channel (e.g. food_ind from manifesto).
+
+    Returns:
+        Integer Manhattan distance, or None if no target visible.
+    """
+    h, w = vision.shape[1], vision.shape[2]
+    cr, cc = h // 2, w // 2
+    coords = list(zip(*np.where(vision[channel] > 0)))
+    if not coords:
+        return None
+    return min(abs(r - cr) + abs(c - cc) for r, c in coords)
+
+
 def compute_learning_analytics(
     events: pd.DataFrame,
     episode_fraction: float = 0.15,
@@ -105,8 +127,8 @@ def compute_learning_analytics(
 ) -> dict:
     """Pure. Returns {phase: {ratio, start_avg, end_avg, window, passed, ...}}."""
     result = {}
-    for phase, mask in [("train", ~events["IsTest"]), ("test", events["IsTest"])]:
-        phase_events = events[mask]
+    for phase in ["train", "test"]:
+        phase_events = filter_events(events, IsTest=(phase == "test"))
         if phase_events.empty:
             continue
         episode_rewards = phase_events.groupby("Episode")["Reward"].sum().sort_index()
@@ -150,22 +172,35 @@ def assert_learning_improvement(analytics: dict, phase: str = "train") -> None:
             )
 
 
-def _dist_to_nearest(vision, channel) -> int | None:
-    """Min Manhattan distance from viewport center to nearest target in given channel.
+def compute_steps_to_first_reward(events: pd.DataFrame) -> pd.DataFrame:
+    """Per-episode step index of first positive reward.
 
-    Args:
-        vision: (C, H, W) numpy array.
-        channel: index of the target channel (e.g. food_ind from manifesto).
-
-    Returns:
-        Integer Manhattan distance, or None if no target visible.
+    Returns DataFrame[Episode, Trial, steps_to_reward].
     """
-    h, w = vision.shape[1], vision.shape[2]
-    cr, cc = h // 2, w // 2
-    coords = list(zip(*np.where(vision[channel] > 0)))
-    if not coords:
-        return None
-    return min(abs(r - cr) + abs(c - cc) for r, c in coords)
+    positive = events[events["Reward"] > 0][["Episode", "Trial", "Step"]]
+    if positive.empty:
+        return pd.DataFrame(columns=["Episode", "Trial", "steps_to_reward"])
+    first = positive.groupby(["Episode", "Trial"])["Step"].min().reset_index()
+    first.columns = ["Episode", "Trial", "steps_to_reward"]
+    return first
+
+
+def filter_events(events: pd.DataFrame, **filters) -> pd.DataFrame:
+    # Design: events travel compressed throughout (SERIALIZABLE_COLUMNS contain
+    # pickled+zlib bytes). Deserialization is deferred to here so the pipe and
+    # in-memory DataFrame stay small. All analytics that need observation data
+    # must access it through this function — never index events directly.
+    # Callers are responsible for keeping filters selective enough to fit in memory.
+    mask = pd.Series(True, index=events.index)
+    for col, val in filters.items():
+        mask &= events[col] == val
+    result = events[mask].copy()
+    for col in SERIALIZABLE_COLUMNS:
+        if col in result.columns:
+            result[col] = result[col].apply(
+                lambda x: deserialize_state(x) if x is not None else None
+            )
+    return result
 
 
 def compute_optimal_analytics(
@@ -194,13 +229,17 @@ def compute_optimal_analytics(
     Returns:
         dict with efficiency_pct (mean %), per_episode list, n_episodes.
     """
-    mask = events["IsTest"] if phase == "test" else ~events["IsTest"]
-    phase_events = events[mask]
+    phase_events = filter_events(events, IsTest=(phase == "test"))
     if phase_events.empty:
         return {"efficiency_pct": None, "per_episode": [], "n_episodes": 0}
 
-    per_episode = []
+    steps_by_episode = (
+        compute_steps_to_first_reward(phase_events)
+        .groupby("Episode")["steps_to_reward"]
+        .min()
+    )
 
+    per_episode = []
     for episode, ep_events in phase_events.groupby("Episode"):
         step0_rows = ep_events[ep_events["Step"] == 0]
         spawn_dist = None
@@ -209,8 +248,11 @@ def compute_optimal_analytics(
             if obs is not None:
                 spawn_dist = _dist_to_nearest(obs["vision"], target_channel)
 
-        rewarded = ep_events[ep_events["Reward"] > 0]
-        steps_to_goal = int(rewarded.iloc[0]["Step"]) if not rewarded.empty else None
+        steps_to_goal = (
+            int(steps_by_episode[episode])
+            if episode in steps_by_episode.index
+            else None
+        )
 
         if spawn_dist is None:
             efficiency = None
@@ -281,20 +323,7 @@ def report_optimal_policy(optimal: dict, min_efficiency_pct: float) -> float:
     return mean_eff
 
 
-def compute_steps_to_first_reward(events: pd.DataFrame) -> pd.DataFrame:
-    """Per-episode step index of first positive reward.
-
-    Returns DataFrame[Episode, Trial, steps_to_reward].
-    """
-    positive = events[events["Reward"] > 0][["Episode", "Trial", "Step"]]
-    if positive.empty:
-        return pd.DataFrame(columns=["Episode", "Trial", "steps_to_reward"])
-    first = positive.groupby(["Episode", "Trial"])["Step"].min().reset_index()
-    first.columns = ["Episode", "Trial", "steps_to_reward"]
-    return first
-
-
-def compute_optimal_manhattan(events: pd.DataFrame):
+def _compute_optimal_manhattan(events: pd.DataFrame):
     """Per-episode Manhattan distance from agent spawn to food spawn.
 
     Reads Position and Food_position at Step 0 (pre-action spawn coordinates).
@@ -466,8 +495,8 @@ def analytic_learning_improvement(events, learning_df, cfg):
 def analytic_learning_curve(events, learning_df, cfg):
     """Episode × reward band plot, one series per phase."""
     series = {}
-    for phase, mask in [("Train", ~events["IsTest"]), ("Test", events["IsTest"])]:
-        phase_df = events[mask]
+    for phase in ["Train", "Test"]:
+        phase_df = filter_events(events, IsTest=(phase.lower() == "test"))
         if phase_df.empty:
             continue
         collapsed = collapse(phase_df, ["Episode", "Trial"], "Reward", "sum")
@@ -498,7 +527,7 @@ def analytic_loss_curve(events, learning_df, cfg):
 @register_analytic("steps_to_reward", flag="steps_to_reward")
 def analytic_steps_to_reward(events, learning_df, cfg):
     """Steps to first reward per episode, vs optional optimal Manhattan baseline."""
-    train_events = events[~events["IsTest"]]
+    train_events = filter_events(events, IsTest=False)
     steps_df = compute_steps_to_first_reward(train_events)
     if steps_df.empty:
         return {}
@@ -512,7 +541,7 @@ def analytic_steps_to_reward(events, learning_df, cfg):
     dfs = {"steps_to_reward": steps_df}
 
     if getattr(cfg.run.analytics, "optimal_policy_pct", False):
-        optimal = compute_optimal_manhattan(train_events)
+        optimal = _compute_optimal_manhattan(train_events)
         if optimal is not None:
             med_opt = float(optimal.median())
             ref_line = ("Optimal (Manhattan)", med_opt)

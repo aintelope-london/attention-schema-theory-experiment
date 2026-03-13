@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pickle
 
-SERIALIZABLE_COLUMNS = ("State", "Next_state", "Observation", "Board")
+SERIALIZABLE_COLUMNS = ("Observation", "Board")
 STATE_COLUMNS = ["Run_id", "Trial", "Episode", "Step", "Board"]
 
 
@@ -34,7 +34,13 @@ class EventLog:
         self._rows.append(event)
 
     def to_dataframe(self):
-        return pd.DataFrame(self._rows, columns=self.columns)
+        df = pd.DataFrame(self._rows, columns=self.columns)
+        for col in SERIALIZABLE_COLUMNS:
+            if col in df.columns:
+                df[col] = df[col].apply(
+                    lambda x: serialize_state(x) if x is not None else None
+                )
+        return df
 
 
 class StateLog:
@@ -47,7 +53,13 @@ class StateLog:
         self._rows.append(row)
 
     def to_dataframe(self):
-        return pd.DataFrame(self._rows, columns=STATE_COLUMNS)
+        df = pd.DataFrame(self._rows, columns=self.columns)
+        for col in SERIALIZABLE_COLUMNS:
+            if col in df.columns:
+                df[col] = df[col].apply(
+                    lambda x: serialize_state(x) if x is not None else None
+                )
+        return df
 
 
 def write_csv(path, df):
@@ -62,9 +74,6 @@ def _write_grouped_csv(outputs_dir, frames, filename):
     combined = pd.concat(frames, ignore_index=True)
     for name, group in combined.groupby("Run_id"):
         df = group.copy()
-        for col in SERIALIZABLE_COLUMNS:
-            if col in df.columns:
-                df[col] = df[col].apply(serialize_state)
         write_csv(Path(outputs_dir) / name / filename, df)
 
 
@@ -79,7 +88,9 @@ def read_events(filepath):
     df = pd.read_csv(filepath)
     for col in SERIALIZABLE_COLUMNS:
         if col in df.columns:
-            df[col] = df[col].apply(deserialize_state)
+            df[col] = df[col].apply(
+                lambda x: deserialize_state(x) if pd.notna(x) else None
+            )
     return df
 
 

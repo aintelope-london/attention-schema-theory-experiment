@@ -311,30 +311,20 @@ class DQN(Component):
         self.n_actions = context["plans"]["n_actions"]
 
         self._q_net_id = self.inputs[0]
-        self.eps_start = self.metadata["eps_start"]
-        self.eps_end = self.metadata["eps_end"]
-        self.eps_decay_steps = self.metadata["eps_decay_steps"]
-        self.step_count = 0
         self.update_count = 0
 
     def activate(self, activations):
         self.components[self._q_net_id].activate(activations)
         q_values = list(activations[self._q_net_id].values())[0]
-
-        epsilon = self._compute_epsilon()
         n = self.n_env_actions
 
-        def _eps_greedy(q_slice):
-            if np.random.random() < epsilon:
-                return np.random.randint(len(q_slice))
-            return int(np.argmax(q_slice))
-
-        activations[self.component_id] = _eps_greedy(q_values[:n])
-
+        activations[self.component_id] = _epsilon_action(
+            q_values[:n], self.cfg, self.metadata, activations["episode"]
+        )
         if n < self.n_actions:
-            activations["internal_action"] = _eps_greedy(q_values[n:])
-
-        self.step_count += 1
+            activations["internal_action"] = _epsilon_action(
+                q_values[n:], self.cfg, self.metadata, activations["episode"]
+            )
 
     def update(self, signals=None):
         if signals is None:
@@ -387,9 +377,19 @@ class DQN(Component):
 
         return report
 
-    def _compute_epsilon(self):
-        decay_rate = (self.eps_start - self.eps_end) / self.eps_decay_steps
-        return max(self.eps_end, self.eps_start - self.step_count * decay_rate)
+
+def _epsilon_action(q_slice, cfg, metadata, episode):
+    """Epsilon-greedy action selection, decaying linearly to greedy.
+
+    Explores from episode 0 up to greedy_until * total_episodes, then
+    exploits fully. greedy_until=0.0 means always greedy (pure exploitation).
+    """
+    explore_episodes = int(cfg.run.experiment.episodes * metadata["greedy_until"])
+    if episode < explore_episodes:
+        epsilon = 1.0 - episode / explore_episodes
+        if np.random.random() < epsilon:
+            return np.random.randint(len(q_slice))
+    return int(np.argmax(q_slice))
 
 
 class ModelBased(Component):

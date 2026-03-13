@@ -149,7 +149,7 @@ def run_experiment(
                 observation = observations[agent.id]
                 score = scores[agent.id]
                 done = dones[agent.id]
-                if terminateds[agent.id]:
+                if terminateds[agent.id] and not cfg.run.experiment.test_mode:
                     observation = None
                 else:
                     report = agent.update(observation=observation, done=done)
@@ -167,11 +167,9 @@ def run_experiment(
                         step,
                         cfg.run.experiment.test_mode,
                         agent.id,
-                        None,  # State — TODO: define canonical state representation
                         agent.last_action,
                         sum(score.values()),
                         done,
-                        None,  # Next_state
                         observation,
                         agent_pre_info.get("position"),
                         agent_pre_info.get("food_position"),

@@ -16,7 +16,7 @@ run:
     test_mode: False               # @ui bool
     event_columns: [
       Run_id, Trial, Episode, Env layout seed, Step, IsTest,
-      Agent_id, State, Action, Reward, Done, Next_state, Observation,
+      Agent_id, Action, Reward, Done, Observation,
       Position, Food_position, Internal_action]
   write_outputs: True              # @ui bool
   analytics:
@@ -135,9 +135,7 @@ models:
     DQN:
       metadata:
         q_network: DQN-NN
-        eps_start: 0.9
-        eps_end: 0.05
-        eps_decay_steps: 4500      
+        greedy_until: 0.95 # % of steps     
     ModelBased:
       metadata:
         input:

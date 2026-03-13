@@ -71,9 +71,9 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
     }
 
 
-def run_experiments(main_config):
+def run_experiments(cfg, main_config):
     """Main orchestrator entry point."""
-    cfg = init_config(main_config)
+
     set_console_title(cfg.run.outputs_dir)
 
     configs = []

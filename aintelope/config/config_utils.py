@@ -28,7 +28,7 @@ def init_config(main_config):
     """Load defaults, merge orchestrator-level overrides, resolve timestamps."""
     cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
     cfg = OmegaConf.merge(cfg, list(main_config.values())[0])
-    OmegaConf.update(cfg, "run.outputs_dir", cfg.run.outputs_dir)
+    OmegaConf.update(cfg, "run.outputs_dir", str(cfg.run.outputs_dir))
     return cfg
 
 
