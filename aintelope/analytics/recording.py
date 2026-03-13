@@ -47,6 +47,7 @@ class StateLog:
     """Per-step environment state accumulator. One row per step, not per agent."""
 
     def __init__(self):
+        self.columns = STATE_COLUMNS
         self._rows = []
 
     def log(self, row):
