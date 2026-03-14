@@ -133,7 +133,7 @@ class Model:
 
     def get_action(self, observation):
         self.activations.update(observation)
-        self.activations["episode"] = self.resets
+        self.activations["internal_episode"] = self.resets
         self.components["action"].activate(self.activations)
         return {
             k: self.activations[k] for k in self._output_keys if k in self.activations
