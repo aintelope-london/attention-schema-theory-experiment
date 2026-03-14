@@ -22,6 +22,12 @@ run:
   analytics:
     episode_fraction: 0.15         # @ui 0.0 1.0
     min_improvement_ratio: 1.3     # @ui 0.0 100.0
+    min_efficiency_pct: 70         # @ui 0 100
+    loss_curve: True               # @ui bool
+    steps_to_reward: True          # @ui bool
+    optimal_policy_pct: False      # @ui bool
+    epsilon_curve: True            # @ui bool
+    reward_curve: True             # @ui bool
 agent_params:
   save_frequency: 50
   custom_model: ""                 # @ui file

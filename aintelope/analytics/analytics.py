@@ -55,11 +55,11 @@ class AnalyticsResult:
 _ANALYTICS = []  # list of (name, fn, config_flag)
 
 
-def register_analytic(name, flag=None):
+def register_analytic(name):
     """Decorator. flag: cfg.run.analytics attribute name, or None = always run."""
 
     def decorator(fn):
-        _ANALYTICS.append((name, fn, flag))
+        _ANALYTICS.append((name, fn))
         return fn
 
     return decorator
@@ -282,7 +282,7 @@ def compute_optimal_analytics(
     }
 
 
-def report_optimal_policy(optimal: dict, min_efficiency_pct: float) -> float:
+def report_optimal_policy(optimal: dict) -> float:
     """Print per-episode optimality table and assert mean efficiency >= threshold.
 
     Always prints — designed for test output visibility.
@@ -316,7 +316,7 @@ def report_optimal_policy(optimal: dict, min_efficiency_pct: float) -> float:
     else:
         print(f"\n  Efficiency: {mean_eff:.1f}% {suffix}")
     print("──────────────────────────────────────────────────────\n")
-
+    min_efficiency_pct = optimal["min_efficiency_pct"]
     assert (
         mean_eff is not None and mean_eff >= min_efficiency_pct
     ), f"Policy efficiency {mean_eff:.1f}% < required {min_efficiency_pct:.1f}%"
@@ -385,7 +385,9 @@ def analyze(
 
     if manifesto is not None and manifesto.get("food_ind") is not None:
         result.metrics["optimal"] = compute_optimal_analytics(
-            events, manifesto["food_ind"]
+            events,
+            manifesto["food_ind"],
+            min_efficiency_pct=cfg.run.analytics.min_efficiency_pct,
         )
 
     analytics_cfg = cfg.run.analytics
@@ -509,9 +511,35 @@ def analytic_learning_curve(events, learning_df, cfg):
     return {"figures": {"learning_curve": fig}}
 
 
-@register_analytic("loss_curve", flag="loss_curve")
+@register_analytic("epsilon_curve")
+def analytic_epsilon_curve(events, learning_df, cfg):
+    """Epsilon decay over training episodes."""
+    if learning_df is None or learning_df.empty or "epsilon" not in learning_df.columns:
+        return {}
+    df = learning_df.copy()
+    collapsed = collapse(df, ["episode", "trial"], "epsilon", "mean")
+    collapsed.columns = ["Episode", "Trial", "Epsilon"]
+    series = {"Epsilon": aggregate_series(collapsed, "Episode", "Epsilon")}
+    fig = plot(series, x_label="Episode", y_label="Epsilon", title="Epsilon Decay")
+    return {"figures": {"epsilon_curve": fig}}
+
+
+@register_analytic("reward_curve")
+def analytic_reward_curve(events, learning_df, cfg):
+    """Per-update reward signal over training episodes."""
+    if learning_df is None or learning_df.empty or "reward" not in learning_df.columns:
+        return {}
+    df = learning_df.copy()
+    collapsed = collapse(df, ["episode", "trial"], "reward", "mean")
+    collapsed.columns = ["Episode", "Trial", "Reward"]
+    series = {"Reward": aggregate_series(collapsed, "Episode", "Reward")}
+    fig = plot(series, x_label="Episode", y_label="Mean Reward", title="Reward Signal")
+    return {"figures": {"reward_curve": fig}}
+
+
+@register_analytic("loss_curve")
 def analytic_loss_curve(events, learning_df, cfg):
-    """Episode × mean loss band plot."""
+    """Episode x mean loss band plot."""
     if learning_df is None or learning_df.empty:
         return {}
     df = learning_df.copy()
@@ -524,7 +552,7 @@ def analytic_loss_curve(events, learning_df, cfg):
     return {"figures": {"loss_curve": fig}, "dataframes": {"learning": learning_df}}
 
 
-@register_analytic("steps_to_reward", flag="steps_to_reward")
+@register_analytic("steps_to_reward")
 def analytic_steps_to_reward(events, learning_df, cfg):
     """Steps to first reward per episode, vs optional optimal Manhattan baseline."""
     train_events = filter_events(events, IsTest=False)

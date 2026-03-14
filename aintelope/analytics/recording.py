@@ -119,6 +119,12 @@ def read_checkpoints(checkpoint_dir):
     return model_paths
 
 
+def save_env_layout(image, outputs_dir, seed):
+    path = Path(outputs_dir) / "env_layouts" / f"{seed}.jpg"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(path)
+
+
 def frames_to_video(frames, output_path, frame_duration=0.7):
     """Render PIL Image frames as an mp4 video.
 

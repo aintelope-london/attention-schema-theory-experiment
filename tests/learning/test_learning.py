@@ -195,7 +195,7 @@ def test_main_agent_dqn_optimal(base_learning_config):
         },
     )
     result = run(cfg)
-    report_optimal_policy(result["analytics"]["optimal"], 70.0)
+    report_optimal_policy(result["analytics"]["optimal"])
 
 
 if __name__ == "__main__":

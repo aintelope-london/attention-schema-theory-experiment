@@ -10,7 +10,7 @@ All analytics and reporting live in analytics/analytics.py.
 
 import pandas as pd
 
-LEARNING_COLUMNS = ["trial", "episode", "step", "loss"]
+LEARNING_COLUMNS = ["trial", "episode", "step", "loss", "epsilon", "reward"]
 
 
 class LearningMonitor:
@@ -21,12 +21,19 @@ class LearningMonitor:
         self._rows = []
 
     def sample(self, episode: int, step: int, report):
-        """Record a loss value. Silently skips if report has no loss."""
-        if report is None:
-            return
-        loss = report.get("loss") if isinstance(report, dict) else None
+        """Record learning signal. Skips steps where no gradient update occurred (loss absent)."""
+        loss = report.get("loss")
         if loss is not None:
-            self._rows.append([self._trial, episode, step, loss])
+            self._rows.append(
+                [
+                    self._trial,
+                    episode,
+                    step,
+                    loss,
+                    report.get("epsilon"),
+                    report.get("reward"),
+                ]
+            )
 
     def to_dataframe(self) -> pd.DataFrame:
         return pd.DataFrame(self._rows, columns=LEARNING_COLUMNS)

@@ -9,7 +9,7 @@ from omegaconf import DictConfig
 from aintelope.agents import get_agent_class
 from aintelope.agents.model.dl_utils import checkpoint_path, select_checkpoint
 from aintelope.analytics.diagnostics import DiagnosticsMonitor
-from aintelope.analytics.recording import EventLog, StateLog
+from aintelope.analytics.recording import EventLog, StateLog, save_env_layout
 from aintelope.environments import get_env_class
 
 
@@ -81,6 +81,7 @@ def run_experiment(
 
     save_freq = cfg.agent_params.save_frequency
 
+    env_layout_seeds = set()
     reporter.set_total("episode", cfg.run.experiment.episodes)
     for i_episode in range(cfg.run.experiment.episodes):
         reporter.update("episode", i_episode + 1)
@@ -93,6 +94,8 @@ def run_experiment(
 
         if cfg.env_params.env_layout_seed_modulo > 0:
             env_layout_seed = env_layout_seed % cfg.env_params.env_layout_seed_modulo
+
+        env_layout_seeds.add(env_layout_seed)
 
         # Reset
         observations, infos = env.reset(env_layout_seed=env_layout_seed)
@@ -212,6 +215,20 @@ def run_experiment(
         monitor.save_performance(Path(cfg.run.outputs_dir) / cfg.experiment_name)
         for agent in agents:
             agent.save_model(checkpoint_path(cfg.run.outputs_dir, agent.id, i_trial))
+        from aintelope.gui.renderer import (
+            StateRenderer,
+            Tileset,
+            find_tileset,
+            SavannaInterpreter,
+        )
+
+        renderer = StateRenderer(Tileset(find_tileset()))
+        interpreter = SavannaInterpreter()
+        for seed in env_layout_seeds:
+            env.reset(env_layout_seed=seed)
+            board, layer_order, _ = env.board_state()
+            img = renderer.render(*interpreter.interpret((board, layer_order)))
+            save_env_layout(img, Path(cfg.run.outputs_dir) / cfg.experiment_name, seed)
 
     return {
         "events": events.to_dataframe(),
