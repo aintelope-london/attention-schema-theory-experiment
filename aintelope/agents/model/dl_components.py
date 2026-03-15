@@ -374,7 +374,7 @@ class DQN(Component):
         signals[self._q_net_id] = bellman_loss
         report = q_net.update(signals)
         report["episode"] = self.activations.get("episode", 0)
-        report["reward"] = self.activations.get("reward", 0.0)
+        report["reward"] = float(self.activations.get("reward", 0.0))
         report["explore_episodes"] = int(
             self.cfg.run.experiment.episodes * self.metadata["greedy_until"]
         )
