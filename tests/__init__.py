@@ -4,7 +4,3 @@
 #
 # Repository:
 # https://github.com/aintelope-london/attention-schema-theory-experiment
-
-from aintelope.config.config_utils import register_resolvers
-
-register_resolvers()

@@ -1,19 +1,14 @@
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
-#
-# Repository:
-# https://github.com/aintelope-london/attention-schema-theory-experiment
-
 import os
 import sys
 import threading
+from pathlib import Path
 from typing import Union
 
 from omegaconf import DictConfig, OmegaConf
 
 from aintelope.config.config_utils import (
-    register_resolvers,
+    TeeStream,
+    init_config,
     select_gpu,
     set_memory_limits,
     set_priorities,
@@ -21,19 +16,6 @@ from aintelope.config.config_utils import (
 
 
 def run(config: Union[str, DictConfig] = "default_config.yaml", gui: bool = False):
-    """Single entrypoint for the whole project.
-
-    Args:
-        config: Either a filename (relative to aintelope/config/) or a DictConfig.
-        gui: If True, launch config GUI before run, and results viewer after.
-
-    Usage:
-        python -m aintelope --gui
-        python -m aintelope custom_config.yaml
-        In tests: run(my_dictconfig)
-    """
-    register_resolvers()
-
     if sys.gettrace() is None:
         set_priorities()
 
@@ -50,15 +32,26 @@ def run(config: Union[str, DictConfig] = "default_config.yaml", gui: bool = Fals
             print("GUI cancelled.")
             return
 
-    # Start GPU init after GUI — heavy imports happen below, not before
-    gpu_thread = threading.Thread(target=select_gpu)
-    gpu_thread.start()
+    first_cfg = init_config(config)
+    if first_cfg.run.write_outputs:
+        outputs_dir = Path(first_cfg.run.outputs_dir)
+        outputs_dir.mkdir(parents=True, exist_ok=True)
+        log_file = open(outputs_dir / "stdout.txt", "w")
+        sys.stdout = TeeStream(sys.__stdout__, log_file)
 
-    from aintelope.orchestrator import run_experiments
+    try:
+        gpu_thread = threading.Thread(target=select_gpu)
+        gpu_thread.start()
 
-    gpu_thread.join()
+        from aintelope.orchestrator import run_experiments
 
-    result = run_experiments(config)
+        gpu_thread.join()
+
+        result = run_experiments(first_cfg, config)
+    finally:
+        if first_cfg.run.write_outputs:
+            sys.stdout = sys.__stdout__
+            log_file.close()
 
     if gui:
         from aintelope.gui.results_viewer import run_results_viewer

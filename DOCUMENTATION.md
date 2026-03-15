@@ -128,11 +128,11 @@ Agents and environments use a registry pattern: a string key in config maps to a
 Config (yaml)
   → OmegaConf DictConfig
     → orchestrator distributes trials across workers
-      → each experiment produces an EventLog
-        → EventLog.to_dataframe() → pandas DataFrame
-          → compute_learning_analytics() → analytics dict
-            → write_results() serializes to CSV per run
-            → write_run_report() writes report.txt + learning_curve.png
+      → each experiment block produces EventLog + StateLog + learning_df
+        → orchestrator assembles results: {block_name: {events, states, learning_df, manifesto, cfg}}
+          → analyze(results) runs configured analytics, returns {analytic_name: {block_name: result}}
+            → write_results() serializes events/states to CSV per block
+            → each analytic writes its own figures/text/CSVs to outputs_dir
               → results viewer reads CSVs for analysis/playback
 ```
 
@@ -171,17 +171,27 @@ map_max: 1            # (no annotation → locked/read-only in GUI)
 
 ### Analytics config block
 
-Under `run:`, the `analytics:` block controls the learning improvement thresholds used by both the run report and `assert_learning_improvement()`:
+Under `run:`, the `analytics:` block is a dict of analytic names to parameter dicts. Each key names a library function in `analytics/analytics.py`; the value is passed as `params` to that function. An empty dict `{}` means the analytic runs with no configurable parameters.
 
 ```yaml
 run:
   write_outputs: True
   analytics:
-    episode_fraction: 0.15
-    min_improvement_ratio: 1.3
+    run_summary: {}
+    learning_improvement:
+      episode_fraction: 0.15
+      min_improvement_ratio: 1.3
+    learning_curve: {}
+    loss_curve: {}
+    epsilon_curve: {}
+    reward_curve: {}
+    steps_to_reward: {}
+    optimal_efficiency:
+      min_efficiency_pct: 0.70
+    efficiency_curve: {}
 ```
 
-These values travel with the analytics dict returned by `compute_learning_analytics()`, so the same threshold that produced the data is the one used to assert against it. Tests that override these params do so through the same config merge path as everything else.
+Adding or removing an analytic from a run requires only a config change — no code modification. Per-block test overrides follow the same config merge path as all other parameters.
 
 ---
 
@@ -207,50 +217,90 @@ Each suite has its own base fixture in its own `conftest.py`. Both provide a min
 
 ### Return value from `run()`
 
-`run()` returns a dict including an `analytics` key populated from `compute_learning_analytics()` applied to the combined EventLog DataFrame:
+`run()` returns a dict with a `results` key (per-block raw data) and an `analytics` key (per-analytic, per-block computed results):
 
 ```python
 result = run(cfg)
-assert_learning_improvement(result["analytics"])  # reads pre-computed metrics
+assert_learning_improvement(result["analytics"]["learning_improvement"]["train"])
+report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
 ```
 
-`assert_learning_improvement` reads from the analytics dict rather than recomputing — the threshold used to generate the data is the same one being asserted against.
+The block names (`"train"`, `"test"`) are the same keys defined in the config. Analytics always return per-block dicts, so tests are explicit about which block they are asserting on — no implicit phase defaulting.
 
 ---
 
-## Analytics and Diagnostics
+## Analytics
 
-### `compute_learning_analytics(events, episode_fraction, min_improvement_ratio)`
+### Architecture
 
-Pure function in `analytics/diagnostics.py`. Takes the EventLog DataFrame and returns a dict keyed by phase (`"train"`, `"test"`), each containing `ratio`, `start_avg`, `end_avg`, `window`, `passed`, and `min_improvement_ratio`. Called unconditionally in the orchestrator after all trials complete; result is always present in the `run()` return value.
+`analyze(results)` is the single entry point. It receives the full `results` dict (keyed by block name), iterates `cfg.run.analytics`, and calls each configured library function. It returns `{analytic_name: {block_name: result}}`.
 
-### `assert_learning_improvement(analytics, phase)`
+```python
+# analyze() internals:
+analytics = {}
+for name, params in cfg.run.analytics.items():
+    analytics[name] = _ANALYTICS[name](results, params)
+return analytics
+```
 
-Thin assertion wrapper in `analytics/analytics.py`. Reads from the pre-computed analytics dict and raises `AssertionError` with a descriptive message if the improvement criterion is not met. Used directly in learning tests.
+Each library function receives the complete `results` dict and its params, computes its analytic independently across all blocks, writes its own outputs (figures, text, CSVs) to `outputs_dir` when `write_outputs` is enabled, and returns computed data keyed by block name. Library functions are standalone — they can be called in isolation from outside `analyze()`.
+
+### Library functions
+
+| Function | Returns per block | Writes |
+|----------|------------------|--------|
+| `run_summary` | list of summary lines | `report.txt` (appended) |
+| `learning_improvement` | `{ratio, start_avg, end_avg, window, passed, min_improvement_ratio}` | `report.txt` |
+| `learning_curve` | `{figure}` | `learning_curve.png` |
+| `loss_curve` | `{figure}` | `loss_curve.png` |
+| `epsilon_curve` | `{figure}` | `epsilon_curve.png` |
+| `reward_curve` | `{figure}` | `reward_curve.png` |
+| `steps_to_reward` | `{figure}` | `steps_to_reward.png` |
+| `optimal_efficiency` | `{efficiency_pct, per_episode, n_episodes, min_efficiency_pct}` | — |
+| `efficiency_curve` | `{figure}` | `efficiency_curve.png` |
+
+### Assertion helpers
+
+`assert_learning_improvement(block_result)` and `report_optimal_policy(block_result)` take a single block's result dict directly — the caller selects the block by name:
+
+```python
+assert_learning_improvement(result["analytics"]["learning_improvement"]["train"])
+report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
+```
 
 ### `DiagnosticsMonitor`
 
-Coordinates resource and learning diagnostics for a single experiment block. Lives in `analytics/diagnostics.py`. Replaces the direct `ResourceMonitor` usage in `experiment.py`.
+Coordinates resource and learning diagnostics for a single experiment block. Lives in `analytics/diagnostics.py`.
 
-- `sample(label)` — resource snapshot, same interface as the former `ResourceMonitor`
-- `sample_learning(episode, step, report)` — accepts the report dict returned by `agent.update()`, extracts loss
+- `sample(label)` — resource snapshot
+- `sample_learning(episode, step, report)` — records `loss`, `epsilon`, and `reward` from the agent update report. Skips steps where no gradient update occurred (identified by absence of `loss`).
 - `report()` — prints resource report to terminal
-- `save(folder)` — writes `performance_report.csv` and `learning.csv` to the experiment block's output folder
+- `save_performance(folder)` — writes `performance_report.csv`
+- `learning_dataframe()` — returns accumulated `[trial, episode, step, loss, epsilon, reward]` DataFrame
 
 `ResourceMonitor` continues to exist in `utils/performance.py` as the resource-sampling implementation; `DiagnosticsMonitor` owns it as a member.
 
 ### Run outputs (gated by `write_outputs`)
 
-All file writes are gated under a single `if cfg.run.write_outputs:` check in the orchestrator. When enabled, the run's timestamp folder contains:
+When enabled, the run's timestamp folder contains:
 
 | File | Source | Contents |
 |------|--------|----------|
-| `report.txt` | `write_run_report()` | Learning improvement summary across phases |
-| `learning_curve.png` | `_write_learning_curve()` | Per-episode reward with rolling average, per phase |
+| `report.txt` | `run_summary`, `learning_improvement` analytics | Run metadata and improvement summary |
+| `learning_curve.png` | `learning_curve` analytic | Per-episode reward per block |
+| `loss_curve.png` | `loss_curve` analytic | Per-episode mean loss per block |
+| `epsilon_curve.png` | `epsilon_curve` analytic | Epsilon decay per block |
+| `reward_curve.png` | `reward_curve` analytic | Per-update reward signal per block |
+| `steps_to_reward.png` | `steps_to_reward` analytic | Steps to first reward per block |
+| `efficiency_curve.png` | `efficiency_curve` analytic | Per-episode policy efficiency per block |
 | `{block}/events.csv` | `write_results()` | Full event log per experiment block |
 | `{block}/states.csv` | `write_results()` | Board state per step |
-| `{block}/performance_report.csv` | `DiagnosticsMonitor.save()` | Resource snapshots |
-| `{block}/learning.csv` | `DiagnosticsMonitor.save()` | Per-step loss from component update reports |
+| `{block}/performance_report.csv` | `DiagnosticsMonitor.save_performance()` | Resource snapshots |
+| `{block}/env_layouts/{seed}.jpg` | `experiment.py` + `renderer.py` | One image per unique env layout seed used during training |
+
+### Environment layout images
+
+At the end of each experiment block, when `write_outputs` is enabled, a JPEG is rendered for each unique `env_layout_seed` that was used during training. The filename is the seed value itself. Images are written to `{outputs_dir}/{block}/env_layouts/`. The seed set is collected as a natural by-product of the episode loop — no recalculation.
 
 ---
 

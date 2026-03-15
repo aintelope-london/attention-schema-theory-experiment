@@ -39,6 +39,7 @@ class Model:
         action_space = env_manifesto["action_space"]
         self.components = {}
         self.activations = {}
+        self.resets = 0
 
         architecture = cfg.agent_params[agent_id].architecture
         obs_fields = list(obs_shapes.keys())
@@ -119,6 +120,7 @@ class Model:
         self.activations.clear()
         for component in self.components.values():
             component.reset()
+        self.resets += 1
 
     def _load_checkpoint(self, path):
         """Load a bundled checkpoint and distribute to components."""
@@ -131,6 +133,7 @@ class Model:
 
     def get_action(self, observation):
         self.activations.update(observation)
+        self.activations["internal_episode"] = self.resets
         self.components["action"].activate(self.activations)
         return {
             k: self.activations[k] for k in self._output_keys if k in self.activations

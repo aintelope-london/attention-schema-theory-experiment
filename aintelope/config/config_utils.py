@@ -28,7 +28,7 @@ def init_config(main_config):
     """Load defaults, merge orchestrator-level overrides, resolve timestamps."""
     cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
     cfg = OmegaConf.merge(cfg, list(main_config.values())[0])
-    OmegaConf.update(cfg, "run.outputs_dir", cfg.run.outputs_dir)
+    OmegaConf.update(cfg, "run.outputs_dir", str(cfg.run.outputs_dir))
     return cfg
 
 
@@ -390,24 +390,19 @@ def archive_code_in_dir(directory_path, zip_path):
                     )
 
 
-# used for disabling context objects like multiprocessing pool
-class DummyContext(object):
-    def __init__(self, *args, **kwargs):
-        pass
+class TeeStream:
+    """Writes to multiple streams simultaneously. Used to tee stdout to a file."""
 
-    # context manager functionality requires this method to be explicitly implemented
-    def __enter__(self):
-        return self
+    def __init__(self, *streams):
+        self.streams = streams
 
-    # context manager functionality requires this method to be explicitly implemented
-    def __exit__(self, type, value, traceback):
-        return
+    def write(self, data):
+        for s in self.streams:
+            s.write(data)
 
-    def _blackHoleMethod(*args, **kwargs):
-        return
-
-    def __getattr__(self, attr):
-        return self._blackHoleMethod
+    def flush(self):
+        for s in self.streams:
+            s.flush()
 
 
-# / class DummyContext(object):
+register_resolvers()

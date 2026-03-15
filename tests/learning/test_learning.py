@@ -40,7 +40,7 @@ def test_sb3_ppo_learns(base_learning_config):
         },
     )
     result = run(cfg)
-    assert_learning_improvement(result["analytics"])
+    assert_learning_improvement(result["analytics"]["learning_improvement"]["train"])
 
 
 @pytest.mark.skip
@@ -69,7 +69,7 @@ def test_dqn_learns(base_learning_config):
         },
     )
     result = run(cfg)
-    assert_learning_improvement(result["analytics"])
+    assert_learning_improvement(result["analytics"]["learning_improvement"]["train"])
 
 
 @pytest.mark.skip
@@ -98,7 +98,7 @@ def test_dqn_roi_learns(base_learning_config):
         },
     )
     result = run(cfg)
-    assert_learning_improvement(result["analytics"])
+    assert_learning_improvement(result["analytics"]["learning_improvement"]["train"])
 
 
 @pytest.mark.skip(reason="ModelBased debugging pending")
@@ -147,13 +147,13 @@ def test_model_based_learns(base_learning_config):
         },
     )
     result = run(cfg)
-    assert_learning_improvement(result["analytics"])
+    assert_learning_improvement(result["analytics"]["learning_improvement"]["train"])
 
 
 def test_main_agent_dqn_optimal(base_learning_config):
     """DQN agent reaches near-optimal policy on simple scenario.
 
-    Two-block run: train block builds the policy, eval block measures it
+    Two-block run: train block builds the policy, test block measures it
     at zero epsilon (pure exploitation) so efficiency is not noise-floored.
     """
     cfg = OmegaConf.merge(
@@ -163,7 +163,7 @@ def test_main_agent_dqn_optimal(base_learning_config):
                 "run": {
                     "experiment": {
                         "steps": 11,
-                        "episodes": 500,
+                        "episodes": 1500,
                         "test_mode": False,
                     },
                 },
@@ -187,14 +187,15 @@ def test_main_agent_dqn_optimal(base_learning_config):
                 },
                 "models": {
                     "DQN": {
-                        "metadata": {
-                            "eps_start": 0.0,
-                            "eps_end": 0.0,
-                        },
+                        "metadata": {"greedy_until": 0.0},
                     },
                 },
             },
         },
     )
     result = run(cfg)
-    report_optimal_policy(result["analytics"]["optimal"], 0.7)
+    report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
+
+
+if __name__ == "__main__":
+    pytest.main([__file__])

@@ -58,7 +58,7 @@ class NeuralNet(nn.Module, Component):
 
     def optimize(self, signals):
         if len(self.memory) < self.cfg.agent_params.batch_size:
-            return None
+            return {}
 
         batch = self.memory.sample(self.cfg.agent_params.batch_size)
         custom_loss_fn = signals.get(self.component_id)
@@ -311,35 +311,28 @@ class DQN(Component):
         self.n_actions = context["plans"]["n_actions"]
 
         self._q_net_id = self.inputs[0]
-        self.eps_start = self.metadata["eps_start"]
-        self.eps_end = self.metadata["eps_end"]
-        self.eps_decay_steps = self.metadata["eps_decay_steps"]
-        self.step_count = 0
         self.update_count = 0
 
     def activate(self, activations):
         self.components[self._q_net_id].activate(activations)
         q_values = list(activations[self._q_net_id].values())[0]
-
-        epsilon = self._compute_epsilon()
         n = self.n_env_actions
+        activations["epsilon"] = epsilon(
+            self.cfg.run.experiment.episodes,
+            self.metadata["greedy_until"],
+            activations["internal_episode"],
+        )
 
-        def _eps_greedy(q_slice):
-            if np.random.random() < epsilon:
-                return np.random.randint(len(q_slice))
-            return int(np.argmax(q_slice))
+        if np.random.random() < activations["epsilon"]:
+            activations[self.component_id] = np.random.randint(len(q_values[:n]))
+            if n < self.n_actions:
+                activations["internal_action"] = np.random.randint(len(q_values[n:]))
+        else:
+            activations[self.component_id] = int(np.argmax(q_values[:n]))
+            if n < self.n_actions:
+                activations["internal_action"] = int(np.argmax(q_values[n:]))
 
-        activations[self.component_id] = _eps_greedy(q_values[:n])
-
-        if n < self.n_actions:
-            activations["internal_action"] = _eps_greedy(q_values[n:])
-
-        self.step_count += 1
-
-    def update(self, signals=None):
-        if signals is None:
-            signals = {}
-
+    def update(self, signals={}):
         q_net = self.components[self._q_net_id]
         gamma = self.cfg.agent_params.gamma
         loss_fn = q_net.loss_fn
@@ -380,16 +373,29 @@ class DQN(Component):
 
         signals[self._q_net_id] = bellman_loss
         report = q_net.update(signals)
-
+        report["episode"] = self.activations.get("episode", 0)
+        report["reward"] = float(self.activations.get("reward", 0.0))
+        report["explore_episodes"] = int(
+            self.cfg.run.experiment.episodes * self.metadata["greedy_until"]
+        )
+        report["epsilon"] = self.activations.get("epsilon", 0.0)
+        report["greedy_until"] = self.metadata["greedy_until"]
         self.update_count += 1
         if self.update_count % q_net.metadata["target_net_update_frequency"] == 0:
             q_net.update_target_net()
 
         return report
 
-    def _compute_epsilon(self):
-        decay_rate = (self.eps_start - self.eps_end) / self.eps_decay_steps
-        return max(self.eps_end, self.eps_start - self.step_count * decay_rate)
+
+def epsilon(max_episodes, greedy_until, episode):
+    """Epsilon-greedy epsilon, decaying linearly to greedy.
+
+    Explores from episode 0 up to greedy_until * total_episodes, then
+    exploits fully. greedy_until=0.0 means always greedy (pure exploitation).
+    """
+    explore_episodes = max(int(max_episodes * greedy_until), 1)
+    epsilon = max(1.0 - episode / explore_episodes, 0.0)
+    return epsilon
 
 
 class ModelBased(Component):

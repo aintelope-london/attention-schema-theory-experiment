@@ -14,7 +14,6 @@ from aintelope.config.config_utils import (
     archive_code,
     set_console_title,
     prepare_experiment_cfg,
-    init_config,
     to_picklable,
     from_picklable,
 )
@@ -22,15 +21,15 @@ from aintelope.experiment import run_experiment
 from aintelope.utils.seeding import set_global_seeds
 from aintelope.utils.progress import ProgressReporter
 from aintelope.utils.concurrency import find_workers
-from aintelope.analytics.analytics import analyze, write_analytics
+from aintelope.analytics.analytics import analyze
 from aintelope.analytics.recording import write_results
 
 
 def run_trial(cfg_dict, main_config_dict, i_trial):
-    """Run all experiments for a single trial.
+    """Run all experiment blocks for a single trial.
 
+    Returns {block_name: {events, states, learning_df, manifesto, cfg_dict}}.
     Args must be dicts for multiprocessing pickling.
-    Returns dict with configs, events, states, learning_dfs, and manifestos.
     """
     cfg = from_picklable(cfg_dict)
     main_config = from_picklable(main_config_dict)
@@ -38,52 +37,30 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
     trial_seed = cfg.run.seed + i_trial
     set_global_seeds(trial_seed)
 
-    configs = []
-    all_events = []
-    all_states = []
-    all_learning = []
-    all_manifestos = []
-
-    for _, experiment_name in enumerate(main_config):
+    trial_results = {}
+    for experiment_name in main_config:
         experiment_cfg = prepare_experiment_cfg(
             cfg, main_config[experiment_name], experiment_name, trial_seed
         )
         reporter = ProgressReporter(["episode"], on_update=None)
-
-        result = run_experiment(
-            experiment_cfg,
-            i_trial=i_trial,
-            reporter=reporter,
-        )
-
-        all_events.append(result["events"])
-        all_states.append(result["states"])
-        all_learning.append(result["learning_df"])
-        all_manifestos.append(result["manifesto"])
-        configs.append(experiment_cfg)
-
-    return {
-        "configs": configs,
-        "events": all_events,
-        "states": all_states,
-        "learning": all_learning,
-        "manifestos": all_manifestos,
-    }
+        result = run_experiment(experiment_cfg, i_trial=i_trial, reporter=reporter)
+        trial_results[experiment_name] = {
+            "events": result["events"],
+            "states": result["states"],
+            "learning_df": result["learning_df"],
+            "manifesto": result["manifesto"],
+            "cfg_dict": to_picklable(experiment_cfg),
+        }
+    return trial_results
 
 
-def run_experiments(main_config):
+def run_experiments(cfg, main_config):
     """Main orchestrator entry point."""
-    cfg = init_config(main_config)
     set_console_title(cfg.run.outputs_dir)
 
-    configs = []
-    all_events = []
-    all_states = []
-    all_learning = []
-    all_manifestos = []
+    block_data = {}
 
     workers = find_workers(cfg.run.max_workers, cfg.run.trials)
-
     cfg_dict = to_picklable(cfg)
     main_config_dict = to_picklable(main_config)
 
@@ -95,12 +72,24 @@ def run_experiments(main_config):
             for i_trial in range(cfg.run.trials)
         }
         for future in as_completed(futures):
-            result = future.result()
-            configs.extend(result["configs"])
-            all_events.extend(result["events"])
-            all_states.extend(result["states"])
-            all_learning.extend(result["learning"])
-            all_manifestos.extend(result["manifestos"])
+            for block_name, data in future.result().items():
+                if block_name not in block_data:
+                    block_data[block_name] = {
+                        "events": [],
+                        "states": [],
+                        "learning": [],
+                        "manifesto": None,
+                        "cfg_dict": None,
+                    }
+                block_data[block_name]["events"].append(data["events"])
+                block_data[block_name]["states"].append(data["states"])
+                block_data[block_name]["learning"].append(data["learning_df"])
+                block_data[block_name]["manifesto"] = (
+                    block_data[block_name]["manifesto"] or data["manifesto"]
+                )
+                block_data[block_name]["cfg_dict"] = (
+                    block_data[block_name]["cfg_dict"] or data["cfg_dict"]
+                )
         executor.shutdown(wait=True)
     except KeyboardInterrupt:
         for p in executor._processes.values():
@@ -108,24 +97,29 @@ def run_experiments(main_config):
         executor.shutdown(wait=False, cancel_futures=True)
         raise
 
-    combined_events = pd.concat(all_events, ignore_index=True)
-    combined_learning = (
-        pd.concat(all_learning, ignore_index=True) if all_learning else pd.DataFrame()
-    )
+    results = {
+        block: {
+            "events": pd.concat(data["events"], ignore_index=True),
+            "states": data["states"],
+            "learning_df": pd.concat(data["learning"], ignore_index=True)
+            if data["learning"]
+            else pd.DataFrame(),
+            "manifesto": data["manifesto"],
+            "cfg": from_picklable(data["cfg_dict"]),
+        }
+        for block, data in block_data.items()
+    }
 
-    manifesto = all_manifestos[0] if all_manifestos else None
-    analytics_result = analyze(cfg, combined_events, combined_learning, manifesto)
+    analytics = analyze(results)
 
     if cfg.run.write_outputs:
+        all_events = [ev for data in block_data.values() for ev in data["events"]]
+        all_states = [st for data in block_data.values() for st in data["states"]]
         write_results(cfg.run.outputs_dir, all_events, all_states)
         archive_code(cfg)
-        write_analytics(analytics_result, folder=cfg.run.outputs_dir)
 
     return {
         "outputs_dir": cfg.run.outputs_dir,
-        "configs": configs,
-        "events": all_events,
-        "states": all_states,
-        "analytics": analytics_result.metrics,
-        "result": analytics_result,
+        "results": results,
+        "analytics": analytics,
     }
