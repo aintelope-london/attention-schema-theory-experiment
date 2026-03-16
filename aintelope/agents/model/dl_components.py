@@ -344,7 +344,8 @@ class DQN(Component):
             next_state_inputs = {f: tensors[f"next_{f}"] for f in net.inputs}
 
             q_values = list(net(state_inputs).values())[0]  # (batch, n_actions)
-            q_next = list(target_net(next_state_inputs).values())[0]
+            with torch.no_grad():
+                q_next = list(target_net(next_state_inputs).values())[0]
 
             reward = tensors["reward"].squeeze(1)
             mask = 1.0 - tensors["done"].squeeze(1)

@@ -36,8 +36,7 @@ from aintelope.analytics.recording import (
 # ── Render helpers ────────────────────────────────────────────────────────────
 
 
-def plot(series_by_label, x_label, y_label, title, ref_line=None):
-    """Multi-series mean±std band plot. Returns Figure."""
+def plot(series_by_label, x_label, y_label, title, ref_line=None, yscale="linear"):
     figure, ax = create_figure()
     for i, (label, (x, mean, std)) in enumerate(series_by_label.items()):
         plot_band(ax, x, mean, std, label=label, color=get_color(i))
@@ -47,6 +46,7 @@ def plot(series_by_label, x_label, y_label, title, ref_line=None):
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
     ax.set_title(title)
+    ax.set_yscale(yscale)
     if series_by_label or ref_line:
         ax.legend()
     ax.figure.tight_layout()
