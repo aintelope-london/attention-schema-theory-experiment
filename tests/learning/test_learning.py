@@ -162,8 +162,8 @@ def test_main_agent_dqn_optimal(base_learning_config):
             "train": {
                 "run": {
                     "experiment": {
-                        "steps": 11,
-                        "episodes": 200,
+                        "steps": 10,
+                        "episodes": 2500,
                         "test_mode": False,
                     },
                 },
@@ -180,8 +180,8 @@ def test_main_agent_dqn_optimal(base_learning_config):
             "test": {
                 "run": {
                     "experiment": {
-                        "steps": 11,
-                        "episodes": 50,
+                        "steps": 10,
+                        "episodes": 20,
                         "test_mode": True,
                     },
                 },

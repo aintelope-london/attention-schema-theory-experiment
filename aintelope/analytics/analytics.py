@@ -8,7 +8,8 @@ analyze(results) iterates cfg.run.analytics, calls each library function,
 and returns {name: {block: result}} for test assertions.
 
 Each library function receives the full results dict, computes its analytic,
-writes its own outputs, and returns computed data keyed by block name.
+writes its own outputs (figures, CSVs), and sends text sections to
+diagnostics.collector. Returns computed data keyed by block name.
 
 results shape: {block_name: {events, states, learning_df, manifesto, cfg}}
 """
@@ -18,6 +19,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from aintelope.analytics.diagnostics import collector
 from aintelope.analytics.plotting import (
     aggregate_series,
     collapse,
@@ -54,7 +56,7 @@ def plot(series_by_label, x_label, y_label, title, ref_line=None, yscale="linear
 
 
 def text(title, rows):
-    """Formatted text block for report.txt."""
+    """Formatted text block for report sections."""
     bar = "─" * 50
     header = f"── {title} " + bar[len(title) + 4 :]
     return "\n".join([header] + rows)
@@ -73,15 +75,6 @@ def _write_figure(results, name, fig):
         path = Path(cfg.run.outputs_dir) / f"{name}.png"
         path.parent.mkdir(parents=True, exist_ok=True)
         save_figure(fig, path)
-
-
-def _write_text(results, txt):
-    cfg = _cfg(results)
-    if cfg.run.write_outputs:
-        path = Path(cfg.run.outputs_dir) / "report.txt"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "a") as f:
-            f.write(txt + "\n\n")
 
 
 def _write_df(results, name, df):
@@ -204,7 +197,11 @@ def assert_learning_improvement(block_result):
 
 
 def report_optimal_policy(block_result):
-    """Print per-episode optimality table and assert mean efficiency >= threshold."""
+    """Print per-episode optimality table and assert mean efficiency >= threshold.
+
+    Printing here is for pytest terminal visibility only — the structured report
+    is already in report.txt via optimal_efficiency analytic.
+    """
     print("\n── Optimal Policy Report ─────────────────────────────")
     for ep in block_result["per_episode"]:
         dist = ep["spawn_dist"] if ep["spawn_dist"] is not None else "?"
@@ -279,7 +276,7 @@ def run_summary(results, params):
             lines.append(f"Training: {' | '.join(train_parts)}")
         lines_all += lines + [""]
         out[block] = lines
-    _write_text(results, text("Run Summary", lines_all))
+    collector.collect({"Run Summary": text("Run Summary", lines_all)})
     return out
 
 
@@ -313,7 +310,7 @@ def learning_improvement(results, params):
             else f"  {block}: {status}  start={start_avg:.3f} → end={end_avg:.3f}"
         )
         out[block] = block_result
-    _write_text(results, text("Learning Improvement", lines))
+    collector.collect({"Learning Improvement": text("Learning Improvement", lines)})
     return out
 
 
@@ -399,6 +396,7 @@ def steps_to_reward(results, params):
 def optimal_efficiency(results, params):
     min_efficiency_pct = params.get("min_efficiency_pct", 0.70) * 100
     out = {}
+    report_lines = []
     for block, data in results.items():
         per_episode = _per_episode_efficiency(
             data["events"], data["manifesto"]["food_ind"]
@@ -411,6 +409,25 @@ def optimal_efficiency(results, params):
             "n_episodes": len(per_episode),
             "min_efficiency_pct": min_efficiency_pct,
         }
+        report_lines.append(f"Block: {block}")
+        for ep in per_episode:
+            dist = ep["spawn_dist"] if ep["spawn_dist"] is not None else "?"
+            steps = ep["steps_to_goal"] if ep["steps_to_goal"] is not None else "never"
+            eff = (
+                f"{ep['efficiency'] * 100:.0f}%"
+                if ep["efficiency"] is not None
+                else "N/A"
+            )
+            report_lines.append(
+                f"  Episode {ep['episode']:>4}: spawn_dist={dist}, steps_to_goal={steps}, efficiency={eff}"
+            )
+        n = len(per_episode)
+        eff_str = f"{mean_eff:.1f}%" if mean_eff is not None else "N/A"
+        report_lines.append(f"  Efficiency: {eff_str} (mean over {n} episodes)")
+        report_lines.append("")
+    collector.collect(
+        {"Optimal Policy Report": text("Optimal Policy Report", report_lines)}
+    )
     return out
 
 

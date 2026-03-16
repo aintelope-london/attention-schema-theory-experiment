@@ -6,7 +6,9 @@
 # https://github.com/aintelope-london/attention-schema-theory-experiment
 
 import multiprocessing
+import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib import Path
 
 import pandas as pd
 
@@ -17,18 +19,19 @@ from aintelope.config.config_utils import (
     to_picklable,
     from_picklable,
 )
+from aintelope.analytics.diagnostics import collector
 from aintelope.experiment import run_experiment
 from aintelope.utils.seeding import set_global_seeds
 from aintelope.utils.progress import ProgressReporter
 from aintelope.utils.concurrency import find_workers
 from aintelope.analytics.analytics import analyze
-from aintelope.analytics.recording import write_results
+from aintelope.analytics.recording import write_results, write_csv
 
 
 def run_trial(cfg_dict, main_config_dict, i_trial):
     """Run all experiment blocks for a single trial.
 
-    Returns {block_name: {events, states, learning_df, manifesto, cfg_dict}}.
+    Returns {block_name: {events, states, learning_df, performance_df, manifesto, cfg_dict}}.
     Args must be dicts for multiprocessing pickling.
     """
     cfg = from_picklable(cfg_dict)
@@ -48,6 +51,7 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
             "events": result["events"],
             "states": result["states"],
             "learning_df": result["learning_df"],
+            "performance_df": result["performance_df"],
             "manifesto": result["manifesto"],
             "cfg_dict": to_picklable(experiment_cfg),
         }
@@ -56,6 +60,11 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
 
 def run_experiments(cfg, main_config):
     """Main orchestrator entry point."""
+    t0 = time.monotonic()
+
+    if cfg.run.write_outputs:
+        collector.init(cfg.run.outputs_dir)
+
     set_console_title(cfg.run.outputs_dir)
 
     block_data = {}
@@ -78,12 +87,14 @@ def run_experiments(cfg, main_config):
                         "events": [],
                         "states": [],
                         "learning": [],
+                        "performance": [],
                         "manifesto": None,
                         "cfg_dict": None,
                     }
                 block_data[block_name]["events"].append(data["events"])
                 block_data[block_name]["states"].append(data["states"])
                 block_data[block_name]["learning"].append(data["learning_df"])
+                block_data[block_name]["performance"].append(data["performance_df"])
                 block_data[block_name]["manifesto"] = (
                     block_data[block_name]["manifesto"] or data["manifesto"]
                 )
@@ -112,11 +123,31 @@ def run_experiments(cfg, main_config):
 
     analytics = analyze(results)
 
-    if cfg.run.write_outputs:
-        all_events = [ev for data in block_data.values() for ev in data["events"]]
-        all_states = [st for data in block_data.values() for st in data["states"]]
-        write_results(cfg.run.outputs_dir, all_events, all_states)
-        archive_code(cfg)
+    try:
+        if cfg.run.write_outputs:
+            all_events = [ev for data in block_data.values() for ev in data["events"]]
+            all_states = [st for data in block_data.values() for st in data["states"]]
+            write_results(cfg.run.outputs_dir, all_events, all_states)
+
+            for block_name, data in block_data.items():
+                if data["performance"]:
+                    perf_df = pd.concat(data["performance"], ignore_index=True)
+                    write_csv(
+                        Path(cfg.run.outputs_dir)
+                        / block_name
+                        / "performance_report.csv",
+                        perf_df,
+                    )
+
+            archive_code(cfg)
+    finally:
+        if cfg.run.write_outputs:
+            elapsed = time.monotonic() - t0
+            m, s = divmod(int(elapsed), 60)
+            h, m = divmod(m, 60)
+            runtime_str = f"{h}h {m}m {s}s" if h else f"{m}m {s}s"
+            collector.collect({"_elapsed": runtime_str})
+            collector.finalize(cfg.run.outputs_dir)
 
     return {
         "outputs_dir": cfg.run.outputs_dir,
