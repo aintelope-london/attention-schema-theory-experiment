@@ -130,17 +130,22 @@ class ResourceMonitor:
             ]
         )
 
+    def to_dataframe(self):
+        """Return resource snapshots as a DataFrame."""
+        return pd.DataFrame(self._rows, columns=COLUMNS)
+
     def report(self):
         """Print console report."""
-        df = pd.DataFrame(self._rows, columns=COLUMNS)
-        system = {
-            "ram_mb": self._ram_mb,
-            "cpus": self._cpus,
-            "gpu_mb": self._gpu_mb,
-        }
-        _print_report(df, system, self._context)
+        _print_report(
+            self.to_dataframe(),
+            {
+                "ram_mb": self._ram_mb,
+                "cpus": self._cpus,
+                "gpu_mb": self._gpu_mb,
+            },
+            self._context,
+        )
 
     def save(self, folder):
         """Write performance_report.csv."""
-        df = pd.DataFrame(self._rows, columns=COLUMNS)
-        write_csv(Path(folder) / "performance_report.csv", df)
+        write_csv(Path(folder) / "performance_report.csv", self.to_dataframe())

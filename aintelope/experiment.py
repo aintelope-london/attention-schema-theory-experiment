@@ -76,6 +76,7 @@ def run_experiment(
             "events": events.to_dataframe(),
             "states": states.to_dataframe(),
             "learning_df": monitor.learning_dataframe(),
+            "performance_df": monitor.performance_dataframe(),
             "manifesto": env.manifesto,
         }
 
@@ -108,9 +109,6 @@ def run_experiment(
 
         # Iterations within the episode
         for step in range(cfg.run.experiment.steps):
-            # Collect actions. Each agent returns a dict with at least {"action": int}.
-            # Additional keys (e.g. viewport masks) flow to the env via step_parallel.
-            # Legacy SB3 agents return a plain int — wrapped here for uniform contract.
             pre_step_infos = infos
 
             actions = {}
@@ -142,7 +140,6 @@ def run_experiment(
                     scores,
                     terminateds,
                     truncateds,
-                    infos,
                 ) = env.step_sequential(actions)
 
             dones = {aid: terminateds[aid] or truncateds[aid] for aid in terminateds}
@@ -158,7 +155,6 @@ def run_experiment(
                     report = agent.update(observation=observation, done=done)
                     monitor.sample_learning(i_episode, step, report)
 
-                # Record event — experiment.py owns the log format.
                 agent_pre_info = pre_step_infos.get(agent.id, {})
                 env_step_info = [score.get(dim, 0) for dim in score_dims]
                 events.log_event(
@@ -181,9 +177,6 @@ def run_experiment(
                     + env_step_info
                 )
 
-            # Record global board state once per step.
-            # aux_mask is assembled by the env from agents' returned masks —
-            # no ROI geometry logic lives in experiment.
             board, layer_order, aux_mask = env.board_state()
             states.log(
                 [
@@ -195,13 +188,11 @@ def run_experiment(
                 ]
             )
 
-            # Break when all agents are done
             if all(dones.values()):
                 break
 
         monitor.sample("steps")
 
-        # Periodic checkpoint (overwrites)
         if cfg.run.write_outputs and save_freq > 0 and (i_episode + 1) % save_freq == 0:
             for agent in agents:
                 agent.save_model(
@@ -212,7 +203,6 @@ def run_experiment(
     gc.collect()
     monitor.report()
     if cfg.run.write_outputs:
-        monitor.save_performance(Path(cfg.run.outputs_dir) / cfg.experiment_name)
         for agent in agents:
             agent.save_model(checkpoint_path(cfg.run.outputs_dir, agent.id, i_trial))
         from aintelope.gui.renderer import (
@@ -234,6 +224,7 @@ def run_experiment(
         "events": events.to_dataframe(),
         "states": states.to_dataframe(),
         "learning_df": monitor.learning_dataframe(),
+        "performance_df": monitor.performance_dataframe(),
         "manifesto": env.manifesto,
     }
 
@@ -287,7 +278,6 @@ def _run_sb3_training(cfg, i_trial, env, agents, events, states, monitor):
     gc.collect()
     monitor.report()
     if cfg.run.write_outputs:
-        monitor.save_performance(Path(cfg.run.outputs_dir) / cfg.experiment_name)
         agents[0].save_model(
             checkpoint_path(cfg.run.outputs_dir, agents[0].id, i_trial), i_trial=i_trial
         )
