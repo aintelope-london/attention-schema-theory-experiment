@@ -149,11 +149,8 @@ def run_experiment(
                 observation = observations[agent.id]
                 score = scores[agent.id]
                 done = dones[agent.id]
-                if terminateds[agent.id] and not cfg.run.experiment.test_mode:
-                    observation = None
-                else:
-                    report = agent.update(observation=observation, done=done)
-                    monitor.sample_learning(i_episode, step, report)
+                report = agent.update(observation=observation, done=done)
+                monitor.sample_learning(i_episode, step, report)
 
                 agent_pre_info = pre_step_infos.get(agent.id, {})
                 env_step_info = [score.get(dim, 0) for dim in score_dims]

@@ -285,6 +285,9 @@ class GridworldZooBaseEnv:
         # TODO!: fix that on the gridworld implementation side
         self.super_initargs["max_iterations"] *= self.super_initargs["amount_agents"]
 
+        # JOEL's
+        self._goal = self.metadata.get("goal", None)
+
         self._observation_direction_mode = self.metadata["observation_direction_mode"]
         if self._observation_direction_mode == -1:
             self.super_initargs["observation_direction_mode"] = 0
@@ -425,6 +428,15 @@ class GridworldZooBaseEnv:
             }
 
         qqq = True  # for debugging
+
+    # Used to create more goals than just steps ending: JOEL
+    def _apply_goal(self, infos, terminateds):
+        if self._goal is None:
+            return
+        for agent, info in infos.items():
+            reward_dict = info[INFO_REWARD_DICT]
+            if self._goal == "reach_food" and reward_dict.get("FOOD", 0) > 0:
+                terminateds[agent] = True
 
     # this method has no side effects
     def transform_observation(
@@ -954,6 +966,7 @@ class SavannaGridworldParallelEnv(GridworldZooBaseEnv, GridworldZooParallelEnv):
         )
         infos = self.format_infos(infos)
         self._last_infos = infos
+        self._apply_goal(infos, terminateds)  # JOEL
 
         rewards2 = {}
         # transform observations and rewards
@@ -1247,6 +1260,11 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
 
         terminated = self.terminations[agent]
         truncated = self.truncations[agent]
+        single_infos = {agent: self._last_infos[agent]}
+        single_terminateds = {agent: terminated}
+        self._apply_goal(single_infos, single_terminateds)
+        terminated = single_terminateds[agent]
+        self.terminations[agent] = terminated
 
         if self._override_infos:
             step_agent_info = {}
@@ -1371,6 +1389,9 @@ class SavannaGridworldSequentialEnv(GridworldZooBaseEnv, GridworldZooAecEnv):
 
         terminateds = self.terminations
         truncateds = self.truncations
+        self._apply_goal(infos, terminateds)
+        for agent, term in terminateds.items():
+            self.terminations[agent] = term
 
         if self._override_infos:
             infos = {agent: {} for agent in infos.keys()}
