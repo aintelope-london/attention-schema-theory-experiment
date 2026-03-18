@@ -180,14 +180,14 @@ def test_main_agent_dqn_optimal(base_learning_config):
                 "env_params": {
                     "map_max": 4,
                     "combine_interoception_and_vision": False,
-                    "env_layout_seed_repeat_sequence_length": 12,
+                    "env_layout_seed_repeat_sequence_length": 24,
                 },
             },
             "test": {
                 "run": {
                     "experiment": {
                         "steps": 10,
-                        "episodes": 25,
+                        "episodes": 50,
                         "test_mode": True,
                     },
                 },

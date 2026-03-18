@@ -130,36 +130,23 @@ def _dist_to_nearest(vision, channel):
 
 
 def _per_episode_efficiency(events, food_ind):
-    """Per-episode efficiency list. Only deserializes step-0 observations."""
+    """Per-episode efficiency list."""
     step0 = filter_events(events, Step=0)
     steps_by_ep = first_reward(events).groupby("Episode")["steps_to_reward"].min()
+
     per_episode = []
     for episode in sorted(events["Episode"].unique()):
-        row0 = step0[step0["Episode"] == episode]
-        spawn_dist = None
-        if not row0.empty:
-            obs = row0.iloc[0]["Observation"]
-            if obs is not None:
-                spawn_dist = _dist_to_nearest(obs["vision"], food_ind)
-        steps_to_goal = (
-            int(steps_by_ep[episode]) if episode in steps_by_ep.index else None
-        )
-        if spawn_dist is None:
-            efficiency = None
-        elif steps_to_goal is None:
-            efficiency = 0.0
-        elif steps_to_goal == 0 or spawn_dist == 0:
-            efficiency = 1.0
-        else:
-            efficiency = min(1.0, spawn_dist / steps_to_goal)
-        per_episode.append(
-            {
-                "episode": int(episode),
-                "spawn_dist": spawn_dist,
-                "steps_to_goal": steps_to_goal,
-                "efficiency": efficiency,
-            }
-        )
+        row = step0[step0["Episode"] == episode].iloc[0]
+        spawn_dist = abs(row["Position"][0] - row["Food_position"][0]) + abs(row["Position"][1] - row["Food_position"][1])
+        steps_to_goal = int(steps_by_ep[episode]) if episode in steps_by_ep.index else float("inf")
+        efficiency = 1.0 if steps_to_goal == 0 else min(1.0, spawn_dist / steps_to_goal)
+
+        per_episode.append({
+            "episode": int(episode),
+            "spawn_dist": spawn_dist,
+            "steps_to_goal": steps_to_goal,
+            "efficiency": efficiency,
+        })
     return per_episode
 
 
