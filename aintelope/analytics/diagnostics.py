@@ -28,7 +28,8 @@ class ReportCollector:
         collector.collect({"Title": "text"}) # anywhere in the system
         collector.finalize(outputs_dir)      # writes report.txt, end of run
 
-    Reserved key: '_elapsed' — rendered as a header line, not a titled section.
+    Reserved keys: '_elapsed' — rendered as a header line, not a titled section.
+                   '_config'  — rendered as the third titled section.
     All other keys become titled sections in insertion order.
     The raw stdout buffer is appended at the bottom of report.txt.
     """
@@ -57,14 +58,18 @@ class ReportCollector:
         stdout_content = self._buf.getvalue()
         self._buf.close()
 
+        bar = "─" * 50
         parts = []
         if "_elapsed" in self._sections:
             parts.append(f"Runtime: {self._sections['_elapsed']}\n")
-        for title, content in self._sections.items():
-            if title.startswith("_"):
-                continue
+        regular = [(k, v) for k, v in self._sections.items() if not k.startswith("_")]
+        for title, content in regular[:2]:
             parts.append(content + "\n")
-        bar = "─" * 50
+        if "_config" in self._sections:
+            parts.append(f"── Config {bar[9:]}\n")
+            parts.append(self._sections["_config"] + "\n")
+        for title, content in regular[2:]:
+            parts.append(content + "\n")
         parts.append(f"── stdout {bar[9:]}\n")
         parts.append(stdout_content)
 

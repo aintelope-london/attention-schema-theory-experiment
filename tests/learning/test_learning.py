@@ -12,7 +12,7 @@ from aintelope.analytics.analytics import (
 )
 
 
-@pytest.mark.skip
+@pytest.mark.skip(reason="SB3 PPO shows learning improvement on 4x4 map, 300 episodes")
 def test_sb3_ppo_learns(base_learning_config):
     """SB3 PPO agent shows learning improvement over training."""
     cfg = OmegaConf.merge(
@@ -28,11 +28,9 @@ def test_sb3_ppo_learns(base_learning_config):
                 "agent_params": {
                     "agent_0": {"agent_class": "sb3_ppo_agent"},
                     "num_conv_layers": 0,
-                    "learning_rate": 0.0005,
                     "ppo_n_steps": 10,
                 },
                 "env_params": {
-                    "map_max": 4,
                     "combine_interoception_and_vision": True,
                     "env_layout_seed_repeat_sequence_length": 12,
                 },
@@ -43,7 +41,9 @@ def test_sb3_ppo_learns(base_learning_config):
     assert_learning_improvement(result["analytics"]["learning_improvement"]["train"])
 
 
-@pytest.mark.skip
+@pytest.mark.skip(
+    reason="DQN (no ROI) shows learning improvement on 4x4 map, 500 episodes"
+)
 def test_dqn_learns(base_learning_config):
     """main_agent with DQN, roi_mode=null (vestigial ROI channel, no cone)."""
     cfg = OmegaConf.merge(
@@ -58,10 +58,8 @@ def test_dqn_learns(base_learning_config):
                 },
                 "agent_params": {
                     "roi_mode": None,
-                    "learning_rate": 0.0005,
                 },
                 "env_params": {
-                    "map_max": 4,
                     "combine_interoception_and_vision": False,
                     "env_layout_seed_repeat_sequence_length": 12,
                 },
@@ -72,7 +70,9 @@ def test_dqn_learns(base_learning_config):
     assert_learning_improvement(result["analytics"]["learning_improvement"]["train"])
 
 
-@pytest.mark.skip
+@pytest.mark.skip(
+    reason="DQN + ROI cone shows learning improvement on 4x4 map, 1000 episodes"
+)
 def test_dqn_roi_learns(base_learning_config):
     """main_agent with DQN + active ROI cone."""
     cfg = OmegaConf.merge(
@@ -87,10 +87,8 @@ def test_dqn_roi_learns(base_learning_config):
                 },
                 "agent_params": {
                     "roi_mode": "cone",
-                    "learning_rate": 0.0005,
                 },
                 "env_params": {
-                    "map_max": 4,
                     "combine_interoception_and_vision": False,
                     "env_layout_seed_repeat_sequence_length": 12,
                 },
@@ -116,7 +114,6 @@ def test_model_based_learns(base_learning_config):
                 },
                 "agent_params": {
                     "roi_mode": None,
-                    "learning_rate": 0.0005,
                     "agent_0": {
                         "architecture": {
                             "action": {
@@ -139,7 +136,6 @@ def test_model_based_learns(base_learning_config):
                     },
                 },
                 "env_params": {
-                    "map_max": 4,
                     "combine_interoception_and_vision": False,
                     "env_layout_seed_repeat_sequence_length": 12,
                 },
@@ -152,7 +148,7 @@ def test_model_based_learns(base_learning_config):
 
 # @pytest.mark.skip()
 def test_main_agent_dqn_optimal(base_learning_config):
-    """DQN agent reaches near-optimal policy on simple scenario.
+    """DQN (no ROI) reaches near-optimal food-finding on 4x4 map.
 
     Two-block run: train block builds the policy, test block measures it
     at zero epsilon (pure exploitation) so efficiency is not noise-floored.
@@ -175,10 +171,8 @@ def test_main_agent_dqn_optimal(base_learning_config):
                 },
                 "agent_params": {
                     "roi_mode": None,
-                    "learning_rate": 0.0005,
                 },
                 "env_params": {
-                    "map_max": 4,
                     "combine_interoception_and_vision": False,
                     "env_layout_seed_repeat_sequence_length": 24,
                 },
@@ -203,9 +197,9 @@ def test_main_agent_dqn_optimal(base_learning_config):
     report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
 
 
-@pytest.mark.skip()
+@pytest.mark.skip(reason="DQN + ROI cone reaches near-optimal food-finding on 5x5 map")
 def test_roi_agent_dqn_optimal(base_learning_config):
-    """DQN agent reaches near-optimal policy on simple scenario.
+    """DQN + ROI cone reaches near-optimal policy on simple scenario.
 
     Two-block run: train block builds the policy, test block measures it
     at zero epsilon (pure exploitation) so efficiency is not noise-floored.
@@ -228,7 +222,6 @@ def test_roi_agent_dqn_optimal(base_learning_config):
                 },
                 "agent_params": {
                     "roi_mode": "cone",
-                    "learning_rate": 0.0005,
                 },
                 "env_params": {
                     "map_max": 5,

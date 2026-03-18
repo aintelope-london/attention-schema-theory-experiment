@@ -11,6 +11,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import pandas as pd
+from omegaconf import OmegaConf
 
 from aintelope.config.config_utils import (
     archive_code,
@@ -64,6 +65,7 @@ def run_experiments(cfg, main_config):
 
     if cfg.run.write_outputs:
         collector.init(cfg.run.outputs_dir)
+        collector.collect({"_config": OmegaConf.to_yaml(main_config)})
 
     set_console_title(cfg.run.outputs_dir)
 

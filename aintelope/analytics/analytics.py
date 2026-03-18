@@ -137,16 +137,22 @@ def _per_episode_efficiency(events, food_ind):
     per_episode = []
     for episode in sorted(events["Episode"].unique()):
         row = step0[step0["Episode"] == episode].iloc[0]
-        spawn_dist = abs(row["Position"][0] - row["Food_position"][0]) + abs(row["Position"][1] - row["Food_position"][1])
-        steps_to_goal = int(steps_by_ep[episode]) if episode in steps_by_ep.index else float("inf")
+        spawn_dist = abs(row["Position"][0] - row["Food_position"][0]) + abs(
+            row["Position"][1] - row["Food_position"][1]
+        )
+        steps_to_goal = (
+            int(steps_by_ep[episode]) if episode in steps_by_ep.index else float("inf")
+        )
         efficiency = 1.0 if steps_to_goal == 0 else min(1.0, spawn_dist / steps_to_goal)
 
-        per_episode.append({
-            "episode": int(episode),
-            "spawn_dist": spawn_dist,
-            "steps_to_goal": steps_to_goal,
-            "efficiency": efficiency,
-        })
+        per_episode.append(
+            {
+                "episode": int(episode),
+                "spawn_dist": spawn_dist,
+                "steps_to_goal": steps_to_goal,
+                "efficiency": efficiency,
+            }
+        )
     return per_episode
 
 
