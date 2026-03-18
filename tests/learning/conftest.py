@@ -24,8 +24,12 @@ def base_learning_config():
                         "steps": 10,
                     },
                 },
+                "agent_params": {
+                    "learning_rate": 0.0005,
+                },
                 "env_params": {
-                    "map_max": 5,
+                    "map_max": 4,
+                    "goal": None,
                 },
             }
         }

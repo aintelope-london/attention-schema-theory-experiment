@@ -38,7 +38,9 @@ class FoodInteroception(RewardScheme):
     """
 
     def activate(self, activations: dict, env_manifesto: dict) -> float:
-        interoception = activations.get("interoception", np.array([]))
+        interoception = activations.get(
+            "next_interoception", activations.get("interoception", np.array([]))
+        )
         if len(interoception) > 0 and interoception[0] > 0:
             return float(interoception[0])
         return 0.0
@@ -85,7 +87,9 @@ class Homeostasis(RewardScheme):
         self.satiation = 0.0
 
     def activate(self, activations: dict, env_manifesto: dict) -> float:
-        interoception = activations.get("interoception", np.array([]))
+        interoception = activations.get(
+            "next_interoception", activations.get("interoception", np.array([]))
+        )
         if len(interoception) > 0 and interoception[0] > 0:
             self.satiation = min(self.satiation + 10.0, 10.0)
         if self.satiation > -10.0:
