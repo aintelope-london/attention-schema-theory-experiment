@@ -32,6 +32,10 @@ run:
     optimal_efficiency:
       min_efficiency_pct: 0.70
     efficiency_curve: {}
+    visitation_heatmap:
+      n_windows: 2
+    action_distribution:
+      n_windows: 2
 agent_params:
   save_frequency: 50
   custom_model: ""                 # @ui file
@@ -42,32 +46,7 @@ agent_params:
   # Agents
   agent_0:
     agent_class: main_agent        # @ui str main_agent,random_agent,sb3_ppo_agent,sb3_a2c_agent
-    architecture:
-      # roi: pre-filters vision before any network sees it.
-      #   - Reads activations["internal_action"] from previous step (persists between steps).
-      #   - Darkens vision[:-1] outside cone, writes cone mask into vision[-1].
-      #   - Writes activations["roi"] (the viewport mask) for env blit via outputs below.
-      #   - n_internal_actions: 3 is declared here; fill_plans reads it generically
-      #     via entry.get("n_internal_actions", 0) to extend q_net's output vector.
-      #     No component names are mentioned in model.py — any future component
-      #     that contributes internal action slots declares n_internal_actions here too.
-      roi:
-        type: ROI
-        inputs: [internal_action]    # internal_action: written by DQN, persists in activations
-        outputs: [roi]               # surfaces activations["roi"] in get_action return dict
-        n_internal_actions: 3        # left / stay / right
-      # q_net: "roi" in inputs triggers ROI.activate() before the network runs.
-      #   Tensor inputs to the network are defined by DQN-NN plan source fields
-      #   (vision, interoception) -- vision is already ROI-ified at that point.
-      q_net:
-        type: DQN-NN
-        inputs: [roi, observation]   # roi -> DAG trigger; observation -> expands to modalities
-      action:
-        type: DQN
-        inputs: [q_net]
-      reward:
-        type: RewardInference
-        inputs: [observation]
+    model: basic_dqn_roi
   # SB3 model parameters
   num_conv_layers: 0               # @ui int 0 3
   learning_rate: 0.0003            # @ui float 0.0001 0.01
@@ -138,121 +117,3 @@ env_params:
   action_direction_mode: 1         
   test_death: False                # @ui bool
   seed: ${run.seed}
-models:
-    RewardInference:
-      metadata:
-        rewards: [FoodInteroception]
-        post_activate: True
-    DQN:
-      metadata:
-        q_network: DQN-NN
-        greedy_until: 0.7 # % of steps     
-    ModelBased:
-      metadata:
-        input:
-          dynamic: sae
-          value: state_value
-        num_simulations: 5
-        max_depth: 2
-        c_puct: 1.0
-    DQN-NN:
-      metadata:
-        optimizer: AdamW
-        optimizer_params:
-          lr: 0.001
-          amsgrad: True
-          weight_decay: 0.01
-        loss_function: SmoothL1Loss
-        target: [reward]
-        use_target_net: True
-        target_net_update_frequency: 100
-        tau: 0.05
-      architecture:
-        vision_net:
-          - {type: input, source: vision}
-          - {type: conv, size: 4, kernel: 1}
-          - {type: relu}
-          - {type: conv, size: 4, kernel: 3}
-          - {type: relu}
-          - {type: linear, size: 16}
-          - {type: relu}
-        interoception_net:
-          - {type: input, source: interoception}
-          - {type: linear, size: 4}
-          - {type: relu}
-        combined_net:
-          - {type: input, source: vision_net+interoception_net}
-          - {type: linear, size: 16}
-          - {type: relu}
-          - {type: linear, source: action}
-          - {type: output}
-    StateValue-NN:
-      metadata:
-        optimizer: Adam
-        optimizer_params:
-          lr: 0.0005
-        loss_function: MSELoss
-        target: [reward]
-        use_target_net: False
-      architecture:
-        vision_net:
-          - {type: input, source: vision}
-          - {type: conv, size: 8, kernel: 1}
-          - {type: relu}
-          - {type: conv, size: 8, kernel: 3}
-          - {type: relu}
-          - {type: linear, size: 16}
-          - {type: relu}
-        interoception_net:
-          - {type: input, source: interoception}
-          - {type: linear, size: 4}
-          - {type: relu}
-        combined_net:
-          - {type: input, source: vision_net+interoception_net}
-          - {type: linear, size: 8}
-          - {type: relu}
-          - {type: linear, size: 1}
-          - {type: output}
-    NextState-NN:
-      metadata:
-        optimizer: Adam
-        optimizer_params:
-          lr: 0.001
-        loss_function: MSELoss
-        target: [next_observation]
-        use_target_net: False
-        post_activate: True 
-      architecture:
-        vision_net:
-          - {type: input, source: vision}
-          - {type: conv, size: 8, kernel: 1}
-          - {type: relu}
-          - {type: conv, size: 8, kernel: 3}
-          - {type: relu}
-          - {type: linear, size: 16}
-          - {type: relu}
-        interoception_net:
-          - {type: input, source: interoception}
-          - {type: linear, size: 4}
-          - {type: relu}
-        encoder:
-          - {type: input, source: vision_net+interoception_net+action}
-          - {type: linear, size: 32}
-          - {type: relu}
-          - {type: linear, size: 16}
-          - {type: relu}
-          - {type: linear, size: 32}
-        vision_denet:
-          - {type: input, source: encoder}
-          - {type: linear, source: vision_encoded}
-          - {type: unflatten}
-          - {type: conv_transpose, size: 8, kernel: 3}
-          - {type: relu}
-          - {type: conv_transpose, source: vision, kernel: 1}
-          - {type: output}
-        interoception_denet:
-          - {type: input, source: encoder}
-          - {type: relu}
-          - {type: linear, size: 4}
-          - {type: linear, source: interoception}
-          - {type: output}

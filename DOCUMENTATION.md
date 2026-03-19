@@ -146,6 +146,19 @@ Config (yaml)
 
 Configs are saved per-block in a diff-style fashion: only the overrides are stored, not the full resolved config. This keeps the config architecture lean and composable, and lays the groundwork for future automated config generation (grid search, hyperparameter sweeps) where programmatic block construction needs to be straightforward.
 
+### Models library
+
+`models_library.yaml` is a protected config file (never overwritten by the GUI or experiment saves) that contains two top-level sections:
+
+- `models:` — library cards for all component types (optimizers, loss functions, network layer stacks). These are merged into `cfg.models` at load time and referenced by `type` fields in architecture entries.
+- `architectures:` — named connectome topologies. Each entry is a complete `architecture:` dict ready to be injected into an agent.
+
+`agent_0.model` in `default_config.yaml` holds the name of the chosen architecture (e.g., `basic_dqn_roi`). `init_config` resolves this name against the library and injects the corresponding architecture into `cfg.agent_params.agent_0.architecture` before any block overrides are applied. `model.py` is unaware of this indirection — it reads `cfg.agent_params[agent_id].architecture` and `cfg.models` as always.
+
+One model per experiment set — all blocks in a config share the same architecture. Switching models means choosing a different name in `agent_0.model`; there is no per-block model override.
+
+Currently available named architectures: `basic_dqn_roi`, `basic_dqn`, `model_based`.
+
 ### Custom OmegaConf resolvers
 
 Registered in `config_utils.register_resolvers()`:
@@ -189,6 +202,10 @@ run:
     optimal_efficiency:
       min_efficiency_pct: 0.70
     efficiency_curve: {}
+    visitation_heatmap:
+      n_windows: 2
+    action_distribution:
+      n_windows: 2
 ```
 
 Adding or removing an analytic from a run requires only a config change — no code modification. Per-block test overrides follow the same config merge path as all other parameters.
@@ -213,7 +230,7 @@ Two separate test suites with different purposes:
 
 ### `base_test_config` / `base_learning_config`
 
-Each suite has its own base fixture in its own `conftest.py`. Both provide a minimal single-block config diff on top of `default_config.yaml`. The only meaningful difference is `write_outputs`. Each test merges its own episode count, architecture, and env params on top of the base fixture — two config layers total, no third layer.
+Each suite has its own base fixture in its own `conftest.py`. Both provide a minimal single-block config diff on top of `default_config.yaml`. The only meaningful difference is `write_outputs`. Each test merges its own episode count, model, and env params on top of the base fixture — two config layers total, no third layer.
 
 ### Return value from `run()`
 
@@ -258,6 +275,8 @@ Each library function receives the complete `results` dict and its params, compu
 | `steps_to_reward` | `{figure}` | `steps_to_reward.png` |
 | `optimal_efficiency` | `{efficiency_pct, per_episode, n_episodes, min_efficiency_pct}` | — |
 | `efficiency_curve` | `{figure}` | `efficiency_curve.png` |
+| `visitation_heatmap` | `{block: {figure}}` | `visitation_heatmap_{block}.png` per block |
+| `action_distribution` | `{block: {figure}}` | `action_distribution_{block}.png` per block |
 
 ### Assertion helpers
 
@@ -293,6 +312,8 @@ When enabled, the run's timestamp folder contains:
 | `reward_curve.png` | `reward_curve` analytic | Per-update reward signal per block |
 | `steps_to_reward.png` | `steps_to_reward` analytic | Steps to first reward per block |
 | `efficiency_curve.png` | `efficiency_curve` analytic | Per-episode policy efficiency per block |
+| `visitation_heatmap_{block}.png` | `visitation_heatmap` analytic | Grid visitation count heatmap, early vs late episodes, one file per block |
+| `action_distribution_{block}.png` | `action_distribution` analytic | Action frequency bar charts, early vs late episodes, one file per block |
 | `{block}/events.csv` | `write_results()` | Full event log per experiment block |
 | `{block}/states.csv` | `write_results()` | Board state per step |
 | `{block}/performance_report.csv` | `DiagnosticsMonitor.save_performance()` | Resource snapshots |
@@ -372,6 +393,8 @@ ROI appends per-agent boolean attention masks to the vision component of each ag
 
 Because SB3's training loop bypasses `experiments.py`, the savanna wrapper applies ROI directly inside its PettingZoo-compatible `step()` method — ensuring SB3 agents receive ROI-augmented observations through their own training path.
 
+The ROI component works as follows: it reads `activations["internal_action"]` from the previous step (this value persists between steps via the activations dict), darkens `vision[:-1]` outside the cone, writes the cone mask into `vision[-1]`, and surfaces `activations["roi"]` as an output for the environment to blit. The `n_internal_actions: 3` declaration in the architecture entry is read generically by `fill_plans` via `entry.get("n_internal_actions", 0)` to extend the q_net's output vector — no component names are mentioned in `model.py`. Any future component that contributes internal action slots uses the same mechanism.
+
 ### 12. Savanna wrapper
 
 `savanna_wrapper.py` is the interface that allows the legacy savanna gridworld environment to work with the system's `AbstractEnv` contract. It is the sole file that imports from `savanna_safetygrid`. It translates savanna's PettingZoo-derived interface into the canonical MDP contract: dict-format observations `{"vision": ndarray, "interoception": ndarray}`, augmented infos with position and direction data, and a manifesto built on each reset. Legacy-format observations and PettingZoo compatibility are maintained through the `step()` method for SB3 agents.
@@ -409,7 +432,7 @@ Each agent's `architecture` is a dict of named components. Two keys are reserved
 
 Each entry has two fields:
 
-- `type`: references a library card in the `models:` config section, which defines the Python class, network layers, optimizer, loss function, and other parameters.
+- `type`: references a library card in `cfg.models` (populated from `models_library.yaml`), which defines the Python class, network layers, optimizer, loss function, and other parameters.
 - `inputs`: list of names. If a name matches a sibling key in the architecture, it's a component reference. If it matches `observation`, it expands to the environment's modality list from the manifesto. Otherwise, it's an observation field name.
 
 ```yaml
@@ -458,11 +481,11 @@ This design keeps responsibilities cleanly separated: strategy components define
 - `components`: the persistent dict of component objects. Components can access siblings through this dict (received at init via context).
 - `memory`: shared replay memory. All components read from it during learning. The field list is derived from observation shapes, architecture keys, and `done`.
 
-#### Library cards (`models:` config section)
+#### Library cards (`models_library.yaml` → `cfg.models`)
 
-Each component type has a library card defining its class, parameters, and (for NeuralNets) layer architecture. The `type` field in the architecture entry references a key in this section. Class resolution uses the naming convention: names containing `-NN` map to `NeuralNet`; others map to the class matching the type name.
+Each component type has a library card defining its class, parameters, and (for NeuralNets) layer architecture. The `type` field in the architecture entry references a key in `cfg.models`, which is populated at load time from `models_library.yaml`. Class resolution uses the naming convention: names containing `-NN` map to `NeuralNet`; others map to the class matching the type name.
 
-Library cards are defined separately from the architecture so that multiple components can share the same card (e.g. two NeuralNets with identical topology but different roles), and so that scientists can develop new cards without modifying the connectome framework.
+Library cards are defined separately from the architecture so that multiple components can share the same card (e.g. two NeuralNets with identical topology but different roles), and so that scientists can develop new cards without modifying the connectome framework. Adding a new card requires only an entry in `models_library.yaml` — no code changes.
 
 #### Component contract
 
@@ -472,5 +495,3 @@ All components implement the `Component` ABC:
 - `update(signals: dict = None) -> report or None`: propagate learning. Strategy components write loss closures into signals and call subcomponent `update`. NeuralNets execute training. Non-learning components return None.
 
 Components receive a `context` dict at init containing: `cfg`, `device`, `components`, `memory`, `activations`, `env_manifesto`, `agent_id`, `component_id`, `inputs` (expanded), and `plans` (the library card).
-
-<!-- Entries to be added step by step -->

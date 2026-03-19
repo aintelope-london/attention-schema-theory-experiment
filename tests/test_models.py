@@ -6,32 +6,50 @@ from omegaconf import OmegaConf, open_dict
 from aintelope.agents.model.model import Model
 from aintelope.environments import get_env_class
 
+from aintelope.config.config_utils import init_config
+
 
 @pytest.fixture
 def model_free_cfg():
-    cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
-    cfg = OmegaConf.merge(
-        cfg,
-        {
-            "env_params": {
-                "map_max": 5,
-                "combine_interoception_and_vision": False,
-            },
-            "agent_params": {
-                "roi_mode": None,
-                "agent_0": {"agent_class": "main_agent"},
-            },
-        },
-    )
-    with open_dict(cfg):
-        cfg.agent_params.agent_0.architecture = OmegaConf.create(
+    return init_config(
+        OmegaConf.create(
             {
-                "action": {"type": "DQN", "inputs": ["q_net"]},
-                "reward": {"type": "RewardInference", "inputs": ["observation"]},
-                "q_net": {"type": "DQN-NN", "inputs": ["observation"]},
+                "test": {
+                    "env_params": {
+                        "map_max": 5,
+                        "combine_interoception_and_vision": False,
+                    },
+                    "agent_params": {
+                        "roi_mode": None,
+                        "agent_0": {"agent_class": "main_agent", "model": "basic_dqn"},
+                    },
+                }
             }
         )
-    return cfg
+    )
+
+
+@pytest.fixture
+def model_based_cfg():
+    return init_config(
+        OmegaConf.create(
+            {
+                "test": {
+                    "env_params": {
+                        "map_max": 5,
+                        "combine_interoception_and_vision": False,
+                    },
+                    "agent_params": {
+                        "roi_mode": None,
+                        "agent_0": {
+                            "agent_class": "main_agent",
+                            "model": "model_based",
+                        },
+                    },
+                }
+            }
+        )
+    )
 
 
 @pytest.fixture
@@ -40,34 +58,6 @@ def model_free_env(model_free_cfg):
     e = env_cls(model_free_cfg)
     e.reset()
     return e
-
-
-@pytest.fixture
-def model_based_cfg():
-    cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
-    cfg = OmegaConf.merge(
-        cfg,
-        {
-            "env_params": {
-                "map_max": 5,
-                "combine_interoception_and_vision": False,
-            },
-            "agent_params": {
-                "roi_mode": None,
-                "agent_0": {"agent_class": "main_agent"},
-            },
-        },
-    )
-    with open_dict(cfg):
-        cfg.agent_params.agent_0.architecture = OmegaConf.create(
-            {
-                "action": {"type": "ModelBased", "inputs": ["dynamic", "value"]},
-                "reward": {"type": "RewardInference", "inputs": ["observation"]},
-                "dynamic": {"type": "NextState-NN", "inputs": ["observation"]},
-                "value": {"type": "StateValue-NN", "inputs": ["observation"]},
-            }
-        )
-    return cfg
 
 
 @pytest.fixture

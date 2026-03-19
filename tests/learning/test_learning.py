@@ -174,7 +174,8 @@ def test_main_agent_dqn_optimal(base_learning_config):
                 },
                 "env_params": {
                     "combine_interoception_and_vision": False,
-                    "env_layout_seed_repeat_sequence_length": 24,
+                    "env_layout_seed_repeat_sequence_length": 1,
+                    "goal": None,
                 },
             },
             "test": {
