@@ -32,6 +32,10 @@ run:
     optimal_efficiency:
       min_efficiency_pct: 0.70
     efficiency_curve: {}
+    visitation_heatmap:
+      n_windows: 2
+    action_distribution:
+      n_windows: 2
 agent_params:
   save_frequency: 50
   custom_model: ""                 # @ui file

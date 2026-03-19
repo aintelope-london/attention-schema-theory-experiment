@@ -189,6 +189,10 @@ run:
     optimal_efficiency:
       min_efficiency_pct: 0.70
     efficiency_curve: {}
+    visitation_heatmap:
+      n_windows: 2
+    action_distribution:
+      n_windows: 2
 ```
 
 Adding or removing an analytic from a run requires only a config change — no code modification. Per-block test overrides follow the same config merge path as all other parameters.
@@ -258,6 +262,8 @@ Each library function receives the complete `results` dict and its params, compu
 | `steps_to_reward` | `{figure}` | `steps_to_reward.png` |
 | `optimal_efficiency` | `{efficiency_pct, per_episode, n_episodes, min_efficiency_pct}` | — |
 | `efficiency_curve` | `{figure}` | `efficiency_curve.png` |
+| `visitation_heatmap` | `{block: {figure}}` | `visitation_heatmap_{block}.png` per block |
+| `action_distribution` | `{block: {figure}}` | `action_distribution_{block}.png` per block |
 
 ### Assertion helpers
 
@@ -293,6 +299,8 @@ When enabled, the run's timestamp folder contains:
 | `reward_curve.png` | `reward_curve` analytic | Per-update reward signal per block |
 | `steps_to_reward.png` | `steps_to_reward` analytic | Steps to first reward per block |
 | `efficiency_curve.png` | `efficiency_curve` analytic | Per-episode policy efficiency per block |
+| `visitation_heatmap_{block}.png` | `visitation_heatmap` analytic | Grid visitation count heatmap, early vs late episodes, one file per block |
+| `action_distribution_{block}.png` | `action_distribution` analytic | Action frequency bar charts, early vs late episodes, one file per block |
 | `{block}/events.csv` | `write_results()` | Full event log per experiment block |
 | `{block}/states.csv` | `write_results()` | Board state per step |
 | `{block}/performance_report.csv` | `DiagnosticsMonitor.save_performance()` | Resource snapshots |

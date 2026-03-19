@@ -24,8 +24,11 @@ from aintelope.analytics.plotting import (
     aggregate_series,
     collapse,
     create_figure,
+    create_figure_grid,
     get_color,
     plot_band,
+    render_bar,
+    render_heatmap,
     save_figure,
 )
 from aintelope.analytics.recording import (
@@ -116,6 +119,20 @@ def first_reward(events):
     first.columns = ["Episode", "Trial", "steps_to_reward"]
     return first
 
+def _episode_windows(episodes, n_windows):
+    """Split sorted episode list into n_windows roughly equal ranges.
+
+    Returns list of (label, frozenset) tuples.
+    """
+    eps = sorted(set(episodes))
+    size = max(1, len(eps) // n_windows)
+    windows = []
+    for i in range(n_windows):
+        start = i * size
+        end = start + size if i < n_windows - 1 else len(eps)
+        label = f"ep {eps[start]}–{eps[end - 1]}"
+        windows.append((label, frozenset(eps[start:end])))
+    return windows
 
 # ── Compute ───────────────────────────────────────────────────────────────────
 
@@ -446,6 +463,56 @@ def efficiency_curve(results, params):
     _write_figure(results, "efficiency_curve", fig)
     return {"figure": fig}
 
+def visitation_heatmap(results, params):
+    n_windows = params.get("n_windows", 2)
+    out = {}
+    for block, data in results.items():
+        events = data["events"]
+        valid = events[events["Position"].apply(lambda x: x is not None)]
+        if valid.empty:
+            continue
+        rows = valid["Position"].apply(lambda p: p[0])
+        cols = valid["Position"].apply(lambda p: p[1])
+        grid_h, grid_w = int(rows.max()) + 1, int(cols.max()) + 1
+        windows = _episode_windows(valid["Episode"].unique(), n_windows)
+        figure, axes = create_figure_grid(n_windows)
+        for ax, (label, ep_set) in zip(axes, windows):
+            mask = valid["Episode"].isin(ep_set)
+            grid = np.zeros((grid_h, grid_w))
+            for r, c in zip(rows[mask], cols[mask]):
+                grid[int(r), int(c)] += 1
+            render_heatmap(ax, grid, f"{block} — {label}")
+        figure.tight_layout()
+        _write_figure(results, f"visitation_heatmap_{block}", figure)
+        out[block] = {"figure": figure}
+    return out
+
+
+def action_distribution(results, params):
+    n_windows = params.get("n_windows", 2)
+    out = {}
+    for block, data in results.items():
+        events = data["events"]
+        valid = events[events["Action"].apply(lambda x: x is not None)]
+        if valid.empty:
+            continue
+        all_actions = sorted(valid["Action"].unique())
+        labels = [str(a) for a in all_actions]
+        windows = _episode_windows(valid["Episode"].unique(), n_windows)
+        figure, axes = create_figure_grid(n_windows)
+        for i, (ax, (label, ep_set)) in enumerate(zip(axes, windows)):
+            counts = (
+                valid[valid["Episode"].isin(ep_set)]["Action"]
+                .value_counts()
+                .reindex(all_actions, fill_value=0)
+            )
+            total = counts.sum()
+            fractions = (counts / total).values if total > 0 else counts.values
+            render_bar(ax, labels, fractions, f"{block} — {label}", get_color(i))
+        figure.tight_layout()
+        _write_figure(results, f"action_distribution_{block}", figure)
+        out[block] = {"figure": figure}
+    return out
 
 _ANALYTICS = {
     "run_summary": run_summary,
@@ -457,4 +524,6 @@ _ANALYTICS = {
     "steps_to_reward": steps_to_reward,
     "optimal_efficiency": optimal_efficiency,
     "efficiency_curve": efficiency_curve,
+    "visitation_heatmap": visitation_heatmap,
+    "action_distribution": action_distribution,
 }

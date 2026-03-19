@@ -145,3 +145,27 @@ def plot_grouped_bands(ax, df, metric, groups, group_col, series_fn, x_label):
     if len(groups) > 1:
         ax.legend()
     ax.figure.tight_layout()
+
+def create_figure_grid(ncols, figsize=None):
+    """Create a Figure with one row of ncols subplots. Returns (figure, axes list)."""
+    figsize = figsize or (5 * ncols, 4)
+    figure = Figure(figsize=figsize)
+    return figure, [figure.add_subplot(1, ncols, i + 1) for i in range(ncols)]
+
+
+def render_heatmap(ax, grid, title):
+    """2D count grid rendered as a heat map."""
+    im = ax.imshow(grid, origin="upper", cmap="hot")
+    ax.set_title(title)
+    ax.set_xlabel("col")
+    ax.set_ylabel("row")
+    ax.figure.colorbar(im, ax=ax)
+
+
+def render_bar(ax, labels, values, title, color):
+    """Normalized bar chart for action fractions."""
+    ax.bar(labels, values, color=color)
+    ax.set_title(title)
+    ax.set_xlabel("Action")
+    ax.set_ylabel("Fraction")
+    ax.set_ylim(0, 1)
