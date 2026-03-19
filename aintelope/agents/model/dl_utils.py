@@ -24,8 +24,7 @@ def select_checkpoint(outputs_dir, agent_id, i_trial, custom_model=""):
         path = Path(custom_model)
         return path if path.exists() else None
 
-    pattern = str(Path(outputs_dir) / "checkpoints" / f"{agent_id}_*.pt")
-    found = sorted(glob.glob(pattern))
-    if found:
-        return Path(found[i_trial % len(found)])
+    trial_ckpt = checkpoint_path(outputs_dir, agent_id, i_trial)
+    if trial_ckpt.exists():
+        return trial_ckpt
     return None
