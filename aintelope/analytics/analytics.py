@@ -146,32 +146,30 @@ def _dist_to_nearest(vision, channel):
 
 
 def _per_episode_efficiency(events, food_ind):
-    """Per-episode efficiency list."""
     step0 = filter_events(events, Step=0)
-    steps_by_ep = first_reward(events).groupby("Episode")["steps_to_reward"].min()
+    first = first_reward(events).set_index(["Episode", "Trial"])["steps_to_reward"]
 
     per_episode = []
-    for episode in sorted(events["Episode"].unique()):
-        row = step0[step0["Episode"] == episode].iloc[0]
+    for (episode, trial), group in step0.groupby(["Episode", "Trial"]):
+        row = group.iloc[0]
         spawn_dist = abs(row["Position"][0] - row["Food_position"][0]) + abs(
             row["Position"][1] - row["Food_position"][1]
         )
         steps_to_goal = (
-            int(steps_by_ep[episode])
-            + 1  # +1: reward fires on entry, step 0 = 1 actual step
-            if episode in steps_by_ep.index
+            int(first.loc[(episode, trial)]) + 1
+            if (episode, trial) in first.index
             else float("inf")
         )
         efficiency = (
             1.0
-            if spawn_dist == 0  # spawned on food
+            if spawn_dist == 0
             else 0.0
-            if steps_to_goal == float("inf")  # never reached
+            if steps_to_goal == float("inf")
             else min(1.0, spawn_dist / steps_to_goal)
         )
-
         per_episode.append(
             {
+                "trial": int(trial),
                 "episode": int(episode),
                 "spawn_dist": spawn_dist,
                 "steps_to_goal": steps_to_goal,
@@ -437,7 +435,7 @@ def optimal_efficiency(results, params):
                 else "N/A"
             )
             report_lines.append(
-                f"  Episode {ep['episode']:>4}: spawn_dist={dist}, steps_to_goal={steps}, efficiency={eff}"
+                f"  Trial {ep['trial']:>2}, Episode {ep['episode']:>4}: spawn_dist={dist}, steps_to_goal={steps}, efficiency={eff}"
             )
         n = len(per_episode)
         eff_str = f"{mean_eff:.1f}%" if mean_eff is not None else "N/A"
@@ -458,7 +456,6 @@ def efficiency_curve(results, params):
         df = pd.DataFrame(per_episode).rename(
             columns={"episode": "Episode", "efficiency": "Efficiency"}
         )
-        df["Trial"] = 0
         series[block] = aggregate_series(df, "Episode", "Efficiency")
     if not series:
         return {}

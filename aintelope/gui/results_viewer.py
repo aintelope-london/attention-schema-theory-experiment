@@ -51,7 +51,7 @@ ROI_ALPHA = 76
 
 
 class ResultsViewer:
-    TILE_SCALE = 4
+    TILE_SCALE = 1
 
     def __init__(self, root, outputs_dir):
         self.root = root

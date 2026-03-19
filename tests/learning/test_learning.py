@@ -186,7 +186,7 @@ def test_roi_agent_dqn_optimal(base_learning_config):
     report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
 
 
-# @pytest.mark.skip("100% with base DQN-FC 2x2")
+@pytest.mark.skip("100% with base DQN-FC 2x2")
 def test_main_agent_dqn_optimal(base_learning_config):
     cfg = OmegaConf.merge(
         base_learning_config,
@@ -214,8 +214,57 @@ def test_main_agent_dqn_optimal(base_learning_config):
                     },
                 },
                 "env_params": {
-                    "combine_interoception_and_vision": False,
-                    "env_layout_seed_repeat_sequence_length": 1,
+                    "goal": "reach_food",
+                },
+            },
+            "test": {
+                "run": {
+                    "experiment": {
+                        "steps": 10,
+                        "episodes": 500,
+                        "test_mode": True,
+                    },
+                },
+                "models": {
+                    "DQN": {
+                        "metadata": {"greedy_until": 0.0},
+                    },
+                },
+            },
+        },
+    )
+    result = run(cfg)
+    report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
+
+#@pytest.mark.skip("100% with base DQN-FC 3x3")
+def test_main_agent_dqn_optimal(base_learning_config):
+    cfg = OmegaConf.merge(
+        base_learning_config,
+        {
+            "train": {
+                "run": {
+                    "trials": 1,
+                    "experiment": {
+                        "steps": 20,
+                        "episodes": 5000,
+                        "test_mode": False,
+                    },
+                },
+                "agent_params": {
+                    "batch_size": 150,
+                    "replay_buffer_size": 30000,
+                    "gamma": 0.99,
+                    "agent_0": {
+                        "model": "fc_dqn",
+                    },
+                },
+                "models": {
+                    "DQN": {
+                        "metadata": {"greedy_until": 0.3},
+                    },
+                },
+                "env_params": {
+                    "map_max": 7,
                     "goal": "reach_food",
                 },
             },
