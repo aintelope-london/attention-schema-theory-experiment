@@ -236,7 +236,8 @@ def test_main_agent_dqn_optimal(base_learning_config):
     result = run(cfg)
     report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
 
-#@pytest.mark.skip("100% with base DQN-FC 3x3")
+
+# @pytest.mark.skip("100% with base DQN-FC 3x3")
 def test_main_agent_dqn_optimal(base_learning_config):
     cfg = OmegaConf.merge(
         base_learning_config,
