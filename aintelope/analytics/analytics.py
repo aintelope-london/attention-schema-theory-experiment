@@ -119,12 +119,10 @@ def first_reward(events):
     first.columns = ["Episode", "Trial", "steps_to_reward"]
     return first
 
-def _episode_windows(episodes, n_windows):
-    """Split sorted episode list into n_windows roughly equal ranges.
 
-    Returns list of (label, frozenset) tuples.
-    """
+def _episode_windows(episodes, n_windows):
     eps = sorted(set(episodes))
+    n_windows = min(n_windows, len(eps))
     size = max(1, len(eps) // n_windows)
     windows = []
     for i in range(n_windows):
@@ -133,6 +131,7 @@ def _episode_windows(episodes, n_windows):
         label = f"ep {eps[start]}–{eps[end - 1]}"
         windows.append((label, frozenset(eps[start:end])))
     return windows
+
 
 # ── Compute ───────────────────────────────────────────────────────────────────
 
@@ -463,6 +462,7 @@ def efficiency_curve(results, params):
     _write_figure(results, "efficiency_curve", fig)
     return {"figure": fig}
 
+
 def visitation_heatmap(results, params):
     n_windows = params.get("n_windows", 2)
     out = {}
@@ -514,6 +514,7 @@ def action_distribution(results, params):
         out[block] = {"figure": figure}
     return out
 
+
 _ANALYTICS = {
     "run_summary": run_summary,
     "learning_improvement": learning_improvement,
@@ -523,7 +524,7 @@ _ANALYTICS = {
     "reward_curve": reward_curve,
     "steps_to_reward": steps_to_reward,
     "optimal_efficiency": optimal_efficiency,
-    "efficiency_curve": efficiency_curve,   
+    "efficiency_curve": efficiency_curve,
     "visitation_heatmap": visitation_heatmap,
     "action_distribution": action_distribution,
 }

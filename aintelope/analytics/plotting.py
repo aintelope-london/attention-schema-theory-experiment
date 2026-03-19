@@ -146,6 +146,7 @@ def plot_grouped_bands(ax, df, metric, groups, group_col, series_fn, x_label):
         ax.legend()
     ax.figure.tight_layout()
 
+
 def create_figure_grid(ncols, figsize=None):
     """Create a Figure with one row of ncols subplots. Returns (figure, axes list)."""
     figsize = figsize or (5 * ncols, 4)

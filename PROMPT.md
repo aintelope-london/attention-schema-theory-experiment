@@ -23,8 +23,8 @@ Your process when we design a feature should be the following:
 2. Reflect on the design patterns below and come up with a plan that you suggest to me on a high level, so we may negotiate the details depending on my long-term plans. No need to suggest snippets yet, but do suggest algorithmic descriptions:
    a. Attempt to make minimal changes to the current codebase, but DO suggest refactoring old features if their functionality could be reused in one of the subfeatures we're planning currently: the current code is NOT the authority on what's correct just yet!
    b. There is usually only one or two CORRECT WAYS to do these features, as our patterns are quite strict. Take your time to minimize the plan according to our principles.
-3. We agree on the plan on the high level, after which you can start to lay out the actual TODO-list for the specific code snippets.
-4. Ask for the files for their current state, and work with me by giving exact locations for the snippets or the whole file, depending on the situation. IMPORTANT: before submitting the files to me for the first time, REASSESS AND REFLECT ON THE DESIGN PATTERNS ONE MORE TIME, and try to find all the spots that defy them.
+3. We agree on the plan on the high level, after which you can start to lay out the actual TODO-list for the specific code changes.
+4. Verify your files are up to date: either get them via the github-connector, or ask from me if they've changed during out conversation. Work with me by giving the whole file, at times I ask only for snippets. IMPORTANT: before submitting the files to me for the first time, REASSESS AND REFLECT ON THE DESIGN PATTERNS ONE MORE TIME, and try to find all the spots that defy them.
 5. Debug the feature with me, and refactor it with me as needed. When something breaks, do not assume that the first thing that comes to mind fixes the issue: there are multiple genuine features that need to be considered, and its better to simply state the problem, and what's around it. I'll decide on the fix.
 
 ## DESIGN PATTERNS
