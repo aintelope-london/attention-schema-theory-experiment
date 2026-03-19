@@ -58,8 +58,7 @@ def test_dqn_learns(base_learning_config):
                 "agent_params": {
                     "roi_mode": None,
                 },
-                "env_params": {
-                },
+                "env_params": {},
             },
         },
     )
@@ -85,8 +84,7 @@ def test_dqn_roi_learns(base_learning_config):
                 "agent_params": {
                     "roi_mode": "cone",
                 },
-                "env_params": {
-                },
+                "env_params": {},
             },
         },
     )
@@ -130,8 +128,7 @@ def test_model_based_learns(base_learning_config):
                         },
                     },
                 },
-                "env_params": {
-                },
+                "env_params": {},
             },
         },
     )
@@ -189,7 +186,6 @@ def test_roi_agent_dqn_optimal(base_learning_config):
     report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
 
 
-
 # @pytest.mark.skip("100% with base DQN-FC 2x2")
 def test_main_agent_dqn_optimal(base_learning_config):
     cfg = OmegaConf.merge(
@@ -241,8 +237,6 @@ def test_main_agent_dqn_optimal(base_learning_config):
     )
     result = run(cfg)
     report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
-
-
 
 
 if __name__ == "__main__":

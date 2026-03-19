@@ -74,6 +74,7 @@ class FoodSmell(RewardScheme):
         )
         return 10.0 - closest
 
+
 class StepPenalty(RewardScheme):
     """Fixed negative reward on every step, encouraging shorter paths.
 
