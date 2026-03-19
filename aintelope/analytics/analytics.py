@@ -523,7 +523,7 @@ _ANALYTICS = {
     "reward_curve": reward_curve,
     "steps_to_reward": steps_to_reward,
     "optimal_efficiency": optimal_efficiency,
-    "efficiency_curve": efficiency_curve,
+    "efficiency_curve": efficiency_curve,   
     "visitation_heatmap": visitation_heatmap,
     "action_distribution": action_distribution,
 }
