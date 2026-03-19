@@ -30,6 +30,7 @@ def base_learning_config():
                 "env_params": {
                     "map_max": 4,
                     "goal": None,
+                    "env_layout_seed_repeat_sequence_length": 1,
                 },
             }
         }

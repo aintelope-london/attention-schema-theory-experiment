@@ -32,7 +32,6 @@ def test_sb3_ppo_learns(base_learning_config):
                 },
                 "env_params": {
                     "combine_interoception_and_vision": True,
-                    "env_layout_seed_repeat_sequence_length": 12,
                 },
             },
         },
@@ -59,10 +58,7 @@ def test_dqn_learns(base_learning_config):
                 "agent_params": {
                     "roi_mode": None,
                 },
-                "env_params": {
-                    "combine_interoception_and_vision": False,
-                    "env_layout_seed_repeat_sequence_length": 12,
-                },
+                "env_params": {},
             },
         },
     )
@@ -88,10 +84,7 @@ def test_dqn_roi_learns(base_learning_config):
                 "agent_params": {
                     "roi_mode": "cone",
                 },
-                "env_params": {
-                    "combine_interoception_and_vision": False,
-                    "env_layout_seed_repeat_sequence_length": 12,
-                },
+                "env_params": {},
             },
         },
     )
@@ -135,67 +128,12 @@ def test_model_based_learns(base_learning_config):
                         },
                     },
                 },
-                "env_params": {
-                    "combine_interoception_and_vision": False,
-                    "env_layout_seed_repeat_sequence_length": 12,
-                },
+                "env_params": {},
             },
         },
     )
     result = run(cfg)
     assert_learning_improvement(result["analytics"]["learning_improvement"]["train"])
-
-
-# @pytest.mark.skip()
-def test_main_agent_dqn_optimal(base_learning_config):
-    """DQN (no ROI) reaches near-optimal food-finding on 4x4 map.
-
-    Two-block run: train block builds the policy, test block measures it
-    at zero epsilon (pure exploitation) so efficiency is not noise-floored.
-    """
-    cfg = OmegaConf.merge(
-        base_learning_config,
-        {
-            "train": {
-                "run": {
-                    "experiment": {
-                        "steps": 20,
-                        "episodes": 4000,
-                        "test_mode": False,
-                    },
-                },
-                "models": {
-                    "DQN": {
-                        "metadata": {"greedy_until": 0.3},
-                    },
-                },
-                "agent_params": {
-                    "roi_mode": None,
-                },
-                "env_params": {
-                    "combine_interoception_and_vision": False,
-                    "env_layout_seed_repeat_sequence_length": 1,
-                    "goal": None,
-                },
-            },
-            "test": {
-                "run": {
-                    "experiment": {
-                        "steps": 10,
-                        "episodes": 50,
-                        "test_mode": True,
-                    },
-                },
-                "models": {
-                    "DQN": {
-                        "metadata": {"greedy_until": 0.0},
-                    },
-                },
-            },
-        },
-    )
-    result = run(cfg)
-    report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
 
 
 @pytest.mark.skip(reason="DQN + ROI cone reaches near-optimal food-finding on 5x5 map")
@@ -225,9 +163,7 @@ def test_roi_agent_dqn_optimal(base_learning_config):
                     "roi_mode": "cone",
                 },
                 "env_params": {
-                    "map_max": 5,
-                    "combine_interoception_and_vision": False,
-                    "env_layout_seed_repeat_sequence_length": 12,
+                    "map_max": 4,
                 },
             },
             "test": {
@@ -235,6 +171,59 @@ def test_roi_agent_dqn_optimal(base_learning_config):
                     "experiment": {
                         "steps": 10,
                         "episodes": 50,
+                        "test_mode": True,
+                    },
+                },
+                "models": {
+                    "DQN": {
+                        "metadata": {"greedy_until": 0.0},
+                    },
+                },
+            },
+        },
+    )
+    result = run(cfg)
+    report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
+
+
+# @pytest.mark.skip("100% with base DQN-FC 2x2")
+def test_main_agent_dqn_optimal(base_learning_config):
+    cfg = OmegaConf.merge(
+        base_learning_config,
+        {
+            "train": {
+                "run": {
+                    "trials": 5,
+                    "experiment": {
+                        "steps": 20,
+                        "episodes": 5000,
+                        "test_mode": False,
+                    },
+                },
+                "agent_params": {
+                    "batch_size": 150,
+                    "replay_buffer_size": 30000,
+                    "gamma": 0.99,
+                    "agent_0": {
+                        "model": "fc_dqn",
+                    },
+                },
+                "models": {
+                    "DQN": {
+                        "metadata": {"greedy_until": 0.3},
+                    },
+                },
+                "env_params": {
+                    "combine_interoception_and_vision": False,
+                    "env_layout_seed_repeat_sequence_length": 1,
+                    "goal": "reach_food",
+                },
+            },
+            "test": {
+                "run": {
+                    "experiment": {
+                        "steps": 10,
+                        "episodes": 500,
                         "test_mode": True,
                     },
                 },

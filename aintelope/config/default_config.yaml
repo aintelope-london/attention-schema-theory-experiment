@@ -39,14 +39,14 @@ run:
 agent_params:
   save_frequency: 50
   custom_model: ""                 # @ui file
-  roi_mode: "cone"                 # @ui str cone null
+  roi_mode: None                   # @ui str cone null
   batch_size: 32                   # @ui int 1 100
   replay_buffer_size: 30000        # @ui int 0 30000
   gamma: 0.99                      # @ui float 0.0 1.0
   # Agents
   agent_0:
     agent_class: main_agent        # @ui str main_agent,random_agent,sb3_ppo_agent,sb3_a2c_agent
-    model: basic_dqn_roi
+    model: basic_dqn
   # SB3 model parameters
   num_conv_layers: 0               # @ui int 0 3
   learning_rate: 0.0003            # @ui float 0.0001 0.01
@@ -57,7 +57,7 @@ env_params:
   env_layout_seed_modulo: 0        # @ui int 0 1000
   mode: parallel                   # @ui str serial,parallel
   goal: None                       # @ui str None,reach_food
-  combine_interoception_and_vision: True  # @ui bool
+  combine_interoception_and_vision: False  # @ui bool
   interoception_transformation_mode: 0   # @ui int 0 4
   interoception_embedding_gaussian_centers: [-32, -16, -8, -4, -2, -1, 0, 1, 2, 4]
   interoception_embedding_gaussian_scales: [32, 16, 8, 4, 2, 1, 1, 1, 2, 4]

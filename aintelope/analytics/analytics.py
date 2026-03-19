@@ -157,9 +157,18 @@ def _per_episode_efficiency(events, food_ind):
             row["Position"][1] - row["Food_position"][1]
         )
         steps_to_goal = (
-            int(steps_by_ep[episode]) if episode in steps_by_ep.index else float("inf")
+            int(steps_by_ep[episode])
+            + 1  # +1: reward fires on entry, step 0 = 1 actual step
+            if episode in steps_by_ep.index
+            else float("inf")
         )
-        efficiency = 1.0 if steps_to_goal == 0 else min(1.0, spawn_dist / steps_to_goal)
+        efficiency = (
+            1.0
+            if spawn_dist == 0  # spawned on food
+            else 0.0
+            if steps_to_goal == float("inf")  # never reached
+            else min(1.0, spawn_dist / steps_to_goal)
+        )
 
         per_episode.append(
             {

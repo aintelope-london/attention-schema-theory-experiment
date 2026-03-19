@@ -75,6 +75,22 @@ class FoodSmell(RewardScheme):
         return 10.0 - closest
 
 
+class StepPenalty(RewardScheme):
+    """Fixed negative reward on every step, encouraging shorter paths.
+
+    The penalty creates a Q-value gradient between actions: reaching food
+    in N steps accumulates N × penalty, so the network learns to prefer
+    actions that reduce distance to food rather than spinning in place.
+    No state — penalty is constant regardless of position or history.
+    """
+
+    def __init__(self, penalty: float = -1.0):
+        self.penalty = penalty
+
+    def activate(self, activations: dict, env_manifesto: dict) -> float:
+        return self.penalty
+
+
 class Homeostasis(RewardScheme):
     """WIP: Inverted-U homeostatic reward with satiation state.
 
@@ -106,6 +122,7 @@ _REWARD_REGISTRY = {
     "FoodInteroception": FoodInteroception,
     "FoodSmell": FoodSmell,
     "Homeostasis": Homeostasis,
+    "StepPenalty": StepPenalty,
 }
 
 
