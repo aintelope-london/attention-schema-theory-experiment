@@ -21,7 +21,7 @@ def model_free_cfg():
                     },
                     "agent_params": {
                         "roi_mode": None,
-                        "agent_0": {"agent_class": "main_agent", "model": "basic_dqn"},
+                        "agent_0": {"agent_class": "main_agent", "model": "dqn_fc"},
                     },
                 }
             }

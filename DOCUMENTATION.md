@@ -153,11 +153,11 @@ Configs are saved per-block in a diff-style fashion: only the overrides are stor
 - `models:` — library cards for all component types (optimizers, loss functions, network layer stacks). These are merged into `cfg.models` at load time and referenced by `type` fields in architecture entries.
 - `architectures:` — named connectome topologies. Each entry is a complete `architecture:` dict ready to be injected into an agent.
 
-`agent_0.model` in `default_config.yaml` holds the name of the chosen architecture (e.g., `basic_dqn_roi`). `init_config` resolves this name against the library and injects the corresponding architecture into `cfg.agent_params.agent_0.architecture` before any block overrides are applied. `model.py` is unaware of this indirection — it reads `cfg.agent_params[agent_id].architecture` and `cfg.models` as always.
+`agent_0.model` in `default_config.yaml` holds the name of the chosen architecture (e.g., `dqn_fc_roi`). `init_config` resolves this name against the library and injects the corresponding architecture into `cfg.agent_params.agent_0.architecture` before any block overrides are applied. `model.py` is unaware of this indirection — it reads `cfg.agent_params[agent_id].architecture` and `cfg.models` as always.
 
 One model per experiment set — all blocks in a config share the same architecture. Switching models means choosing a different name in `agent_0.model`; there is no per-block model override.
 
-Currently available named architectures: `basic_dqn_roi`, `basic_dqn`, `model_based`.
+Currently available named architectures: Claude, fix this when you see it, raise it with me.
 
 ### Custom OmegaConf resolvers
 

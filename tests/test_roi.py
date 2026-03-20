@@ -4,7 +4,8 @@ import numpy as np
 import pytest
 from omegaconf import OmegaConf
 
-from aintelope.utils.roi import _cone_mask, compute_roi
+from aintelope.utils.roi import _cone_mask
+from aintelope.agents.model.roi import _circle_mask, ROI
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -155,171 +156,177 @@ def test_cone_symmetry():
 
 
 # ═════════════════════════════════════════════════════════════════════════
-# 3. compute_roi integration
+# 4. _circle_mask geometry
 # ═════════════════════════════════════════════════════════════════════════
 
 
-def _make_cfg(roi_mode="cone", radius=2):
-    return OmegaConf.create(
+def test_circle_mask_center_disc():
+    """distance=0 -> disc centred exactly on the agent."""
+    result = _circle_mask(7, 7, 3, 3, angle=0.0, distance=0.0, radius=2.0)
+    rows, cols = np.mgrid[0:7, 0:7]
+    expected = (rows - 3) ** 2 + (cols - 3) ** 2 <= 4.0
+    assert np.array_equal(result, expected)
+
+
+def test_circle_mask_offset_north():
+    """angle=0 (north) -> spotlight center at (center_r - distance, center_c)."""
+    result = _circle_mask(9, 9, 4, 4, angle=0.0, distance=2.0, radius=1.0)
+    rows, cols = np.mgrid[0:9, 0:9]
+    expected = (rows - 2.0) ** 2 + (cols - 4.0) ** 2 <= 1.0
+    assert np.array_equal(result, expected)
+
+
+def test_circle_mask_offset_east():
+    """angle=pi/2 (east) -> spotlight center at (center_r, center_c + distance)."""
+    result = _circle_mask(9, 9, 4, 4, angle=np.pi / 2, distance=3.0, radius=1.0)
+    rows, cols = np.mgrid[0:9, 0:9]
+    # circle_r = 4 - 3*cos(pi/2) ~= 4, circle_c = 4 + 3*sin(pi/2) = 7
+    expected = (rows - 4.0) ** 2 + (cols - 7.0) ** 2 <= 1.0
+    assert np.array_equal(result, expected)
+
+
+def test_circle_mask_agent_not_always_included():
+    """Circle spotlight can move fully away from the agent cell."""
+    # distance=3, radius=1 pointing north: spotlight center at (1, 4).
+    # Agent cell (4, 4) is 3 cells away -- outside radius=1.
+    result = _circle_mask(9, 9, 4, 4, angle=0.0, distance=3.0, radius=1.0)
+    assert not result[
+        4, 4
+    ], "Agent's own cell should NOT be forced into the circle mask"
+
+
+def test_circle_mask_orbit_centroid():
+    """Spotlight center tracks the expected orbit position at each angle.
+
+    Cell counts are not invariant on a discrete grid (non-integer centers shift
+    which boundary cells fall inside the radius), but the centroid of lit cells
+    should be within half a cell of the expected continuous center.
+    """
+    for angle in (0.0, np.pi / 4, np.pi / 2, np.pi, 3 * np.pi / 2):
+        mask = _circle_mask(11, 11, 5, 5, angle=angle, distance=2.0, radius=1.5)
+        rows, cols = np.mgrid[0:11, 0:11]
+        centroid_r = rows[mask].mean()
+        centroid_c = cols[mask].mean()
+        expected_r = 5 - 2.0 * np.cos(angle)
+        expected_c = 5 + 2.0 * np.sin(angle)
+        assert (
+            abs(centroid_r - expected_r) < 0.5
+        ), f"angle={angle:.3f}: centroid_r={centroid_r:.2f} expected={expected_r:.2f}"
+        assert (
+            abs(centroid_c - expected_c) < 0.5
+        ), f"angle={angle:.3f}: centroid_c={centroid_c:.2f} expected={expected_c:.2f}"
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# 5. ROI component: reading params from plans (architecture entry)
+# ═════════════════════════════════════════════════════════════════════════
+
+
+def _cone_plans(**overrides):
+    defaults = dict(
+        roi_mode="cone",
+        darkening_factor=0.1,
+        half_arc=np.pi / 4,
+        turn_step=np.pi / 4,
+        cone_radius=2,
+    )
+    defaults.update(overrides)
+    return OmegaConf.create(defaults)
+
+
+def _circle_plans(**overrides):
+    defaults = dict(
+        roi_mode="circle",
+        darkening_factor=0.1,
+        turn_step=np.pi / 4,
+        circle_distance=2.0,
+        circle_radius=2.0,
+    )
+    defaults.update(overrides)
+    return OmegaConf.create(defaults)
+
+
+def _roi(plans):
+    return ROI(
         {
-            "agent_params": {"roi_mode": roi_mode},
-            "env_params": {"render_agent_radius": radius},
+            "plans": plans,
+            "component_id": "roi",
+            "inputs": ["internal_action"],
+            "components": {},
+            "activations": {},
+            "cfg": OmegaConf.create({}),
         }
     )
 
 
-def _make_obs_infos(board_shape, agent_positions, agent_directions, vision_layers=3):
-    """Build mock observations and infos dicts for compute_roi."""
-    vh, vw = board_shape  # For simplicity: viewport = board size
-    observations = {}
-    infos = {}
-    for aid, pos in agent_positions.items():
-        observations[aid] = {
-            "vision": np.zeros((vision_layers, vh, vw), dtype=np.float32),
-            "interoception": np.zeros((2,), dtype=np.float32),
-        }
-        infos[aid] = {
-            "position": pos,
-            "direction": agent_directions[aid],
-            "board_shape": board_shape,
-        }
-    return observations, infos
+def test_roi_cone_reads_plans_params():
+    roi = _roi(_cone_plans(darkening_factor=0.05, half_arc=0.3, turn_step=0.1))
+    assert roi._darkening_factor == pytest.approx(0.05)
+    assert roi._mask_params["half_arc"] == pytest.approx(0.3)
+    assert roi._angle_deltas == pytest.approx((-0.1, 0.0, 0.1))
+    assert roi._mask_params["radius"] == 2
 
 
-def test_compute_roi_output_shape():
-    """compute_roi appends N_agents layers to each agent's vision."""
-    cfg = _make_cfg()
-    obs, infos = _make_obs_infos(
-        board_shape=(5, 5),
-        agent_positions={"a0": (2, 2), "a1": (0, 0)},
-        agent_directions={"a0": (-1, 0), "a1": (1, 0)},
-        vision_layers=3,
-    )
-    result, absolute = compute_roi(obs, infos, cfg)
-
-    # Vision should have 3 original + 2 ROI layers = 5
-    assert result["a0"]["vision"].shape[0] == 5
-    assert result["a1"]["vision"].shape[0] == 5
-    # Interoception unchanged
-    assert result["a0"]["interoception"].shape == (2,)
-    # Absolute masks: 2 agents × 5 × 5
-    assert absolute.shape == (2, 5, 5)
+def test_roi_circle_reads_plans_params():
+    roi = _roi(_circle_plans(circle_distance=1.5, circle_radius=3.0))
+    assert roi.roi_state["distance"] == pytest.approx(1.5)
+    assert roi.roi_state["radius"] == pytest.approx(3.0)
+    assert roi.roi_state["angle"] == pytest.approx(0.0)
 
 
-def test_compute_roi_absolute_mask_matches_geometry():
-    """Absolute mask should match direct _cone_mask call."""
-    cfg = _make_cfg(radius=2)
-    obs, infos = _make_obs_infos(
-        board_shape=(5, 5),
-        agent_positions={"agent_0": (2, 2)},
-        agent_directions={"agent_0": (-1, 0)},
-    )
-    _, absolute = compute_roi(obs, infos, cfg)
-
-    direct = _cone_mask(5, 5, 2, 2, -1, 0, 2)
-    assert not np.any(
-        absolute[0] ^ direct
-    ), "Absolute mask should match direct geometry call"
+def test_roi_cone_reset():
+    roi = _roi(_cone_plans(turn_step=np.pi / 4))
+    roi.roi_state["angle"] = 2.5
+    roi.reset()
+    assert roi.roi_state["angle"] == pytest.approx(0.0)
 
 
-def test_compute_roi_passthrough_none():
-    """roi_mode=None → observations unchanged, empty absolute masks."""
-    cfg = _make_cfg(roi_mode=None)
-    obs, infos = _make_obs_infos(
-        board_shape=(5, 5),
-        agent_positions={"a0": (2, 2)},
-        agent_directions={"a0": (-1, 0)},
-        vision_layers=3,
-    )
-    result, absolute = compute_roi(obs, infos, cfg)
-
-    assert result["a0"]["vision"].shape[0] == 3, "No layers added when roi_mode=None"
-    assert absolute.shape == (0, 5, 5)
+def test_roi_circle_reset_restores_full_state():
+    roi = _roi(_circle_plans(circle_distance=1.5, circle_radius=3.0))
+    roi.roi_state["angle"] = 1.0
+    roi.roi_state["distance"] = 99.0
+    roi.reset()
+    assert roi.roi_state["angle"] == pytest.approx(0.0)
+    assert roi.roi_state["distance"] == pytest.approx(1.5)
+    assert roi.roi_state["radius"] == pytest.approx(3.0)
 
 
-def test_compute_roi_viewport_crop():
-    """On a larger board, viewport crop should extract the correct region."""
-    board_h, board_w = 9, 9
-    cfg = _make_cfg(radius=2)
-    # Agent at (4, 4), viewport is 5x5 (2*radius+1), centered on agent
-    # Vision shape must match viewport, not board
-    vh, vw = 5, 5
-    obs = {
-        "agent_0": {
-            "vision": np.zeros((3, vh, vw), dtype=np.float32),
-            "interoception": np.zeros((2,), dtype=np.float32),
-        }
-    }
-    infos = {
-        "agent_0": {
-            "position": (4, 4),
-            "direction": (-1, 0),
-            "board_shape": (board_h, board_w),
-        }
-    }
-
-    result, absolute = compute_roi(obs, infos, cfg)
-
-    # Absolute mask is on the 9x9 board
-    assert absolute.shape == (1, 9, 9)
-    # The cone on the board should be centered at (4,4) facing UP
-    direct = _cone_mask(9, 9, 4, 4, -1, 0, 2)
-    assert not np.any(absolute[0] ^ direct)
-
-    # Viewport ROI layer should be the 5x5 crop around (4,4)
-    roi_layer = result["agent_0"]["vision"][3].astype(bool)  # first ROI layer
-    crop = absolute[0, 2:7, 2:7]  # rows 2-6, cols 2-6
-    assert not np.any(
-        roi_layer ^ crop
-    ), f"Viewport crop mismatch:\n{roi_layer.astype(int)}\nexpected:\n{crop.astype(int)}"
+def test_roi_activate_cone_writes_mask():
+    roi = _roi(_cone_plans())
+    vision = np.ones((4, 9, 9), dtype=np.float32)
+    activations = {"vision": vision}
+    roi.activate(activations)
+    assert vision[-1].dtype == np.float32
+    assert vision[-1].max() == pytest.approx(1.0)
+    assert "roi" in activations
 
 
-def test_compute_roi_two_agents_see_each_other():
-    """Each agent's observation should contain both agents' ROI masks."""
-    cfg = _make_cfg(radius=2)
-    obs, infos = _make_obs_infos(
-        board_shape=(7, 7),
-        agent_positions={"agent_0": (3, 3), "agent_1": (3, 5)},
-        agent_directions={"agent_0": (-1, 0), "agent_1": (0, -1)},
-        vision_layers=3,
-    )
-    # Override vision to be 7x7 (viewport = full board for simplicity)
-    for aid in obs:
-        obs[aid]["vision"] = np.zeros((3, 7, 7), dtype=np.float32)
-
-    result, absolute = compute_roi(obs, infos, cfg)
-
-    # Each agent gets 2 ROI layers (one per agent)
-    assert result["agent_0"]["vision"].shape[0] == 5
-    assert result["agent_1"]["vision"].shape[0] == 5
-
-    # agent_0's observation layer 3 = agent_0's mask, layer 4 = agent_1's mask
-    # (sorted by agent id)
-    a0_sees_a0 = result["agent_0"]["vision"][3]
-    a0_sees_a1 = result["agent_0"]["vision"][4]
-    assert a0_sees_a0[3, 3], "agent_0 should see its own ROI at its position"
-    assert a0_sees_a1[3, 5], "agent_0 should see agent_1's ROI at agent_1's position"
+def test_roi_activate_circle_writes_mask():
+    roi = _roi(_circle_plans(circle_distance=1.0, circle_radius=1.5))
+    vision = np.ones((4, 9, 9), dtype=np.float32)
+    activations = {"vision": vision}
+    roi.activate(activations)
+    assert vision[-1].max() == pytest.approx(1.0)
+    assert vision[-1].sum() > 1
 
 
-def test_compute_roi_edge_agent():
-    """Agent at board corner — no crash, mask clips to grid."""
-    cfg = _make_cfg(radius=2)
-    obs = {
-        "agent_0": {
-            "vision": np.zeros((3, 5, 5), dtype=np.float32),
-            "interoception": np.zeros((2,), dtype=np.float32),
-        }
-    }
-    infos = {
-        "agent_0": {
-            "position": (0, 0),
-            "direction": (-1, 0),
-            "board_shape": (5, 5),
-        }
-    }
-    result, absolute = compute_roi(obs, infos, cfg)
-    assert absolute[0, 0, 0], "Agent's own cell always lit"
-    assert absolute.shape == (1, 5, 5)
+def test_roi_activate_darkening_zeroes_outside():
+    """darkening_factor=0 -> outside-ROI cells are exactly zero."""
+    roi = _roi(_cone_plans(darkening_factor=0.0))
+    vision = np.ones((4, 9, 9), dtype=np.float32)
+    activations = {"vision": vision}
+    roi.activate(activations)
+    mask = vision[-1].astype(bool)
+    assert np.all(vision[0][~mask] == pytest.approx(0.0))
+    assert np.all(vision[0][mask] == pytest.approx(1.0))
+
+
+def test_roi_default_internal_action_is_stay():
+    """Missing internal_action (step 0) defaults to stay -- angle unchanged."""
+    roi = _roi(_cone_plans(turn_step=np.pi / 4))
+    vision = np.ones((4, 9, 9), dtype=np.float32)
+    roi.activate({"vision": vision})  # no internal_action key
+    assert roi.roi_state["angle"] == pytest.approx(0.0)
 
 
 if __name__ == "__main__":
