@@ -512,6 +512,7 @@ class ConfigGUI:
     def _save_config(self):
         """Save all tabs as a multi-block config."""
         self.root.focus_set()
+        self.root.update()
         filename = self.actions.get_input("Save As")
         save_experiment_config(self._collect_blocks(), filename)
         self.status.set(f"Saved: {filename}")
@@ -520,6 +521,7 @@ class ConfigGUI:
     def _run(self):
         """Return blocks dict and close."""
         self.root.focus_set()
+        self.root.update()
         self.result = OmegaConf.create(self._collect_blocks())
         self.root.quit()
 

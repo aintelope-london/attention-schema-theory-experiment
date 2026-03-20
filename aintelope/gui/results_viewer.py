@@ -51,8 +51,6 @@ ROI_ALPHA = 76
 
 
 class ResultsViewer:
-    TILE_SCALE = 1
-
     def __init__(self, root, outputs_dir):
         self.root = root
         self.root.title("Results Viewer")
@@ -197,9 +195,12 @@ class ResultsViewer:
         )
         self.step_slider.pack(side=LEFT, fill=X, expand=True, padx=(15, 5))
 
-        # State display — tile-rendered image
-        self.state_display = Label(self.playback_tab)
-        self.state_display.pack(fill=BOTH, expand=True, padx=10, pady=5)
+        # State display — label placed inside frame so it doesn't affect frame size
+        self.state_frame = Frame(self.playback_tab)
+        self.state_frame.pack(fill=BOTH, expand=True, padx=10, pady=5)
+        self.state_display = Label(self.state_frame)
+        self.state_display.place(relx=0.5, rely=0.5, anchor="center")
+        self.state_frame.bind("<Configure>", lambda e: self._render_state())
 
         # Video export controls
         export_frame = Frame(self.playback_tab, padding=(10, 5))
@@ -370,10 +371,12 @@ class ResultsViewer:
             return
 
         img = self._get_frame(step)
+        w, h = self.state_frame.winfo_width(), self.state_frame.winfo_height()
+        scale = min(w / img.width, h / img.height)
         scaled = img.resize(
-            (img.width * self.TILE_SCALE, img.height * self.TILE_SCALE),
-            Image.NEAREST,
+            (int(img.width * scale), int(img.height * scale)), Image.NEAREST
         )
+
         self._photo = ImageTk.PhotoImage(scaled)
         self.state_display.configure(image=self._photo)
 
