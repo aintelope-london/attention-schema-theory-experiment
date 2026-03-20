@@ -145,6 +145,21 @@ class SavannaInterpreter:
         ALL_AGENTS_LAYER: None,
     }
 
+    # Paint order: left = bottom, right = top. Edit to taste.
+    DRAW_ORDER = (
+        VOID,
+        WALL,
+        DRINK_SMALL,
+        DRINK,
+        FOOD_SMALL,
+        FOOD,
+        GOLD,
+        SILVER,
+        DANGER,
+        PREDATOR,
+        *AGENTS,
+    )
+
     def interpret(self, state):
         """Extract renderable layers from env state.
 
@@ -155,11 +170,15 @@ class SavannaInterpreter:
             (cube, layers, floor) where layers is [(index, keyword), ...].
         """
         cube, layer_order = state
-        layers = [
-            (idx, self.MANIFEST[key])
-            for idx, key in enumerate(layer_order[: cube.shape[0]])
-            if key in self.MANIFEST and self.MANIFEST[key] is not None
-        ]
+        priority = {kw: i for i, kw in enumerate(self.DRAW_ORDER)}
+        layers = sorted(
+            [
+                (idx, self.MANIFEST[key])
+                for idx, key in enumerate(layer_order[: cube.shape[0]])
+                if key in self.MANIFEST and self.MANIFEST[key] is not None
+            ],
+            key=lambda pair: priority.get(pair[1], -1),
+        )
         return cube, layers, FLOOR
 
     def agent_positions(self, state, agent_ids):
