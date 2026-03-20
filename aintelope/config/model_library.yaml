@@ -1,0 +1,216 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+models:
+  RewardInference:
+    metadata:
+      rewards: [FoodInteroception, StepPenalty]
+      post_activate: True
+  DQN:
+    metadata:
+      q_network: DQN-NN
+      greedy_until: 0.7
+  ModelBased:
+    metadata:
+      input:
+        dynamic: sae
+        value: state_value
+      num_simulations: 5
+      max_depth: 2
+      c_puct: 1.0
+  DQN-NN:
+    metadata:
+      optimizer: AdamW
+      optimizer_params:
+        lr: 0.001
+        amsgrad: True
+        weight_decay: 0.01
+      loss_function: SmoothL1Loss
+      target: [reward]
+      use_target_net: True
+      target_net_update_frequency: 100
+      tau: 0.05
+    architecture:
+      vision_net:
+        - {type: input, source: vision}
+        - {type: conv, size: 4, kernel: 1}
+        - {type: relu}
+        - {type: conv, size: 4, kernel: 3}
+        - {type: relu}
+        - {type: linear, size: 16}
+        - {type: relu}
+      interoception_net:
+        - {type: input, source: interoception}
+        - {type: linear, size: 4}
+        - {type: relu}
+      combined_net:
+        - {type: input, source: vision_net+interoception_net}
+        - {type: linear, size: 16}
+        - {type: relu}
+        - {type: linear, source: action}
+        - {type: output}
+  StateValue-NN:
+    metadata:
+      optimizer: Adam
+      optimizer_params:
+        lr: 0.0005
+      loss_function: MSELoss
+      target: [reward]
+      use_target_net: False
+    architecture:
+      vision_net:
+        - {type: input, source: vision}
+        - {type: conv, size: 8, kernel: 1}
+        - {type: relu}
+        - {type: conv, size: 8, kernel: 3}
+        - {type: relu}
+        - {type: linear, size: 16}
+        - {type: relu}
+      interoception_net:
+        - {type: input, source: interoception}
+        - {type: linear, size: 4}
+        - {type: relu}
+      combined_net:
+        - {type: input, source: vision_net+interoception_net}
+        - {type: linear, size: 8}
+        - {type: relu}
+        - {type: linear, size: 1}
+        - {type: output}
+  NextState-NN:
+    metadata:
+      optimizer: Adam
+      optimizer_params:
+        lr: 0.001
+      loss_function: MSELoss
+      target: [next_observation]
+      use_target_net: False
+      post_activate: True
+    architecture:
+      vision_net:
+        - {type: input, source: vision}
+        - {type: conv, size: 8, kernel: 1}
+        - {type: relu}
+        - {type: conv, size: 8, kernel: 3}
+        - {type: relu}
+        - {type: linear, size: 16}
+        - {type: relu}
+      interoception_net:
+        - {type: input, source: interoception}
+        - {type: linear, size: 4}
+        - {type: relu}
+      encoder:
+        - {type: input, source: vision_net+interoception_net+action}
+        - {type: linear, size: 32}
+        - {type: relu}
+        - {type: linear, size: 16}
+        - {type: relu}
+        - {type: linear, size: 32}
+      vision_denet:
+        - {type: input, source: encoder}
+        - {type: linear, source: vision_encoded}
+        - {type: unflatten}
+        - {type: conv_transpose, size: 8, kernel: 3}
+        - {type: relu}
+        - {type: conv_transpose, source: vision, kernel: 1}
+        - {type: output}
+      interoception_denet:
+        - {type: input, source: encoder}
+        - {type: relu}
+        - {type: linear, size: 4}
+        - {type: linear, source: interoception}
+        - {type: output}
+  FC-DQN-NN:
+    metadata:
+      optimizer: AdamW
+      optimizer_params:
+        lr: 0.001
+        amsgrad: True
+        weight_decay: 0.01
+      loss_function: SmoothL1Loss
+      target: [reward]
+      use_target_net: True
+      target_net_update_frequency: 100
+      tau: 0.05
+    architecture:
+      vision_net:
+        - {type: input, source: vision}
+        - {type: linear, size: 32}
+        - {type: relu}
+        - {type: linear, size: 16}
+        - {type: relu}
+      interoception_net:
+        - {type: input, source: interoception}
+        - {type: linear, size: 4}
+        - {type: relu}
+      combined_net:
+        - {type: input, source: vision_net+interoception_net}
+        - {type: linear, size: 16}
+        - {type: relu}
+        - {type: linear, source: action}
+        - {type: output}
+
+architectures:
+  fc_dqn:
+    q_net:
+      type: FC-DQN-NN
+      inputs: [observation]
+    action:
+      type: DQN
+      inputs: [q_net]
+    reward:
+      type: RewardInference
+      inputs: [observation]
+  fc_dqn_roi:
+    roi:
+      type: ROI
+      inputs: [internal_action]
+      outputs: [roi]
+      n_internal_actions: 3
+    q_net:
+      type: FC-DQN-NN
+      inputs: [roi, observation]
+    action:
+      type: DQN
+      inputs: [q_net]
+    reward:
+      type: RewardInference
+      inputs: [observation]
+  basic_dqn_roi:
+    roi:
+      type: ROI
+      inputs: [internal_action]
+      outputs: [roi]
+      n_internal_actions: 3
+    q_net:
+      type: DQN-NN
+      inputs: [roi, observation]
+    action:
+      type: DQN
+      inputs: [q_net]
+    reward:
+      type: RewardInference
+      inputs: [observation]
+  basic_dqn:
+    q_net:
+      type: DQN-NN
+      inputs: [observation]
+    action:
+      type: DQN
+      inputs: [q_net]
+    reward:
+      type: RewardInference
+      inputs: [observation]
+  model_based:
+    action:
+      type: ModelBased
+      inputs: [dynamic, value]
+    reward:
+      type: RewardInference
+      inputs: [observation]
+    dynamic:
+      type: NextState-NN
+      inputs: [observation]
+    value:
+      type: StateValue-NN
+      inputs: [observation]

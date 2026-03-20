@@ -16,6 +16,7 @@ checkpoints/
 aintelope/config/*.yaml
 !aintelope/config/default_config.yaml
 !aintelope/config/example_config.yaml
+!aintelope/config/model_library.yaml
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
