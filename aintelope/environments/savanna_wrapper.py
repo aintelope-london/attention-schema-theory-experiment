@@ -53,12 +53,13 @@ _OWN_ATTRS = frozenset(
         "_sb3_training",
         "_last_infos",
         "_last_aux_mask",
+        "_n_agents",
     }
 )
 
 
 def _blit_viewport_to_absolute(roi_mask, position, absolute_roi):
-    """Union-blit a viewport ROI mask into absolute board coordinates in-place."""
+    """Blit a viewport ROI mask into absolute board coordinates in-place."""
     obs_r, obs_c = position
     vh, vw = roi_mask.shape
     half_h, half_w = vh // 2, vw // 2
@@ -69,11 +70,11 @@ def _blit_viewport_to_absolute(roi_mask, position, absolute_roi):
     s_c, d_c = max(0, b_c), max(0, -b_c)
     h = min(vh - d_r, board_h - s_r)
     w = min(vw - d_c, board_w - s_c)
-    absolute_roi[s_r : s_r + h, s_c : s_c + w] |= roi_mask[d_r : d_r + h, d_c : d_c + w]
+    absolute_roi[s_r : s_r + h, s_c : s_c + w] = roi_mask[d_r : d_r + h, d_c : d_c + w]
 
 
 def _crop_absolute_to_viewport(absolute_roi, position, viewport_shape):
-    """Crop the absolute ROI union layer into an agent's viewport."""
+    """Crop the absolute ROI layer into an agent's viewport."""
     obs_r, obs_c = position
     vh, vw = viewport_shape
     half_h, half_w = vh // 2, vw // 2
@@ -110,6 +111,7 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
     def __init__(self, cfg):
         self._cfg = cfg
         self._mode = cfg.env_params.mode
+        self._n_agents = sum(1 for k in cfg.agent_params if k.startswith("agent_"))
         # Inner env always produces separate modalities -- wrapper owns the format
         with open_dict(cfg):
             cfg.env_params.combine_interoception_and_vision = False
@@ -118,7 +120,7 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         self._sb3_training = False
         self._last_infos = None
         self._last_aux_mask = np.zeros(
-            (1, cfg.env_params.map_height, cfg.env_params.map_width),
+            (self._n_agents, cfg.env_params.map_height, cfg.env_params.map_width),
             dtype=np.float32,
         )
 
@@ -142,11 +144,11 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         observations = self._to_dict_obs(raw_obs)
 
         board_h, board_w = next(iter(raw_infos.values()))["board_shape"]
-        self._last_aux_mask = np.zeros((1, board_h, board_w), dtype=np.float32)
+        self._last_aux_mask = np.zeros(
+            (self._n_agents, board_h, board_w), dtype=np.float32
+        )
         self._last_infos = raw_infos
 
-        # Blit active ROI masks if roi_mode is set; otherwise the zero slot
-        # remains zeros (vestigial channel kept for consistent observation shape).
         if self._cfg.agent_params.roi_mode is not None:
             observations = self._append_roi_layer(observations, raw_infos)
         else:
@@ -177,10 +179,11 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
     def step_parallel(self, actions):
         """actions: {agent_id: {"action": int, ...}}
 
-        Any "roi" key present in an agent's dict is blitted into the absolute
-        ROI layer using that agent's last known position.
+        Each agent's "roi" viewport mask is blitted into its own absolute slot
+        in _last_aux_mask, keyed by sorted agent index. All N slots are then
+        cropped into each observer's viewport for the next observation.
         Guarded by roi_mode so non-ROI runs skip the blit but still append
-        the zero slot for consistent observation shape.
+        the zero slots for consistent observation shape.
         """
         env_actions = {aid: a["action"] for aid, a in actions.items()}
         raw_obs, raw_scores, terminateds, truncateds, raw_infos = self._env.step(
@@ -193,14 +196,15 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         self._last_infos = raw_infos
 
         if self._cfg.agent_params.roi_mode is not None:
-            aux_mask = np.zeros((board_h, board_w), dtype=bool)
-            for aid, packed in actions.items():
-                mask = packed.get("roi")
-                if mask is not None and self._last_infos is not None:
+            self._last_aux_mask = np.zeros(
+                (self._n_agents, board_h, board_w), dtype=bool
+            )
+            for i, aid in enumerate(sorted(actions.keys())):
+                mask = actions[aid].get("roi")
+                if mask is not None:
                     _blit_viewport_to_absolute(
-                        mask, self._last_infos[aid]["position"], aux_mask
+                        mask, raw_infos[aid]["position"], self._last_aux_mask[i]
                     )
-            self._last_aux_mask = aux_mask[np.newaxis]
             observations = self._append_roi_layer(observations, raw_infos)
         else:
             observations = self._append_zero_roi_layer(observations)
@@ -227,7 +231,7 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
     def observation_space(self, agent_id):
         """Gymnasium observation space for SB3 compatibility.
         Matches the combined (C+N, H, W) cube from combine_obs_sb3.
-        Vision always includes the ROI slot regardless of roi_mode."""
+        Vision always includes n_agents ROI slots regardless of roi_mode."""
         from gymnasium.spaces import Box
 
         sample_obs = self._manifesto["observation_shapes"]
@@ -272,20 +276,21 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         }
 
     def _append_roi_layer(self, observations, infos):
-        """Append the current absolute aux mask union layer (cropped to viewport) to each agent."""
+        """Append N per-agent absolute ROI slots (cropped to viewport) to each observer."""
         for aid, obs in observations.items():
-            viewport_roi = _crop_absolute_to_viewport(
-                self._last_aux_mask[0],
-                infos[aid]["position"],
-                obs["vision"].shape[1:],
-            )
-            obs["vision"] = np.concatenate(
-                [obs["vision"], viewport_roi[np.newaxis]], axis=0
-            )
+            layers = [
+                _crop_absolute_to_viewport(
+                    self._last_aux_mask[i],
+                    infos[aid]["position"],
+                    obs["vision"].shape[1:],
+                ).astype(np.float32)[np.newaxis]
+                for i in range(self._n_agents)
+            ]
+            obs["vision"] = np.concatenate([obs["vision"]] + layers, axis=0)
         return observations
 
     def _append_zero_roi_layer(self, observations):
-        """Append a zero ROI slot to each agent's vision.
+        """Append n_agents zero ROI slots to each agent's vision.
 
         Keeps observation shape consistent with the roi_mode=cone path so
         the same architecture config works for both without modification.
@@ -293,7 +298,8 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         for obs in observations.values():
             h, w = obs["vision"].shape[1], obs["vision"].shape[2]
             obs["vision"] = np.concatenate(
-                [obs["vision"], np.zeros((1, h, w), dtype=np.float32)], axis=0
+                [obs["vision"], np.zeros((self._n_agents, h, w), dtype=np.float32)],
+                axis=0,
             )
         return observations
 
@@ -309,11 +315,11 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         vision = sample_obs[0]
         interoception = sample_obs[1]
 
-        # Vision always gains one ROI slot -- zero when roi_mode is null
+        # Vision gains one ROI slot per agent -- zeros when roi_mode is null
         # (vestigial), cone-masked when roi_mode is active. This is the
         # single source of truth for the agent's vision channel count.
         observation_shapes = {
-            "vision": (vision.shape[0] + 1, *vision.shape[1:]),
+            "vision": (vision.shape[0] + self._n_agents, *vision.shape[1:]),
             "interoception": interoception.shape,
         }
 

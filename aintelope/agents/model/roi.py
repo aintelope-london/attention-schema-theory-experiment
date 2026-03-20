@@ -11,13 +11,15 @@ Mechanics:
   - Reads activations["internal_action"] written by the strategy component in the
     PREVIOUS step (persists across the update boundary by design).
   - Updates roi_state from that value.
-  - Applies darkening to vision[:-1] (original channels) outside the cone.
-  - Writes own boolean mask into vision[-1] (the ROI layer slot the env
-    always appends as zeros) and into activations[self.component_id].
+  - Applies darkening to vision[:-n_agents] (original channels) outside the cone.
+  - Writes own boolean mask into vision[-n_agents + agent_idx] (this agent's ROI
+    slot) and into activations[self.component_id]. Other agents' slots are
+    pre-filled by the wrapper from the previous step's blit.
 
 When ROI is absent from the architecture entirely (roi_mode: null), the env
-wrapper still appends a zero channel as vision[-1] for consistent observation
-shapes. ROI.activate() is simply never called — no vestigial branches needed.
+wrapper still appends n_agents zero channels as vision[-n_agents:] for
+consistent observation shapes. ROI.activate() is simply never called — no
+vestigial branches needed.
 
 n_internal_actions: 3 is declared on the architecture entry in config, not
 as a class attribute. Model.fill_plans reads it generically via
@@ -69,6 +71,7 @@ class ROI(Component):
         roi:
           type: ROI
           inputs: [internal_action]
+          outputs: [roi]
           n_internal_actions: 3
 
     Model.fill_plans reads this generically — ROI is not mentioned by name
@@ -76,12 +79,19 @@ class ROI(Component):
 
     roi_state for cone: {"angle": float} -- 0.0 = north in viewport space.
     Future shapes extend roi_state naturally (circle adds radius, offsets).
+
+    agent_idx is this agent's position in sorted(agent_keys), which matches
+    the wrapper's per-agent slot ordering in _last_aux_mask.
     """
 
     def __init__(self, context):
         self.component_id = context["component_id"]
         self.inputs = context["inputs"]
-        self.radius = context["cfg"].env_params.render_agent_radius
+        cfg = context["cfg"]
+        self.radius = cfg.env_params.render_agent_radius
+        agent_keys = sorted(k for k in cfg.agent_params if k.startswith("agent_"))
+        self.n_agents = len(agent_keys)
+        self.agent_idx = agent_keys.index(context["agent_id"])
         self.roi_state = {"angle": 0.0}
 
     def reset(self):
@@ -94,14 +104,14 @@ class ROI(Component):
         if internal_action is not None:
             self.roi_state["angle"] += _ROI_ANGLE_DELTAS[internal_action]
 
-        vision = activations["vision"]  # (C, H, W); vision[-1] is ROI layer slot
+        vision = activations["vision"]  # (C, H, W); vision[-n_agents:] are ROI slots
         h, w = vision.shape[1], vision.shape[2]
         mask = _cone_mask(h, w, h // 2, w // 2, self.roi_state["angle"], self.radius)
 
-        # Two independent operations on the same mask -- mask is never derived
-        # from vision and neither operation feeds the other.
-        vision[:-1] *= np.where(mask, 1.0, DARKENING_FACTOR)  # darken original channels
-        vision[-1] = mask.astype(np.float32)  # write ROI layer slot
+        # Darken original channels; write only this agent's ROI slot.
+        # Other agents' slots arrive pre-filled from the wrapper's previous-step blit.
+        vision[: -self.n_agents] *= np.where(mask, 1.0, DARKENING_FACTOR)
+        vision[-self.n_agents + self.agent_idx] = mask.astype(np.float32)
         activations[self.component_id] = mask
 
     def update(self, signals=None):
