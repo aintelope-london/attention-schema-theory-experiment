@@ -1,7 +1,10 @@
 """Attention Region of Interest computation.
 
-Computes per-agent boolean attention masks in absolute board coordinates,
-then crops and rotates them into each observer's viewport for the NN.
+compute_roi is now a passthrough -- ROI is applied inside the agent's ROI
+component (agents/model/roi.py) and no longer needs to be computed externally.
+Kept for SB3 compatibility in savanna_wrapper.step().
+
+_cone_mask is retained for use in tests.
 """
 
 import numpy as np
@@ -33,66 +36,11 @@ def _cone_mask(h, w, center_r, center_c, dir_r, dir_c, radius):
     )
 
 
-_REGISTRY = {
-    "cone": _cone_mask,
-}
-
-
 def compute_roi(observations, infos, cfg):
-    """Compute ROI masks and append to observations.
+    """Passthrough -- ROI is now applied inside the agent's ROI component.
 
-    Args:
-        observations: {agent_id: {"vision": ndarray, "interoception": ndarray}}
-        infos:        {agent_id: {"position": (r,c), "direction": (dr,dc),
-                                   "board_shape": (H,W), ...}}
-        cfg:          experiment config
-
-    Returns:
-        (augmented_observations, absolute_masks)
-        absolute_masks: ndarray [N, board_H, board_W] bool — for visualization.
-        Empty [0, H, W] when roi_mode is None.
+    Returns observations unchanged and an empty absolute mask array.
+    Signature preserved for SB3 compatibility in savanna_wrapper.step().
     """
-    roi_mode = cfg.agent_params.roi_mode
-    agent_ids = sorted(observations.keys())
     board_h, board_w = next(iter(infos.values()))["board_shape"]
-
-    # Null case — identity element
-    if roi_mode is None:
-        return observations, np.zeros((0, board_h, board_w), dtype=bool)
-
-    shape_fn = _REGISTRY[roi_mode]
-    radius = cfg.env_params.render_agent_radius
-
-    positions = {aid: infos[aid]["position"] for aid in agent_ids}
-    directions = {aid: infos[aid]["direction"] for aid in agent_ids}
-
-    # 1. Absolute masks on board grid
-    absolute = np.empty((len(agent_ids), board_h, board_w), dtype=bool)
-    for i, aid in enumerate(agent_ids):
-        r, c = positions[aid]
-        dr, dc = directions[aid]
-        absolute[i] = shape_fn(board_h, board_w, r, c, dr, dc, radius)
-
-    # 2. Crop into each observer's viewport
-    result = {}
-    for obs_id in agent_ids:
-        vision = observations[obs_id]["vision"]
-        vh, vw = vision.shape[1:]
-        half_h, half_w = vh // 2, vw // 2
-        obs_r, obs_c = positions[obs_id]
-
-        vp = np.zeros((len(agent_ids), vh, vw), dtype=bool)
-        b_r, b_c = obs_r - half_h, obs_c - half_w
-        # Clipped copy from absolute board → viewport
-        s_r, d_r = max(0, b_r), max(0, -b_r)
-        s_c, d_c = max(0, b_c), max(0, -b_c)
-        h = min(vh - d_r, board_h - s_r)
-        w = min(vw - d_c, board_w - s_c)
-        vp[:, d_r : d_r + h, d_c : d_c + w] = absolute[:, s_r : s_r + h, s_c : s_c + w]
-
-        result[obs_id] = {
-            **observations[obs_id],
-            "vision": np.concatenate([vision, vp], axis=0),
-        }
-
-    return result, absolute
+    return observations, np.zeros((0, board_h, board_w), dtype=bool)

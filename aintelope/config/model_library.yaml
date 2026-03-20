@@ -9,7 +9,6 @@ models:
       post_activate: True
   DQN:
     metadata:
-      q_network: DQN-NN
       greedy_until: 0.7
   ModelBased:
     metadata:
@@ -19,7 +18,7 @@ models:
       num_simulations: 5
       max_depth: 2
       c_puct: 1.0
-  DQN-NN:
+  DQN-CNN-NN:
     metadata:
       optimizer: AdamW
       optimizer_params:
@@ -120,7 +119,7 @@ models:
         - {type: linear, size: 4}
         - {type: linear, source: interoception}
         - {type: output}
-  FC-DQN-NN:
+  DQN-FC-NN:
     metadata:
       optimizer: AdamW
       optimizer_params:
@@ -151,9 +150,9 @@ models:
         - {type: output}
 
 architectures:
-  fc_dqn:
+  dqn_fc:
     q_net:
-      type: FC-DQN-NN
+      type: DQN-FC-NN
       inputs: [observation]
     action:
       type: DQN
@@ -161,14 +160,20 @@ architectures:
     reward:
       type: RewardInference
       inputs: [observation]
-  fc_dqn_roi:
+
+  dqn_fc_roi:
     roi:
       type: ROI
       inputs: [internal_action]
       outputs: [roi]
       n_internal_actions: 3
+      roi_mode: cone
+      darkening_factor: 0.1
+      half_arc: 0.7854    # pi/4 -- half-opening of the cone (45 deg)
+      turn_step: 0.7854   # pi/4 -- angle delta per action step (45 deg)
+      cone_radius: 2      # cone reach in cells
     q_net:
-      type: FC-DQN-NN
+      type: DQN-FC-NN
       inputs: [roi, observation]
     action:
       type: DQN
@@ -176,14 +181,20 @@ architectures:
     reward:
       type: RewardInference
       inputs: [observation]
-  basic_dqn_roi:
+
+  dqn_fc_roi_circle:
     roi:
       type: ROI
       inputs: [internal_action]
       outputs: [roi]
       n_internal_actions: 3
+      roi_mode: circle
+      darkening_factor: 0.1
+      turn_step: 0.7854     # pi/4 -- angle delta per action step (45 deg)
+      circle_distance: 2.0  # orbit radius -- agent center to spotlight center (cells)
+      circle_radius: 2.0    # spotlight coverage radius (cells)
     q_net:
-      type: DQN-NN
+      type: DQN-FC-NN
       inputs: [roi, observation]
     action:
       type: DQN
@@ -191,9 +202,52 @@ architectures:
     reward:
       type: RewardInference
       inputs: [observation]
-  basic_dqn:
+
+  dqn_cnn_roi:
+    roi:
+      type: ROI
+      inputs: [internal_action]
+      outputs: [roi]
+      n_internal_actions: 3
+      roi_mode: cone
+      darkening_factor: 0.1
+      half_arc: 0.7854    # pi/4 -- half-opening of the cone (45 deg)
+      turn_step: 0.7854   # pi/4 -- angle delta per action step (45 deg)
+      cone_radius: 2      # cone reach in cells
     q_net:
-      type: DQN-NN
+      type: DQN-CNN-NN
+      inputs: [roi, observation]
+    action:
+      type: DQN
+      inputs: [q_net]
+    reward:
+      type: RewardInference
+      inputs: [observation]
+
+  dqn_cnn_roi_circle:
+    roi:
+      type: ROI
+      inputs: [internal_action]
+      outputs: [roi]
+      n_internal_actions: 3
+      roi_mode: circle
+      darkening_factor: 0.1
+      turn_step: 0.7854     # pi/4 -- angle delta per action step (45 deg)
+      circle_distance: 2.0  # orbit radius -- agent center to spotlight center (cells)
+      circle_radius: 2.0    # spotlight coverage radius (cells)
+    q_net:
+      type: DQN-CNN-NN
+      inputs: [roi, observation]
+    action:
+      type: DQN
+      inputs: [q_net]
+    reward:
+      type: RewardInference
+      inputs: [observation]
+
+  dqn_cnn:
+    q_net:
+      type: DQN-CNN-NN
       inputs: [observation]
     action:
       type: DQN
@@ -201,6 +255,7 @@ architectures:
     reward:
       type: RewardInference
       inputs: [observation]
+
   model_based:
     action:
       type: ModelBased

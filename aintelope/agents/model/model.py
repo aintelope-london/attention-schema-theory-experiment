@@ -96,15 +96,15 @@ class Model:
             module_cls = globals()[module_type]
 
             # Components with a library card in cfg.models get fill_plans.
-            # Components without one (e.g. ROI, RewardInference) receive empty plans
-            # and read what they need directly from cfg.
+            # Components without one receive the architecture entry as plans so
+            # they can self-parameterise directly from their own config fields.
             if entry.type in cfg.models:
                 plans = copy.deepcopy(cfg.models[entry.type])
                 self.fill_plans(
                     obs_shapes, action_space, plans, obs_fields, internal_actions
                 )
             else:
-                plans = {}
+                plans = entry
 
             context["plans"] = plans
             context["component_id"] = component_id
