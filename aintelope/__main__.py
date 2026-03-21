@@ -71,16 +71,7 @@ if __name__ == "__main__":
         action="store_true",
         help="Launch GUI for config editing, then results after run",
     )
-    parser.add_argument(
-        "--results",
-        action="store_true",
-        help="Launch results viewer standalone",
-    )
+
     args = parser.parse_args()
 
-    if args.results:
-        from aintelope.gui.results_viewer import run_results_viewer
-
-        run_results_viewer()
-    else:
-        run(args.config, gui=args.gui)
+    run(args.config, gui=args.gui)

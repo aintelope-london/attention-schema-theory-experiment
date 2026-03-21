@@ -36,6 +36,10 @@ run:
       n_windows: 2
     action_distribution:
       n_windows: 2
+    roi_turn_distribution:
+      n_windows: 2
+    roi_food_alignment:
+      n_windows: 2
 agent_params:
   save_frequency: 50
   custom_model: ""                 # @ui file
@@ -116,3 +120,4 @@ env_params:
   action_direction_mode: 1         
   test_death: False                # @ui bool
   seed: ${run.seed}
+  

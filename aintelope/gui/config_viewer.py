@@ -85,6 +85,7 @@ class ConfigGUI:
             buttons=[
                 ("Save Config", self._save_config),
                 ("Run", self._run),
+                ("Load Results", self._load_results),
                 ("Cancel", self._on_close),
             ],
         )
@@ -517,6 +518,16 @@ class ConfigGUI:
         save_experiment_config(self._collect_blocks(), filename)
         self.status.set(f"Saved: {filename}")
         self.selector.set_values(list_loadable_configs())
+
+    def _load_results(self):
+        """Open results viewer; hide config window while it's open."""
+        from aintelope.gui.results_viewer import run_results_viewer
+
+        self.root.withdraw()
+        try:
+            run_results_viewer()
+        finally:
+            self.root.deiconify()
 
     def _run(self):
         """Return blocks dict and close."""

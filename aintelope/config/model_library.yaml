@@ -191,8 +191,8 @@ architectures:
       roi_mode: circle
       darkening_factor: 0.1
       turn_step: 0.7854     # pi/4 -- angle delta per action step (45 deg)
-      circle_distance: 2.0  # orbit radius -- agent center to spotlight center (cells)
-      circle_radius: 2.0    # spotlight coverage radius (cells)
+      circle_distance: 3.0  # orbit radius -- agent center to spotlight center (cells)
+      circle_radius: 1.5    # spotlight coverage radius (cells)
     q_net:
       type: DQN-FC-NN
       inputs: [roi, observation]
