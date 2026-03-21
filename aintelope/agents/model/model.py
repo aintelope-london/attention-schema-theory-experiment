@@ -56,7 +56,7 @@ class Model:
         # These must be tracked in memory for training.
         all_inputs_flat = {inp for e in architecture.values() for inp in e.inputs}
         expand_kw = {"observation", "next_observation"}
-        extra_activation_keys = list(
+        internal_activation_keys = list(
             all_inputs_flat - set(architecture.keys()) - set(obs_fields) - expand_kw
         )
 
@@ -67,7 +67,7 @@ class Model:
             + obs_fields
             + ["next_" + f for f in obs_fields]
             + root_component_ids
-            + extra_activation_keys
+            + internal_activation_keys
         )
         self.memory = ReplayMemory(
             cfg.agent_params.replay_buffer_size, memory_field_list
@@ -76,10 +76,12 @@ class Model:
         # Output keys returned from get_action:
         #   - root component ids (not consumed by any sibling)
         #   - explicitly declared outputs (consumed by siblings but also needed externally)
-        explicit_output_keys = {
+        output_keys = {
             k for e in architecture.values() for k in getattr(e, "outputs", [])
         }
-        self._output_keys = set(root_component_ids) | explicit_output_keys
+        self._output_keys = (
+            set(root_component_ids) | output_keys | set(internal_activation_keys)
+        )
 
         context = {
             "cfg": self.cfg,

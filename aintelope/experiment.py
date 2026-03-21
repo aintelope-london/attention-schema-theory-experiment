@@ -169,7 +169,7 @@ def run_experiment(
                         observation,
                         agent_pre_info.get("position"),
                         agent_pre_info.get("food_position"),
-                        actions[agent.id].get("extra_action"),
+                        actions[agent.id].get("internal_action"),
                     ]
                     + env_step_info
                 )

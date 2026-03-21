@@ -521,6 +521,60 @@ def action_distribution(results, params):
     return out
 
 
+def roi_turn_distribution(results, params):
+    n_windows = params.get("n_windows", 2)
+    out = {}
+    for block, data in results.items():
+        events = data["events"]
+        valid = events[events["Internal_action"].notna()]
+        if valid.empty:
+            continue
+        all_actions = sorted(valid["Internal_action"].unique())
+        labels = [str(int(a)) for a in all_actions]
+        windows = _episode_windows(valid["Episode"].unique(), n_windows)
+        figure, axes = create_figure_grid(n_windows)
+        for i, (ax, (label, ep_set)) in enumerate(zip(axes, windows)):
+            counts = (
+                valid[valid["Episode"].isin(ep_set)]["Internal_action"]
+                .value_counts()
+                .reindex(all_actions, fill_value=0)
+            )
+            total = counts.sum()
+            fractions = (counts / total).values if total > 0 else counts.values
+            render_bar(ax, labels, fractions, f"{block} — {label}", get_color(i))
+        figure.tight_layout()
+        _write_figure(results, f"roi_turn_distribution_{block}", figure)
+        out[block] = {"figure": figure}
+    return out
+
+
+def roi_food_alignment(results, params):
+    series = {}
+    for block, data in results.items():
+        events = filter_events(data["events"])
+        food_ind = data["manifesto"]["food_ind"]
+        valid = events[events["Observation"].apply(lambda x: x is not None)]
+        if valid.empty:
+            continue
+        df = valid.copy()
+        df["food_in_roi"] = df["Observation"].apply(
+            lambda obs: bool(
+                np.any((obs["vision"][food_ind] > 0) & (obs["vision"][-1] > 0))
+            )
+        )
+        series[block] = aggregate_series(df, "Episode", "food_in_roi")
+    if not series:
+        return {}
+    fig = plot(
+        series,
+        x_label="Episode",
+        y_label="Food in ROI rate",
+        title="ROI Food Alignment over Training",
+    )
+    _write_figure(results, "roi_food_alignment", fig)
+    return {"figure": fig}
+
+
 _ANALYTICS = {
     "run_summary": run_summary,
     "learning_improvement": learning_improvement,
@@ -533,4 +587,6 @@ _ANALYTICS = {
     "efficiency_curve": efficiency_curve,
     "visitation_heatmap": visitation_heatmap,
     "action_distribution": action_distribution,
+    "roi_turn_distribution": roi_turn_distribution,
+    "roi_food_alignment": roi_food_alignment,
 }

@@ -237,26 +237,26 @@ def test_main_agent_dqn_optimal(base_learning_config):
     report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
 
 
-@pytest.mark.skip("100% with base DQN-FC 3x3")
+@pytest.mark.skip("89% with base DQN-CNN 5x5")
 def test_main_agent_dqn_optimal(base_learning_config):
     cfg = OmegaConf.merge(
         base_learning_config,
         {
             "train": {
                 "run": {
-                    "trials": 1,
+                    "trials": 5,
                     "experiment": {
                         "steps": 20,
-                        "episodes": 5000,
+                        "episodes": 6500,
                         "test_mode": False,
                     },
                 },
                 "agent_params": {
-                    "batch_size": 150,
+                    "batch_size": 350,
                     "replay_buffer_size": 30000,
                     "gamma": 0.99,
                     "agent_0": {
-                        "model": "fc_dqn",
+                        "model": "dqn_fc",
                     },
                 },
                 "models": {
@@ -289,25 +289,24 @@ def test_main_agent_dqn_optimal(base_learning_config):
     report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
 
 
-# @pytest.mark.skip("100% with roi DQN-FC 3x3")
+# @pytest.mark.skip("100% with roi DQN-FC")
 def test_dqn_roi_optimal(base_learning_config):
     cfg = OmegaConf.merge(
         base_learning_config,
         {
             "train": {
                 "run": {
-                    "trials": 1,
+                    "trials": 5,
                     "experiment": {
                         "steps": 20,
-                        "episodes": 5000,
+                        "episodes": 6000,
                         "test_mode": False,
                     },
                 },
                 "agent_params": {
-                    "batch_size": 150,
+                    "batch_size": 350,
                     "replay_buffer_size": 30000,
                     "gamma": 0.99,
-                    "roi": "cone",
                     "agent_0": {
                         "model": "dqn_fc_roi",
                     },
