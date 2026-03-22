@@ -129,7 +129,7 @@ def run_experiments(cfg, main_config):
         if cfg.run.write_outputs:
             all_events = [ev for data in block_data.values() for ev in data["events"]]
             all_states = [st for data in block_data.values() for st in data["states"]]
-            write_results(cfg.run.outputs_dir, all_events, all_states)
+            write_results(cfg.run.outputs_dir, main_config, all_events, all_states)
 
             for block_name, data in block_data.items():
                 if data["performance"]:

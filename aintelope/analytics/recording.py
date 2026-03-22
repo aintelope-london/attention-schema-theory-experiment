@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pickle
+from omegaconf import OmegaConf
 
 SERIALIZABLE_COLUMNS = ("Observation", "Board")
 STATE_COLUMNS = ["Run_id", "Trial", "Episode", "Step", "Board"]
@@ -78,8 +79,9 @@ def _write_grouped_csv(outputs_dir, frames, filename):
         write_csv(Path(outputs_dir) / name / filename, df)
 
 
-def write_results(outputs_dir, events, states):
+def write_results(outputs_dir, main_config, events, states):
     """Write event and state DataFrames grouped by experiment to disk."""
+    OmegaConf.save(main_config, Path(outputs_dir) / "config.yaml")
     _write_grouped_csv(outputs_dir, events, "events.csv")
     _write_grouped_csv(outputs_dir, states, "states.csv")
 
@@ -105,9 +107,8 @@ def list_runs(outputs_dir):
 
 
 def list_blocks(run_dir):
-    """Return block names within a run that contain events.csv."""
-    run_path = Path(run_dir)
-    return sorted(d.name for d in run_path.iterdir() if (d / "events.csv").exists())
+    """Return experiment block names from the run's saved config."""
+    return list(OmegaConf.load(Path(run_dir) / "config.yaml").keys())
 
 
 def read_checkpoints(checkpoint_dir):

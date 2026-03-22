@@ -495,3 +495,14 @@ All components implement the `Component` ABC:
 - `update(signals: dict = None) -> report or None`: propagate learning. Strategy components write loss closures into signals and call subcomponent `update`. NeuralNets execute training. Non-learning components return None.
 
 Components receive a `context` dict at init containing: `cfg`, `device`, `components`, `memory`, `activations`, `env_manifesto`, `agent_id`, `component_id`, `inputs` (expanded), and `plans` (the library card).
+
+
+### 15. ROI analytics
+
+Two analytics track whether agents with ROI components are using their attention meaningfully.
+
+**`roi_turn_distribution`**: plots the frequency of each internal action (left/stay/right turn) across episode windows. Reveals whether the agent develops a preferred rotation strategy over training. No-ops for non-ROI runs — `Internal_action` is null for those agents, `dropna` produces an empty DataFrame, and the function returns `{}`.
+
+**`roi_food_alignment`**: plots the rate at which food appears inside the agent's ROI across episode windows. Computed directly from the logged `Observation`: the food channel (`manifesto["food_ind"]`) and the ROI channel (last vision channel, always appended by the env) are ANDed per step. No geometry is re-implemented — the mask the agent actually used is what was logged. Works for any entity present in the observation space (predators, other agents) by channel index; food is the first use case.
+
+Both analytics follow the null-object pattern: absent ROI data flows through as empty and produces no output, with no branching needed.

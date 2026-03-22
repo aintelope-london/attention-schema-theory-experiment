@@ -30,7 +30,7 @@ def run(config: Union[str, DictConfig] = "default_config.yaml", gui: bool = Fals
         config = OmegaConf.load(os.path.join("aintelope", "config", config))
 
     if gui:
-        from aintelope.gui.config_viewer import run_gui
+        from aintelope.gui.view import run_gui
 
         config = run_gui(config)
         if config is None:
@@ -49,9 +49,9 @@ def run(config: Union[str, DictConfig] = "default_config.yaml", gui: bool = Fals
     result = run_experiments(first_cfg, config)
 
     if gui:
-        from aintelope.gui.results_viewer import run_results_viewer
+        from aintelope.gui.view import run_gui
 
-        run_results_viewer()
+        run_gui(first_cfg, initial_tab="results")
 
     return result
 
@@ -71,7 +71,6 @@ if __name__ == "__main__":
         action="store_true",
         help="Launch GUI for config editing, then results after run",
     )
-
     args = parser.parse_args()
 
     run(args.config, gui=args.gui)
