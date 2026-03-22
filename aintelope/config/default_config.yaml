@@ -42,7 +42,7 @@ run:
       n_windows: 2
 agent_params:
   save_frequency: 50
-  custom_model: ""                 # @ui file
+  custom_model: ""                 # @ui file outputs
   batch_size: 32                   # @ui int 1 100
   replay_buffer_size: 30000        # @ui int 0 30000
   gamma: 0.99                      # @ui float 0.0 1.0
