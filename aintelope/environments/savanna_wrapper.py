@@ -21,6 +21,7 @@ from aintelope.environments.savanna_safetygrid import (
     AGENT_CHR1,
     AGENT_CHR2,
     FOOD_CHR,
+    Actions,
 )
 
 from pettingzoo import ParallelEnv
@@ -308,10 +309,13 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         action_space = list(range(self._env.action_space(sample_agent).n))
         food_ind = layers.index(FOOD_CHR) if FOOD_CHR in layers else None
 
+        action_names = {a.value: a.name for a in Actions if a.value in action_space}
+
         return {
             "layers": layers,
             "observation_shapes": observation_shapes,
             "action_space": action_space,
+            "action_names": action_names,
             "food_ind": food_ind,
         }
 
