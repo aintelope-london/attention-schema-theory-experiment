@@ -290,6 +290,11 @@ def run_summary(results, params):
         ]
         if train_parts:
             lines.append(f"Training: {' | '.join(train_parts)}")
+        manifesto = data.get("manifesto", {})
+        if manifesto:
+            skip = {"observation_shapes", "action_space"}
+            m_parts = [f"{k}={v}" for k, v in manifesto.items() if k not in skip]
+            lines.append(f"Manifesto: {' | '.join(m_parts)}")
         lines_all += lines + [""]
         out[block] = lines
     collector.collect({"Run Summary": text("Run Summary", lines_all)})
@@ -503,7 +508,8 @@ def action_distribution(results, params):
         if valid.empty:
             continue
         all_actions = sorted(valid["Action"].unique())
-        labels = [str(a) for a in all_actions]
+        action_names = data["manifesto"].get("action_names", {})
+        labels = [action_names.get(a, str(a)) for a in all_actions]
         windows = _episode_windows(valid["Episode"].unique(), n_windows)
         figure, axes = create_figure_grid(n_windows)
         for i, (ax, (label, ep_set)) in enumerate(zip(axes, windows)):
