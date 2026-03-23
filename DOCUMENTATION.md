@@ -167,7 +167,6 @@ Registered in `config_utils.register_resolvers()`:
 |----------|---------|
 | `${custom_now:FORMAT}` / `${now:FORMAT}` | Timestamp strings |
 | `${abs_path:REL}` | Absolute path from project root |
-| `${minus_3:VAL}` | Subtract 3 (used for observation radius) |
 | `${muldiv:VAL,MUL,DIV}` | Integer multiply-then-divide |
 | `${range:START,END}` | Generate integer range |
 

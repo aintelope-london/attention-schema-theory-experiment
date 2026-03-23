@@ -42,7 +42,7 @@ run:
       n_windows: 2
 agent_params:
   save_frequency: 50
-  custom_model: ""                 # @ui file
+  custom_model: ""                 # @ui file outputs
   batch_size: 32                   # @ui int 1 100
   replay_buffer_size: 30000        # @ui int 0 30000
   gamma: 0.99                      # @ui float 0.0 1.0
@@ -70,7 +70,7 @@ env_params:
   map_max: 5                       # @ui int 3 50
   map_width: ${env_params.map_max}
   map_height: ${env_params.map_max}
-  render_agent_radius: ${minus_3:${env_params.map_max}}
+  render_agent_radius: 3            # @ui int 1 50
   map_randomization_frequency: 3   # @ui int 0 3
   render_mode: null                # @ui str null,human,rgb_array
   amount_agents: 1

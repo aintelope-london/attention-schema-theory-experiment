@@ -68,6 +68,8 @@ def _parse_annotation(rest: str) -> list:
     parts = text.split()
     type_str = parts[0]
 
+    if type_str == "file":
+        return [parts[1] if len(parts) > 1 else None, "file"]
     if type_str == "bool":
         return [None, "bool"]
     if type_str == "str":
