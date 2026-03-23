@@ -258,7 +258,7 @@ def test_main_agent_dqn_optimal(base_learning_config):
                     "replay_buffer_size": 30000,
                     "gamma": 0.99,
                     "agent_0": {
-                        "model": "dqn_fc",
+                        "model": "dqn_cnn",
                     },
                 },
                 "models": {
@@ -268,6 +268,7 @@ def test_main_agent_dqn_optimal(base_learning_config):
                 },
                 "env_params": {
                     "map_max": 7,
+                    "render_agent_radius": 15,
                     "goal": "reach_food",
                 },
             },
