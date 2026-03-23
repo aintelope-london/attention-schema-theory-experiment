@@ -135,7 +135,7 @@ def test_main_agent_dqn_optimal(base_learning_config):
     report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
 
 
-@pytest.mark.skip("89% with base DQN-CNN 5x5")
+@pytest.mark.skip("89% with base DQN-FC 5x5")
 def test_main_agent_dqn_optimal(base_learning_config):
     cfg = OmegaConf.merge(
         base_learning_config,
@@ -224,6 +224,58 @@ def test_dqn_roi_optimal(base_learning_config):
                     "experiment": {
                         "steps": 10,
                         "episodes": 500,
+                        "test_mode": True,
+                    },
+                },
+                "models": {
+                    "DQN": {
+                        "metadata": {"greedy_until": 0.0},
+                    },
+                },
+            },
+        },
+    )
+    result = run(cfg)
+    report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
+
+
+#@pytest.mark.skip("Curriculum DQN-CNN 5x5")
+def test_main_agent_dqn_optimal(base_learning_config):
+    cfg = OmegaConf.merge(
+        base_learning_config,
+        {
+            "train": {
+                "run": {
+                    "trials": 1,
+                    "experiment": {
+                        "steps": 20,
+                        "episodes": 6500,
+                        "test_mode": False,
+                    },
+                },
+                "agent_params": {
+                    "batch_size": 550,
+                    "replay_buffer_size": 30000,
+                    "gamma": 0.99,
+                    "agent_0": {
+                        "model": "dqn_fc",
+                    },
+                },
+                "models": {
+                    "DQN": {
+                        "metadata": {"greedy_until": 0.3},
+                    },
+                },
+                "env_params": {
+                    "map_max": 7,
+                    "goal": "reach_food",
+                },
+            },
+            "test": {
+                "run": {
+                    "experiment": {
+                        "steps": 10,
+                        "episodes": 100,
                         "test_mode": True,
                     },
                 },

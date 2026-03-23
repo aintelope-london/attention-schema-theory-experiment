@@ -117,15 +117,6 @@ def create_range(start, exclusive_end):
     return list(range(start, exclusive_end))
 
 
-def minus_3(entry):
-    if entry is None:
-        return None
-    elif hasattr(entry, "__iter__"):
-        return [x - 3 for x in entry]
-    else:
-        return entry - 3
-
-
 def muldiv(entry, multiplier, divisor):
     if entry is None:
         return None
@@ -139,7 +130,6 @@ def register_resolvers() -> None:
     OmegaConf.register_new_resolver("custom_now", custom_now, replace=True)
     OmegaConf.register_new_resolver("now", custom_now, replace=True)
     OmegaConf.register_new_resolver("abs_path", get_project_path, replace=True)
-    OmegaConf.register_new_resolver("minus_3", minus_3, replace=True)
     OmegaConf.register_new_resolver("muldiv", muldiv, replace=True)
     OmegaConf.register_new_resolver("range", create_range, replace=True)
     OmegaConf.register_new_resolver(
