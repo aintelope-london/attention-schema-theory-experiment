@@ -10,8 +10,8 @@ from PIL import Image, ImageTk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from omegaconf import DictConfig, OmegaConf
 
-from aintelope.analytics.plotting import create_figure, save_figure, PLOT_TYPES
-import aintelope.analytics.plot_library  # noqa: F401 — registers plot types
+from aintelope.analytics.plot_primitives import create_figure, save_figure, PLOT_TYPES
+import aintelope.analytics.plots  # noqa: F401 — registers plot types
 from aintelope.analytics.recording import (
     list_runs,
     list_blocks,
@@ -735,6 +735,8 @@ class MainWindow:
         agents = sorted(self.df["Agent_id"].unique())
         if agent != "all":
             agents = [agent]
+        self.figure.clear()
+        self.ax = self.figure.add_subplot(111)
         PLOT_TYPES[plot_type](self.ax, self.df, metric, agents, "Agent_id")
         self.canvas.draw()
 
