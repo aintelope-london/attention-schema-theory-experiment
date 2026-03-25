@@ -1,4 +1,8 @@
-"""Plotting toolkit for experiment results visualization.
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+"""Plotting primitives for experiment result visualization.
 
 All matplotlib usage is centralized here. Consumers receive or pass
 figure/axes objects — they never import matplotlib directly.
@@ -40,7 +44,6 @@ PALETTE = [
 
 
 def get_color(index):
-    """Return a color from the palette, cycling if needed."""
     return PALETTE[index % len(PALETTE)]
 
 
@@ -50,48 +53,34 @@ def get_color(index):
 
 
 def create_figure(figsize=(10, 6)):
-    """Create a new Figure with a single subplot."""
     figure = Figure(figsize=figsize)
     ax = figure.add_subplot(111)
     return figure, ax
 
 
+def create_figure_grid(ncols, figsize=None):
+    """Create a Figure with one row of ncols subplots. Returns (figure, axes list)."""
+    figsize = figsize or (5 * ncols, 4)
+    figure = Figure(figsize=figsize)
+    return figure, [figure.add_subplot(1, ncols, i + 1) for i in range(ncols)]
+
+
 def save_figure(figure, path):
-    """Save figure to file."""
     figure.savefig(path, bbox_inches="tight")
 
 
 # =============================================================================
-# Data aggregation primitives
+# Data aggregation
 # =============================================================================
 
 
 def collapse(df, group_cols, y_col, fn="sum"):
-    """Reduce rows by grouping and aggregating.
-
-    Args:
-        df: Source DataFrame.
-        group_cols: Columns to group by.
-        y_col: Column to aggregate.
-        fn: Aggregation function name.
-
-    Returns:
-        DataFrame with one row per group, y_col aggregated.
-    """
+    """Reduce rows by grouping and aggregating."""
     return df.groupby(group_cols, as_index=False)[y_col].agg(fn)
 
 
 def aggregate_series(df, x_col, y_col):
-    """Compute mean and std of y_col grouped by x_col.
-
-    Args:
-        df: Source DataFrame.
-        x_col: Column for the x-axis.
-        y_col: Column to compute statistics on.
-
-    Returns:
-        (x, mean, std) as numpy arrays.
-    """
+    """Compute mean and std of y_col grouped by x_col. Returns (x, mean, std)."""
     agg = df.groupby(x_col)[y_col].agg(["mean", "std"]).fillna(0)
     return agg.index.values, agg["mean"].values, agg["std"].values
 
@@ -100,23 +89,6 @@ def aggregate_series(df, x_col, y_col):
 # Rendering primitives
 # =============================================================================
 
-''' TODO clenaup
-def plot_band(ax, x, mean, std, label=None, color=None, alpha=0.2):
-    """Draw a line with shaded standard deviation region.
-
-    Args:
-        ax: Matplotlib axes.
-        x: X-axis values.
-        mean: Mean values.
-        std: Standard deviation values.
-        label: Legend label.
-        color: Line and fill color.
-        alpha: Fill transparency.
-    """
-    ax.plot(x, mean, linewidth=0.75, label=label, color=color)
-    ax.fill_between(x, mean - std, mean + std, alpha=alpha, color=color)
-'''
-
 
 def plot_band(ax, x, mean, std, label=None, color=None, alpha=0.15):
     ax.plot(x, mean, linewidth=1.5, label=label, color=color)
@@ -124,17 +96,7 @@ def plot_band(ax, x, mean, std, label=None, color=None, alpha=0.15):
 
 
 def plot_grouped_bands(ax, df, metric, groups, group_col, series_fn, x_label):
-    """Render a band per group, each in its own color.
-
-    Args:
-        ax: Matplotlib axes.
-        df: Source DataFrame.
-        metric: Column name for the y-axis value.
-        groups: List of group values to iterate over.
-        group_col: Column name to filter by.
-        series_fn: Callable(df, metric) -> (x, mean, std).
-        x_label: Label for the x-axis.
-    """
+    """Render one band per group into ax."""
     ax.clear()
     for i, group in enumerate(groups):
         group_df = df[df[group_col] == group]
@@ -147,15 +109,8 @@ def plot_grouped_bands(ax, df, metric, groups, group_col, series_fn, x_label):
     ax.figure.tight_layout()
 
 
-def create_figure_grid(ncols, figsize=None):
-    """Create a Figure with one row of ncols subplots. Returns (figure, axes list)."""
-    figsize = figsize or (5 * ncols, 4)
-    figure = Figure(figsize=figsize)
-    return figure, [figure.add_subplot(1, ncols, i + 1) for i in range(ncols)]
-
-
 def render_heatmap(ax, grid, title):
-    """2D count grid rendered as a heat map."""
+    """2D count grid rendered as a heatmap."""
     im = ax.imshow(grid, origin="upper", cmap="hot")
     ax.set_title(title)
     ax.set_xlabel("col")
@@ -164,9 +119,49 @@ def render_heatmap(ax, grid, title):
 
 
 def render_bar(ax, labels, values, title, color):
-    """Normalized bar chart for action fractions."""
+    """Normalized bar chart for categorical fractions."""
     ax.bar(labels, values, color=color)
     ax.set_title(title)
     ax.set_xlabel("Action")
     ax.set_ylabel("Fraction")
     ax.set_ylim(0, 1)
+
+
+def render_scatter(ax, xs, ys, title):
+    """Scatter of actual vs optimal steps. The diagonal y=x is the optimality frontier."""
+    ax.scatter(xs, ys, alpha=0.6, s=20, color=get_color(0))
+    if xs:
+        max_val = max(max(xs), max(ys))
+        ax.plot(
+            [0, max_val],
+            [0, max_val],
+            "--",
+            color="grey",
+            linewidth=1.2,
+            label="optimal (POI=1)",
+        )
+    ax.set_xlabel("Optimal steps (spawn distance)")
+    ax.set_ylabel("Actual steps to goal")
+    ax.set_title(title)
+    ax.legend()
+    ax.figure.tight_layout()
+
+
+def plot_series(
+    series_by_label, x_label, y_label, title, ref_line=None, yscale="linear"
+):
+    """Create a multi-series band chart figure."""
+    figure, ax = create_figure()
+    for i, (label, (x, mean, std)) in enumerate(series_by_label.items()):
+        plot_band(ax, x, mean, std, label=label, color=get_color(i))
+    if ref_line is not None:
+        ref_label, ref_y = ref_line
+        ax.axhline(ref_y, linestyle="--", color="grey", linewidth=1.2, label=ref_label)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    ax.set_title(title)
+    ax.set_yscale(yscale)
+    if series_by_label or ref_line:
+        ax.legend()
+    ax.figure.tight_layout()
+    return figure

@@ -1,15 +1,25 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 """Event recording and run discovery for experiment outputs."""
 
+import ast
 import base64
 import os
 import zlib
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pickle
-from omegaconf import OmegaConf
 
+# Columns stored as compressed+base64 blobs — require deserialize_state on read.
 SERIALIZABLE_COLUMNS = ("Observation", "Board")
+
+# Columns stored as Python repr strings (e.g. "(1, 2)") — require ast.literal_eval on read.
+TUPLE_COLUMNS = ("Position", "Food_position")
+
 STATE_COLUMNS = ["Run_id", "Trial", "Episode", "Step", "Board"]
 
 
@@ -79,20 +89,29 @@ def _write_grouped_csv(outputs_dir, frames, filename):
         write_csv(Path(outputs_dir) / name / filename, df)
 
 
-def write_results(outputs_dir, main_config, events, states):
+def write_results(outputs_dir, events, states):
     """Write event and state DataFrames grouped by experiment to disk."""
-    OmegaConf.save(main_config, Path(outputs_dir) / "config.yaml")
     _write_grouped_csv(outputs_dir, events, "events.csv")
     _write_grouped_csv(outputs_dir, states, "states.csv")
 
 
 def read_events(filepath):
-    """Read an events CSV back into a DataFrame, deserializing state columns."""
+    """Read an events CSV back into a DataFrame with all columns fully parsed.
+
+    - SERIALIZABLE_COLUMNS are decompressed from base64 blobs.
+    - TUPLE_COLUMNS are parsed from their string repr (e.g. "(1, 2)").
+    All consumers receive uniform Python objects regardless of source path.
+    """
     df = pd.read_csv(filepath)
     for col in SERIALIZABLE_COLUMNS:
         if col in df.columns:
             df[col] = df[col].apply(
                 lambda x: deserialize_state(x) if pd.notna(x) else None
+            )
+    for col in TUPLE_COLUMNS:
+        if col in df.columns:
+            df[col] = df[col].apply(
+                lambda x: ast.literal_eval(x) if pd.notna(x) else None
             )
     return df
 
@@ -107,8 +126,9 @@ def list_runs(outputs_dir):
 
 
 def list_blocks(run_dir):
-    """Return experiment block names from the run's saved config."""
-    return list(OmegaConf.load(Path(run_dir) / "config.yaml").keys())
+    """Return block names within a run that contain events.csv."""
+    run_path = Path(run_dir)
+    return sorted(d.name for d in run_path.iterdir() if (d / "events.csv").exists())
 
 
 def read_checkpoints(checkpoint_dir):
@@ -127,13 +147,7 @@ def save_env_layout(image, outputs_dir, seed):
 
 
 def frames_to_video(frames, output_path, frame_duration=0.7):
-    """Render PIL Image frames as an mp4 video.
-
-    Args:
-        frames: List of PIL.Image.Image.
-        output_path: Output .mp4 file path.
-        frame_duration: Seconds each frame is displayed.
-    """
+    """Render PIL Image frames as an mp4 video."""
     import imageio
 
     fps = 10

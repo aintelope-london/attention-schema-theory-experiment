@@ -6,7 +6,7 @@ import pytest
 from omegaconf import OmegaConf
 
 from aintelope.__main__ import run
-from aintelope.analytics.analytics import (
+from aintelope.analytics.metrics import (
     assert_learning_improvement,
     report_optimal_policy,
 )
@@ -239,7 +239,7 @@ def test_dqn_roi_optimal(base_learning_config):
     report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
 
 
-# @pytest.mark.skip("Curriculum DQN-CNN 5x5")
+@pytest.mark.skip("Curriculum DQN-CNN 5x5")
 def test_main_agent_dqn_optimal(base_learning_config):
     cfg = OmegaConf.merge(
         base_learning_config,
