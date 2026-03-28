@@ -77,6 +77,46 @@ Copy the template:
 
 Edit the `PYTHONPATH` in `launch.json` to point to your local repo path.
 
+## Cloud setup
+
+Experiments can be run on cloud GPU instances using `cloud.sh`, a bootstrap script located at the repo root. It is provider-agnostic and has been tested on Lambda Labs (Ubuntu 22.04 base image, no Lambda Stack).
+
+### Choosing an instance
+
+Use a plain Ubuntu 22.04 base image. Avoid provider-managed ML stacks (e.g. Lambda Stack) — `install.py` manages all dependencies explicitly, and pre-installed frameworks risk version conflicts.
+
+A single A100 instance is sufficient for the current workload. Multi-node clusters (e.g. Lambda 1-Click Clusters) are out of scope.
+
+### One-time configuration
+
+Set `REPO_URL` at the top of `cloud.sh` to the HTTPS URL of the repository and commit the file. This is the only configuration required.
+
+### Per-instance workflow
+
+On a fresh instance, run:
+
+```bash
+wget https://raw.githubusercontent.com/YOUR_ORG/YOUR_REPO/main/cloud.sh
+bash cloud.sh
+```
+
+This clones the repo, runs `install.py`, and prints a ready-to-use `scp` command for pulling results. After setup, activate the environment and launch:
+
+```bash
+source repo/venv_aintelope/bin/activate
+aintelope-gui
+```
+
+### Retrieving results
+
+Instance storage is ephemeral — results must be pulled before terminating the instance. At the end of `cloud.sh` output, a copy-pasteable command is printed with the instance's current IP:
+
+```bash
+scp -r ubuntu@INSTANCE_IP:~/repo/outputs ./outputs
+```
+
+Run this from your local machine before terminating the instance.
+
 ## Actions map
 
 The actions the agents can take have the following mapping:

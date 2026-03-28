@@ -5,6 +5,9 @@
 *.toml
 *.lock
 
+# Cloud
+gcs_key.json
+
 # Tensorboard
 tensorboard/
 
