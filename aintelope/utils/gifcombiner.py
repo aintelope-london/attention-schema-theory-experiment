@@ -2,7 +2,7 @@ from PIL import Image
 
 # --- Define your GIFs here ---
 basepath = "/home/joel/project/attention-schema-theory-experiments/outputs/5x5_5trials_dqn_fc/test/"
-input_paths = [basepath+"playback"+str(i)+".gif" for i in range(1,10)]
+input_paths = [basepath + "playback" + str(i) + ".gif" for i in range(1, 10)]
 output_path = "combined.gif"
 # -----------------------------
 
