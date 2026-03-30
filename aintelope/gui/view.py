@@ -1,3 +1,7 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 """Main GUI window — Run config editor and Results viewer in a single window."""
 
 import copy
@@ -16,7 +20,7 @@ from aintelope.analytics.recording import (
     list_runs,
     list_blocks,
     read_events,
-    frames_to_video,
+    save_frames,
 )
 from aintelope.config.config_utils import (
     list_loadable_configs,
@@ -717,7 +721,13 @@ class MainWindow:
             side=LEFT, padx=2
         )
 
-        Button(export_frame, text="Export Video", command=self._export_video).pack(
+        Label(export_frame, text="File:").pack(side=LEFT, padx=(10, 2))
+        self.export_filename_var = StringVar(value="playback.mp4")
+        Entry(export_frame, textvariable=self.export_filename_var, width=16).pack(
+            side=LEFT, padx=2
+        )
+
+        Button(export_frame, text="Export", command=self._export_frames).pack(
             side=LEFT, padx=(10, 5)
         )
 
@@ -805,7 +815,7 @@ class MainWindow:
         save_figure(self.figure, str(save_dir / filename))
         self.status.set(f"Exported: {save_dir / filename}")
 
-    def _export_video(self):
+    def _export_frames(self):
         frames = [
             self._get_frame(step)
             for step in range(
@@ -816,9 +826,9 @@ class MainWindow:
             Path(self.outputs_dir)
             / self.run_var.get()
             / self.block_var.get()
-            / "playback.mp4"
+            / self.export_filename_var.get()
         )
-        frames_to_video(
+        save_frames(
             frames,
             str(output_path),
             frame_duration=float(self.export_duration_var.get()),
