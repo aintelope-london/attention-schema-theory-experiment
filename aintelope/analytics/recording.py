@@ -146,11 +146,29 @@ def save_env_layout(image, outputs_dir, seed):
     image.save(path)
 
 
-def frames_to_video(frames, output_path, frame_duration=0.7):
-    """Render PIL Image frames as an mp4 video."""
-    import imageio
+def save_frames(frames, output_path, frame_duration=0.7):
+    """Save PIL Image frames to a video or animated image file.
 
-    fps = 10
-    repeats = round(frame_duration * fps)
-    images = [np.array(frame) for frame in frames for _ in range(repeats)]
-    imageio.mimwrite(output_path, images, fps=fps)
+    Format is inferred from the output_path extension (.mp4, .gif).
+
+    Args:
+        frames: List of PIL.Image.Image.
+        output_path: Output file path.
+        frame_duration: Seconds each frame is displayed.
+    """
+    ext = Path(output_path).suffix.lower()
+    if ext == ".gif":
+        frames[0].save(
+            output_path,
+            save_all=True,
+            append_images=frames[1:],
+            duration=int(frame_duration * 1000),
+            loop=0,
+        )
+    else:
+        import imageio
+
+        fps = 10
+        repeats = round(frame_duration * fps)
+        images = [np.array(frame) for frame in frames for _ in range(repeats)]
+        imageio.mimwrite(output_path, images, fps=fps)
