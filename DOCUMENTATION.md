@@ -114,7 +114,6 @@ Agents and environments use a registry pattern: a string key in config maps to a
 "sb3_ppo_agent"   → PPOAgent
 "sb3_dqn_agent"   → DQNAgent
 "sb3_a2c_agent"   → A2CAgent
-"llm_agent"       → LLMAgent
 ```
 
 **Environment registry** (`environments/__init__.py`):

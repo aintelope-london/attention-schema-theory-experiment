@@ -64,9 +64,6 @@ make flake8         # Lint
 make typecheck-local # Type check
 ```
 
-### Setting up the LLM API access
-
-Set environment variable `OPENAI_API_KEY`. Ensure you have loaded credits on your OpenAI API account.
 
 ### VSCode launch configurations
 
