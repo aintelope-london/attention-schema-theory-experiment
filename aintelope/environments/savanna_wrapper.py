@@ -32,21 +32,31 @@ from aintelope.utils.roi import compute_roi
 _AGENT_CHRS = [AGENT_CHR1, AGENT_CHR2]
 
 _DIRECTION_VECTORS = {
-    0: (0, -1),   # LEFT
-    1: (0, 1),    # RIGHT
-    2: (-1, 0),   # UP
-    3: (1, 0),    # DOWN
+    0: (0, -1),  # LEFT
+    1: (0, 1),  # RIGHT
+    2: (-1, 0),  # UP
+    3: (1, 0),  # DOWN
 }
 
 _ENV_CLASS = {
-    "parallel":   SavannaGridworldParallelEnv,
+    "parallel": SavannaGridworldParallelEnv,
     "sequential": SavannaGridworldSequentialEnv,
 }
 
-_OWN_ATTRS = frozenset({
-    "_cfg", "_mode", "_env", "_manifesto", "_sb3_training",
-    "_infos", "_dones", "_last_aux_mask", "_n_agents", "state",
-})
+_OWN_ATTRS = frozenset(
+    {
+        "_cfg",
+        "_mode",
+        "_env",
+        "_manifesto",
+        "_sb3_training",
+        "_infos",
+        "_dones",
+        "_last_aux_mask",
+        "_n_agents",
+        "state",
+    }
+)
 
 
 def _blit_viewport_to_absolute(roi_mask, position, absolute_roi):
@@ -59,7 +69,7 @@ def _blit_viewport_to_absolute(roi_mask, position, absolute_roi):
     s_c, d_c = max(0, b_c), max(0, -b_c)
     h = min(vh - d_r, board_h - s_r)
     w = min(vw - d_c, board_w - s_c)
-    absolute_roi[s_r:s_r + h, s_c:s_c + w] = roi_mask[d_r:d_r + h, d_c:d_c + w]
+    absolute_roi[s_r : s_r + h, s_c : s_c + w] = roi_mask[d_r : d_r + h, d_c : d_c + w]
 
 
 def _crop_absolute_to_viewport(absolute_roi, position, viewport_shape):
@@ -73,7 +83,7 @@ def _crop_absolute_to_viewport(absolute_roi, position, viewport_shape):
     s_c, d_c = max(0, b_c), max(0, -b_c)
     h = min(vh - d_r, board_h - s_r)
     w = min(vw - d_c, board_w - s_c)
-    viewport[d_r:d_r + h, d_c:d_c + w] = absolute_roi[s_r:s_r + h, s_c:s_c + w]
+    viewport[d_r : d_r + h, d_c : d_c + w] = absolute_roi[s_r : s_r + h, s_c : s_c + w]
     return viewport
 
 
@@ -96,7 +106,6 @@ def combine_obs_sb3(observations):
 
 
 class SavannaWrapper(AbstractEnv, ParallelEnv):
-
     def __init__(self, cfg):
         self._cfg = cfg
         self._mode = cfg.env_params.mode
@@ -152,7 +161,9 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
     def step(self, actions):
         """PettingZoo ParallelEnv interface — SB3 training only.
         Remove when SB3 agents are deprecated."""
-        raw_obs, raw_scores, terminateds, truncateds, raw_infos = self._env.step(actions)
+        raw_obs, raw_scores, terminateds, truncateds, raw_infos = self._env.step(
+            actions
+        )
         self._update_state(raw_infos, terminateds, truncateds, raw_scores)
         observations = self._to_dict_obs(raw_obs)
         observations, _ = compute_roi(observations, raw_infos, self._cfg)
@@ -201,17 +212,23 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
     @property
     def score_dimensions(self):
         from aintelope.config.config_utils import get_score_dimensions
+
         return get_score_dimensions(self._cfg)
 
     def observation_space(self, agent_id):
         from gymnasium.spaces import Box
+
         sample_obs = self._manifesto["observation_shapes"]
         vision_shape = sample_obs["vision"]
         interoception_shape = sample_obs["interoception"]
         total_channels = vision_shape[0] + interoception_shape[0]
         H, W = vision_shape[1], vision_shape[2]
-        return Box(low=-float("inf"), high=float("inf"),
-                   shape=(total_channels, H, W), dtype=float)
+        return Box(
+            low=-float("inf"),
+            high=float("inf"),
+            shape=(total_channels, H, W),
+            dtype=float,
+        )
 
     @property
     def observation_spaces(self):
@@ -239,7 +256,9 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
 
     # ── State ─────────────────────────────────────────────────────────
 
-    def _update_state(self, raw_infos, terminateds=None, truncateds=None, raw_scores=None):
+    def _update_state(
+        self, raw_infos, terminateds=None, truncateds=None, raw_scores=None
+    ):
         """Update self._infos, self._dones, and rebuild self.state."""
         terminateds = terminateds or {}
         truncateds = truncateds or {}
@@ -283,14 +302,15 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         self._infos = raw_infos
 
         self.state = {
-            "board":           board,
-            "layers":          layer_order,
-            "directions":      directions,
-            "dones":           dict(self._dones),
-            "scores":          {aid: info.get(INFO_REWARD_DICT, {})
-                                for aid, info in raw_infos.items()},
+            "board": board,
+            "layers": layer_order,
+            "directions": directions,
+            "dones": dict(self._dones),
+            "scores": {
+                aid: info.get(INFO_REWARD_DICT, {}) for aid, info in raw_infos.items()
+            },
             "agent_positions": positions,
-            "food_position":   food_pos,
+            "food_position": food_pos,
         }
 
     # ── Observation format ────────────────────────────────────────────
@@ -306,7 +326,9 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
             pos = self._infos[aid]["position"]
             layers = [
                 _crop_absolute_to_viewport(
-                    self._last_aux_mask[i], pos, obs["vision"].shape[1:],
+                    self._last_aux_mask[i],
+                    pos,
+                    obs["vision"].shape[1:],
                 ).astype(np.float32)[np.newaxis]
                 for i in range(self._n_agents)
             ]
@@ -325,7 +347,7 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         interoception = sample_obs[1]
 
         observation_shapes = {
-            "vision":        (vision.shape[0] + self._n_agents, *vision.shape[1:]),
+            "vision": (vision.shape[0] + self._n_agents, *vision.shape[1:]),
             "interoception": interoception.shape,
         }
 
@@ -334,11 +356,11 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         action_names = {a.value: a.name for a in Actions if a.value in action_space}
 
         return {
-            "layers":             layers,
+            "layers": layers,
             "observation_shapes": observation_shapes,
-            "action_space":       action_space,
-            "action_names":       action_names,
-            "food_ind":           food_ind,
+            "action_space": action_space,
+            "action_names": action_names,
+            "food_ind": food_ind,
         }
 
     # ── Internal ──────────────────────────────────────────────────────

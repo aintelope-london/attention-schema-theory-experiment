@@ -38,9 +38,9 @@ def run_experiment(
 
     monitor = DiagnosticsMonitor(
         context={
-            "trial":    i_trial,
+            "trial": i_trial,
             "episodes": cfg.run.experiment.episodes,
-            "steps":    cfg.run.experiment.steps,
+            "steps": cfg.run.experiment.steps,
         }
     )
 
@@ -84,11 +84,11 @@ def run_experiment(
     if is_sb3 and not cfg.run.experiment.test_mode:
         _run_sb3_training(cfg, i_trial, env, agents, events, states, monitor)
         return {
-            "events":         events.to_dataframe(),
-            "states":         states.to_dataframe(),
-            "learning_df":    monitor.learning_dataframe(),
+            "events": events.to_dataframe(),
+            "states": states.to_dataframe(),
+            "learning_df": monitor.learning_dataframe(),
             "performance_df": monitor.performance_dataframe(),
-            "manifesto":      env.manifesto,
+            "manifesto": env.manifesto,
         }
 
     save_freq = cfg.agent_params.save_frequency
@@ -138,7 +138,7 @@ def run_experiment(
                         cfg.experiment_name,
                         i_trial,
                         i_episode,
-                        i_episode,   # seed column — episode index is the seed
+                        i_episode,  # seed column — episode index is the seed
                         step,
                         cfg.run.experiment.test_mode,
                         agent.id,
@@ -153,13 +153,15 @@ def run_experiment(
                     + env_step_info
                 )
 
-            states.log([
-                cfg.experiment_name,
-                i_trial,
-                i_episode,
-                step,
-                (state["board"], state["layers"], None),
-            ])
+            states.log(
+                [
+                    cfg.experiment_name,
+                    i_trial,
+                    i_episode,
+                    step,
+                    (state["board"], state["layers"], None),
+                ]
+            )
 
             if all(dones.values()):
                 break
@@ -168,7 +170,9 @@ def run_experiment(
 
         if cfg.run.write_outputs and save_freq > 0 and (i_episode + 1) % save_freq == 0:
             for agent in agents:
-                agent.save_model(checkpoint_path(cfg.run.outputs_dir, agent.id, i_trial))
+                agent.save_model(
+                    checkpoint_path(cfg.run.outputs_dir, agent.id, i_trial)
+                )
 
     gc.collect()
     monitor.report()
@@ -176,8 +180,12 @@ def run_experiment(
         for agent in agents:
             agent.save_model(checkpoint_path(cfg.run.outputs_dir, agent.id, i_trial))
         from aintelope.gui.renderer import (
-            StateRenderer, Tileset, find_tileset, SavannaInterpreter,
+            StateRenderer,
+            Tileset,
+            find_tileset,
+            SavannaInterpreter,
         )
+
         renderer = StateRenderer(Tileset(find_tileset()))
         interpreter = SavannaInterpreter()
         for seed, s in states_by_seed.items():
@@ -185,11 +193,11 @@ def run_experiment(
             save_env_layout(img, Path(cfg.run.outputs_dir) / cfg.experiment_name, seed)
 
     return {
-        "events":         events.to_dataframe(),
-        "states":         states.to_dataframe(),
-        "learning_df":    monitor.learning_dataframe(),
+        "events": events.to_dataframe(),
+        "states": states.to_dataframe(),
+        "learning_df": monitor.learning_dataframe(),
         "performance_df": monitor.performance_dataframe(),
-        "manifesto":      env.manifesto,
+        "manifesto": env.manifesto,
     }
 
 

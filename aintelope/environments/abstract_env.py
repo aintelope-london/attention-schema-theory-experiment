@@ -45,7 +45,6 @@ from abc import ABC, abstractmethod
 
 
 class AbstractEnv(ABC):
-
     @abstractmethod
     def reset(self, **kwargs):
         """Reset the environment.
@@ -89,4 +88,3 @@ class AbstractEnv(ABC):
 
         Returns [] for environments where reward inference is agent-side.
         """
-        

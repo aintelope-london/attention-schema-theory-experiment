@@ -46,11 +46,11 @@ from pettingzoo import AECEnv, ParallelEnv
 
 # SB3-internal context keys injected into the policy's info dict.
 # "episode" is reserved by Stable Baselines internally.
-INFO_trial           = "trial"
-INFO_EPISODE         = "i_episode"
+INFO_trial = "trial"
+INFO_EPISODE = "i_episode"
 INFO_ENV_LAYOUT_SEED = "env_layout_seed"
-INFO_STEP            = "step"
-INFO_TEST_MODE       = "test_mode"
+INFO_STEP = "step"
+INFO_TEST_MODE = "test_mode"
 
 PettingZooEnv = Union[AECEnv, ParallelEnv]
 Environment = Union[gym.Env, PettingZooEnv]
@@ -178,9 +178,9 @@ class SB3BaseAgent(AbstractAgent):
         self.state = None
         self.infos = {}
         self.states = {}
-        self.model = None          # single-model scenario
-        self.models = None         # multi-model scenario
-        self.exceptions = None     # multi-model scenario
+        self.model = None  # single-model scenario
+        self.models = None  # multi-model scenario
+        self.exceptions = None  # multi-model scenario
         self.model_constructor = None
 
         stable_baselines3.common.save_util.is_json_serializable = is_json_serializable
@@ -215,11 +215,11 @@ class SB3BaseAgent(AbstractAgent):
             return None
 
         self.info = {
-            INFO_trial:           kwargs.get("trial", 0),
-            INFO_EPISODE:         kwargs.get("episode", 0),
+            INFO_trial: kwargs.get("trial", 0),
+            INFO_EPISODE: kwargs.get("episode", 0),
             INFO_ENV_LAYOUT_SEED: kwargs.get("seed", 0),
-            INFO_STEP:            kwargs.get("step", 0),
-            INFO_TEST_MODE:       self.cfg.run.experiment.test_mode,
+            INFO_STEP: kwargs.get("step", 0),
+            INFO_TEST_MODE: self.cfg.run.experiment.test_mode,
         }
         self.infos[self.id] = self.info
 
@@ -333,11 +333,11 @@ class SB3BaseAgent(AbstractAgent):
         self.next_episode_no += 1
 
         repeat_len = self.cfg.env_params.env_layout_seed_repeat_sequence_length
-        env_layout_seed = (
-            int(i_episode / repeat_len) if repeat_len > 0 else i_episode
-        )
+        env_layout_seed = int(i_episode / repeat_len) if repeat_len > 0 else i_episode
         if self.cfg.env_params.env_layout_seed_modulo > 0:
-            env_layout_seed = env_layout_seed % self.cfg.env_params.env_layout_seed_modulo
+            env_layout_seed = (
+                env_layout_seed % self.cfg.env_params.env_layout_seed_modulo
+            )
 
         kwargs["env_layout_seed"] = env_layout_seed
         return (True, seed, options, args, kwargs)
@@ -353,11 +353,11 @@ class SB3BaseAgent(AbstractAgent):
         env_layout_seed = self.env.get_env_layout_seed()
 
         for agent, info in infos.items():
-            info[INFO_trial]           = i_trial
-            info[INFO_EPISODE]         = i_episode
+            info[INFO_trial] = i_trial
+            info[INFO_EPISODE] = i_episode
             info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
-            info[INFO_STEP]            = 0
-            info[INFO_TEST_MODE]       = self.cfg.run.experiment.test_mode
+            info[INFO_STEP] = 0
+            info[INFO_TEST_MODE] = self.cfg.run.experiment.test_mode
 
         if self.model:
             if hasattr(self.model.policy, "my_reset"):
@@ -396,11 +396,11 @@ class SB3BaseAgent(AbstractAgent):
             score2 = info[INFO_REWARD_DICT]
             done = terminateds[agent] or truncateds[agent]
 
-            info[INFO_trial]           = i_trial
-            info[INFO_EPISODE]         = i_episode
+            info[INFO_trial] = i_trial
+            info[INFO_EPISODE] = i_episode
             info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
-            info[INFO_STEP]            = step
-            info[INFO_TEST_MODE]       = self.cfg.run.experiment.test_mode
+            info[INFO_STEP] = step
+            info[INFO_TEST_MODE] = self.cfg.run.experiment.test_mode
 
             agent_step_info = [
                 agent,
@@ -503,11 +503,11 @@ class SB3BaseAgent(AbstractAgent):
         env_layout_seed = self.env.get_env_layout_seed()
         step = self.env.get_step_no() - 1
 
-        self.info[INFO_trial]           = i_trial
-        self.info[INFO_EPISODE]         = i_episode
+        self.info[INFO_trial] = i_trial
+        self.info[INFO_EPISODE] = i_episode
         self.info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
-        self.info[INFO_STEP]            = step
-        self.info[INFO_TEST_MODE]       = self.cfg.run.experiment.test_mode
+        self.info[INFO_STEP] = step
+        self.info[INFO_TEST_MODE] = self.cfg.run.experiment.test_mode
 
         self.infos[self.id] = self.info
 
