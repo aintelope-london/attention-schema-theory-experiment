@@ -41,7 +41,7 @@ class Model:
         self.activations = {}
         self.resets = 0
 
-        architecture = cfg.agent_params[agent_id].architecture
+        architecture = cfg.agent_params.agents[agent_id].architecture
         obs_fields = list(obs_shapes.keys())
 
         # internal_actions: sum of non-env action slots declared by architecture entries.

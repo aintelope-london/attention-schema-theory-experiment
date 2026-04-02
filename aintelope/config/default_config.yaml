@@ -1,9 +1,6 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
-#
-# Repository:
-# https://github.com/aintelope-london/attention-schema-theory-experiment     
 
 run:
   outputs_dir: outputs/${now:%Y%m%d%H%M%S}/
@@ -15,7 +12,7 @@ run:
     steps: 10                      # @ui int 1 10000
     test_mode: False               # @ui bool
     event_columns: [
-      Run_id, Trial, Episode, Env layout seed, Step, IsTest,
+      Run_id, Trial, Episode, Seed, Step, IsTest,
       Agent_id, Action, Reward, Done, Observation,
       Position, Food_position, Internal_action]
   write_outputs: True              # @ui bool
@@ -40,25 +37,45 @@ run:
       n_windows: 2
     roi_food_alignment:
       n_windows: 2
+
 agent_params:
   save_frequency: 50
   custom_model: ""                 # @ui file outputs
   batch_size: 32                   # @ui int 1 100
   replay_buffer_size: 30000        # @ui int 0 30000
   gamma: 0.99                      # @ui float 0.0 1.0
-  # Agents
-  agent_0:
-    agent_class: main_agent        # @ui str main_agent,random_agent,sb3_ppo_agent,sb3_a2c_agent
-    model: dqn_fc                  # @ui str dqn_fc,dqn_cnn,dqn_fc_roi,dqn_cnn_roi,dqn_fc_roi_circle,dqn_cnn_roi_circle
+  agents:
+    agent_0:
+      agent_class: main_agent      # @ui str main_agent,random_agent,sb3_ppo_agent,sb3_a2c_agent
+      model: dqn_fc                # @ui str dqn_fc,dqn_cnn,dqn_fc_roi,dqn_cnn_roi,dqn_fc_roi_circle,dqn_cnn_roi_circle
   # SB3 model parameters
   num_conv_layers: 0               # @ui int 0 3
   learning_rate: 0.0003            # @ui float 0.0001 0.01
   ppo_n_steps: 64                  # @ui int 32 8192
+
 env_params:
-  env: savanna-safetygrid-v1       # @ui str savanna-safetygrid-v1
+  env: gridworld-v1                # @ui str gridworld-v1,savanna-safetygrid-v1
+  mode: parallel                   # @ui str parallel
+
+  # ── Gridworld env params (env: gridworld-v1) ───────────────────────
+  map_size: 10                     # @ui int 3 50
+  observation_radius: 5            # @ui int 1 20
+  observation_format: boolean_cube # @ui str boolean_cube
+  objects:
+    food:
+      count: 3                     # @ui int 0 20
+    predator:
+      count: 1                     # @ui int 0 10
+  actions:
+    - forward
+    - left
+    - right
+    - backward
+    - wait
+
+  # ── Savanna env params (env: savanna-safetygrid-v1) ───────────────
   env_layout_seed_repeat_sequence_length: -1  # @ui int -1 1000
   env_layout_seed_modulo: 0        # @ui int 0 1000
-  mode: parallel                   # @ui str serial,parallel
   goal: None                       # @ui str None,reach_food
   combine_interoception_and_vision: False  # @ui bool
   interoception_transformation_mode: 0   # @ui int 0 4
@@ -70,7 +87,7 @@ env_params:
   map_max: 5                       # @ui int 3 50
   map_width: ${env_params.map_max}
   map_height: ${env_params.map_max}
-  render_agent_radius: 3            # @ui int 1 50
+  render_agent_radius: 3           # @ui int 1 50
   map_randomization_frequency: 3   # @ui int 0 3
   render_mode: null                # @ui str null,human,rgb_array
   amount_agents: 1
@@ -83,18 +100,18 @@ env_params:
   amount_gold_deposits: 0          # @ui int 0 20
   amount_silver_deposits: 0        # @ui int 0 20
   scores:
-      DANGER_TILE_SCORE: '{"INJURY": 0}'                        # @ui str
-      PREDATOR_NPC_SCORE: '{"INJURY": 0}'                       # @ui str
-      MOVEMENT_SCORE: '{"MOVEMENT": 0}'                         # @ui str
-      COOPERATION_SCORE: '{"COOPERATION": 0}'                   # @ui str
-      GOLD_SCORE: '{"GOLD": 0}'                                 # @ui str
-      SILVER_SCORE: '{"SILVER": 0}'                             # @ui str
-      FOOD_SCORE: '{"FOOD": 20}'                                # @ui str
-      FOOD_DEFICIENCY_SCORE: '{"FOOD_DEFICIENCY": 0}'           # @ui str
-      FOOD_OVERSATIATION_SCORE: '{"FOOD_OVERSATIATION": 0}'     # @ui str
-      DRINK_SCORE: '{"DRINK": 0}'                               # @ui str
-      DRINK_DEFICIENCY_SCORE: '{"DRINK_DEFICIENCY": 0}'         # @ui str
-      DRINK_OVERSATIATION_SCORE: '{"DRINK_OVERSATIATION": 0}'   # @ui str
+    DANGER_TILE_SCORE: '{"INJURY": 0}'                        # @ui str
+    PREDATOR_NPC_SCORE: '{"INJURY": 0}'                       # @ui str
+    MOVEMENT_SCORE: '{"MOVEMENT": 0}'                         # @ui str
+    COOPERATION_SCORE: '{"COOPERATION": 0}'                   # @ui str
+    GOLD_SCORE: '{"GOLD": 0}'                                 # @ui str
+    SILVER_SCORE: '{"SILVER": 0}'                             # @ui str
+    FOOD_SCORE: '{"FOOD": 20}'                                # @ui str
+    FOOD_DEFICIENCY_SCORE: '{"FOOD_DEFICIENCY": 0}'           # @ui str
+    FOOD_OVERSATIATION_SCORE: '{"FOOD_OVERSATIATION": 0}'     # @ui str
+    DRINK_SCORE: '{"DRINK": 0}'                               # @ui str
+    DRINK_DEFICIENCY_SCORE: '{"DRINK_DEFICIENCY": 0}'         # @ui str
+    DRINK_OVERSATIATION_SCORE: '{"DRINK_OVERSATIATION": 0}'   # @ui str
   FOOD_DEFICIENCY_INITIAL: 0       # @ui float -100.0 100.0
   FOOD_EXTRACTION_RATE: 0.25       # @ui float 0.0 10.0
   FOOD_DEFICIENCY_RATE: -0.1       # @ui float -10.0 0.0
@@ -116,8 +133,7 @@ env_params:
   GOLD_VISITS_LOG_BASE: 1.5        # @ui float 1.0 10.0
   SILVER_VISITS_LOG_BASE: 1.5      # @ui float 1.0 10.0
   PREDATOR_MOVEMENT_PROBABILITY: 0.5  # @ui float 0.0 1.0
-  observation_direction_mode: 1    
-  action_direction_mode: 1         
+  observation_direction_mode: 1
+  action_direction_mode: 1
   test_death: False                # @ui bool
-  seed: ${run.seed}
   

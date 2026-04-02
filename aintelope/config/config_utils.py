@@ -27,11 +27,11 @@ def init_config(main_config):
     cfg = OmegaConf.merge(cfg, list(main_config.values())[0])
     library = OmegaConf.load(CONFIG_DIR / MODEL_LIBRARY)
     cfg = OmegaConf.merge(cfg, {"models": library.models})
-    for agent_key in (k for k in cfg.agent_params if k.startswith("agent_")):
-        model_name = cfg.agent_params[agent_key].model
+    for agent_key in cfg.agent_params.agents:
+        model_name = cfg.agent_params.agents[agent_key].model
         OmegaConf.update(
             cfg,
-            f"agent_params.{agent_key}.architecture",
+            f"agent_params.agents.{agent_key}.architecture",
             library.architectures[model_name],
             force_add=True,
         )
@@ -47,7 +47,7 @@ def prepare_experiment_cfg(cfg, overrides, experiment_name, trial_seed):
     OmegaConf.update(
         merged.env_params,
         "amount_agents",
-        sum(1 for k in merged.agent_params if k.startswith("agent_")),
+        sum(1 for _ in merged.agent_params.agents),
     )
     return merged
 

@@ -21,7 +21,9 @@ def model_free_cfg():
                     },
                     "agent_params": {
                         "roi_mode": None,
-                        "agent_0": {"agent_class": "main_agent", "model": "dqn_fc"},
+                        "agents": {
+                            "agent_0": {"agent_class": "main_agent", "model": "dqn_fc"},
+                        },
                     },
                 }
             }
@@ -41,9 +43,11 @@ def model_based_cfg():
                     },
                     "agent_params": {
                         "roi_mode": None,
-                        "agent_0": {
-                            "agent_class": "main_agent",
-                            "model": "model_based",
+                        "agents": {
+                            "agent_0": {
+                                "agent_class": "main_agent",
+                                "model": "model_based",
+                            },
                         },
                     },
                 }
@@ -86,7 +90,7 @@ class TestModelFree:
             action = model.get_action(obs)
             assert isinstance(action["action"], int)
 
-            observations, _, _, _, _ = model_free_env.step_parallel({"agent_0": action})
+            observations, _ = model_free_env.step_parallel({"agent_0": action})
             next_obs = observations["agent_0"]
             model.update(next_obs)
             assert not any(
@@ -114,9 +118,7 @@ class TestModelBased:
             action = model.get_action(obs)
             assert isinstance(action["action"], int)
 
-            observations, _, _, _, _ = model_based_env.step_parallel(
-                {"agent_0": action}
-            )
+            observations, _ = model_based_env.step_parallel({"agent_0": action})
             next_obs = observations["agent_0"]
             model.update(next_obs)
             assert not any(

@@ -44,9 +44,10 @@ from typing import Any, Union
 import gymnasium as gym
 from pettingzoo import AECEnv, ParallelEnv
 
-# TODO: implement these infos in savanna_safetygrid.py instead
+# SB3-internal context keys injected into the policy's info dict.
+# "episode" is reserved by Stable Baselines internally.
 INFO_trial = "trial"
-INFO_EPISODE = "i_episode"  # NB! cannot use "episode" because it is used internally by Stable Baselines (including ver 3), see: https://github.com/hill-a/stable-baselines/issues/977
+INFO_EPISODE = "i_episode"
 INFO_ENV_LAYOUT_SEED = "env_layout_seed"
 INFO_STEP = "step"
 INFO_TEST_MODE = "test_mode"
@@ -72,8 +73,7 @@ def vec_env_args(env, num_envs):
     assert num_envs == 1
 
     def env_fn():
-        # env_copy = cloudpickle.loads(cloudpickle.dumps(env))
-        env_copy = env  # TODO: add an assertion check that verifies that this "cloning" function is called only once per environment
+        env_copy = env  # TODO: assertion that this is called only once per env
         return env_copy
 
     return [env_fn] * num_envs, env.observation_space, env.action_space
@@ -88,18 +88,9 @@ class CustomCNN(BaseFeaturesExtractor):
     def __init__(self, observation_space, features_dim=256, num_conv_layers=2):
         super().__init__(observation_space, features_dim)
 
-        # TODO: make this architecture configurable
-
         num_channels = observation_space.shape[0]
         height = observation_space.shape[1]
         width = observation_space.shape[2]
-
-        # Current observation_space is (num_channels, 9, 9) - channels=num_channels, height=9, width=9
-        # Let's build a small CNN with two conv layers:
-        #   Conv1: kernel_size=3, stride=1, padding=1 - keeps spatial dims at 9x9 -> 9x9
-        #   Conv2: kernel_size=3, stride=2, padding=1 - downsamples from 9x9 -> 5x5
-        #   Conv3: kernel_size=3, stride=2, padding=1 - downsamples from 5x5 -> 3x3
-        #   Flatten into a linear layer
 
         if num_conv_layers == 2:
             self.cnn = nn.Sequential(
@@ -124,7 +115,6 @@ class CustomCNN(BaseFeaturesExtractor):
                 nn.Flatten(),
             )
 
-        # Compute shape by doing one forward pass
         with torch.no_grad():
             sample = torch.zeros(1, num_channels, height, width)
             n_flatten = self.cnn(sample).shape[1]
@@ -136,7 +126,6 @@ class CustomCNN(BaseFeaturesExtractor):
 
 
 def sb3_agent_train_thread_entry_point(env_wrapper, agent_id, model_constructor, cfg):
-    # need to catch exception so that the env wrapper can signal the training ended
     try:
         select_gpu(cfg)
         set_priorities(cfg)
@@ -149,17 +138,16 @@ def sb3_agent_train_thread_entry_point(env_wrapper, agent_id, model_constructor,
         model.learn(total_timesteps=env_wrapper.num_total_steps)
         env_wrapper.set_model(agent_id, model)
     except Exception as ex:
-        # need to catch exception so that the env wrapper can signal the training ended
         info = str(ex) + os.linesep + traceback.format_exc()
         env_wrapper.terminate_with_exception(info)
         print(info)
 
 
 class SB3BaseAgent(AbstractAgent):
-    """SB3BaseAgent abstract class for stable baselines 3
-    https://pettingzoo.farama.org/tutorials/sb3/waterworld/
-    https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html
-    https://spinningup.openai.com/en/latest/algorithms/ppo.html
+    """SB3BaseAgent — wraps Stable Baselines 3 models behind the AbstractAgent contract.
+
+    Training runs through SB3's own loop (special permission, see DOCUMENTATION.md).
+    Test mode runs through the canonical experiment loop.
     """
 
     def __init__(
@@ -190,72 +178,57 @@ class SB3BaseAgent(AbstractAgent):
         self.state = None
         self.infos = {}
         self.states = {}
-        self.model = None  # for single-model scenario
-        self.models = None  # for multi-model scenario
-        self.exceptions = None  # for multi-model scenario
-        self.model_constructor = None  # for multi-model scenario
+        self.model = None  # single-model scenario
+        self.models = None  # multi-model scenario
+        self.exceptions = None  # multi-model scenario
+        self.model_constructor = None
 
-        stable_baselines3.common.save_util.is_json_serializable = is_json_serializable  # The original function throws many "Pythonic" exceptions which make debugging in Visual Studio too noisy since VS does not have capacity to filter out handled exceptions
+        stable_baselines3.common.save_util.is_json_serializable = is_json_serializable
 
     def _prepare_obs(self, observation):
         """Convert multimodal dict observation to combined (C+N, H, W) ndarray.
         Each interoception value becomes a constant-filled spatial layer."""
-        vision = observation["vision"]  # (C, H, W)
-        interoception = observation["interoception"]  # (N,)
+        vision = observation["vision"]
+        interoception = observation["interoception"]
         H, W = vision.shape[1], vision.shape[2]
         intero_layers = np.broadcast_to(
             interoception[:, None, None], (len(interoception), H, W)
         ).copy()
         return np.concatenate([vision, intero_layers], axis=0)
 
-    def reset(self, state, info=None, env_class=None, **kwargs) -> None:
-        """Resets self and updates the state."""
+    def reset(self, state, **kwargs) -> None:
+        """Reset agent state. Called at the start of each episode."""
         self.done = False
         self.last_action = None
-
         self.state = self._prepare_obs(state)
-        self.info = info
-        self.states = {self.id: self.state}  # TODO: multi-agent support
-        self.infos = {self.id: info}
-
-        self.env_class = env_class
+        self.info = None
+        self.states = {self.id: self.state}
+        self.infos = {self.id: self.info}
 
     def get_action(self, observation=None, **kwargs) -> Optional[int]:
-        """Given an observation, ask your model what to do.
-        Called during test only, not during training.
+        """Predict action. Runs during canonical test loop.
 
-        Returns:
-            action (Optional[int]): index of action
+        Builds SB3-internal context dict from kwargs (step, episode, trial)
+        without requiring the experiment loop to pass env-specific info.
         """
         if self.done:
             return None
 
-        info = kwargs.get("info", {})
-        trial = kwargs.get("trial", 0)
-        episode = kwargs.get("episode", 0)
-        env_layout_seed = kwargs.get("env_layout_seed", 0)
-        step = kwargs.get("step", 0)
-
-        self.info = info
-
-        self.info[INFO_trial] = trial
-        self.info[INFO_EPISODE] = episode
-        self.info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
-        self.info[INFO_STEP] = step
-        self.info[INFO_TEST_MODE] = self.cfg.run.experiment.test_mode
-
+        self.info = {
+            INFO_trial: kwargs.get("trial", 0),
+            INFO_EPISODE: kwargs.get("episode", 0),
+            INFO_ENV_LAYOUT_SEED: kwargs.get("seed", 0),
+            INFO_STEP: kwargs.get("step", 0),
+            INFO_TEST_MODE: self.cfg.run.experiment.test_mode,
+        }
         self.infos[self.id] = self.info
 
         if self.model and hasattr(self.model.policy, "set_info"):
             self.model.policy.set_info(self.info)
 
         observation = self._prepare_obs(observation)
-        action, _states = self.model.predict(
-            observation, deterministic=True
-        )  # TODO: config setting for "deterministic" parameter
-        action = np.asarray(
-            action
-        ).item()  # SB3 sends actions in wrapped into an one-item array for some reason. np.asarray is also able to handle lists.
+        action, _states = self.model.predict(observation, deterministic=True)
+        action = np.asarray(action).item()
 
         action_space = self.env.action_spaces[self.id]
         if isinstance(action_space, Discrete):
@@ -265,8 +238,7 @@ class SB3BaseAgent(AbstractAgent):
         assert action >= min_action
 
         self.state = observation
-        self.states[self.id] = observation  # TODO: multi-agent support
-
+        self.states[self.id] = observation
         self.last_action = action
         return action
 
@@ -298,7 +270,7 @@ class SB3BaseAgent(AbstractAgent):
         checkpoint_dir = Path(self.cfg.run.outputs_dir) / "checkpoints"
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-        if self.model is not None:  # single-model scenario
+        if self.model is not None:
             self.model.learn(total_timesteps=num_total_steps)
         else:
             checkpoint_filenames = {
@@ -331,7 +303,6 @@ class SB3BaseAgent(AbstractAgent):
         if self.model is not None:
             torch.save(self.model.get_parameters(), path)
         elif self.models:
-            # Multi-model: save each agent to trial-indexed path
             i_trial = kwargs.get("i_trial", 0)
             outputs_dir = str(Path(path).parent.parent)
             for agent_id, model in self.models.items():
@@ -349,35 +320,27 @@ class SB3BaseAgent(AbstractAgent):
         if checkpoint:
             use_cuda = torch.cuda.is_available() and torch.cuda.device_count() > 0
             device = torch.device("cuda" if use_cuda else "cpu")
-
             params = torch.load(checkpoint, map_location=device)
             self.model.set_parameters(params, device=device)
+
+    # ── SB3 training callbacks ─────────────────────────────────────────────────
+    # Second permitted location for layout seed computation (SB3 training path).
 
     def env_pre_reset_callback(self, seed, options, *args, **kwargs):
         assert seed is None
 
-        i_episode = (
-            self.next_episode_no
-        )  # cannot use env.get_next_episode_no() here since its counter is reset for each new env_layout_seed
-        self.next_episode_no += 1  # no need to worry about the first reset happening multiple times in experiments.py since the current callback is activated only before self.model.learn() is called
+        i_episode = self.next_episode_no
+        self.next_episode_no += 1
 
-        env_layout_seed = (
-            int(
-                i_episode / self.cfg.env_params.env_layout_seed_repeat_sequence_length
-            )  # TODO ensure different env_layout_seed during test when num_actual_train_episodes is not divisible by env_layout_seed_repeat_sequence_length
-            if self.cfg.env_params.env_layout_seed_repeat_sequence_length > 0
-            else i_episode  # this ensures that during test episodes, env_layout_seed based map randomization seed is different from training seeds. The environment is re-constructed when testing starts. Without explicitly providing env_layout_seed, the map randomization seed would be automatically reset to env_layout_seed = 0, which would overlap with the training seeds.
-        )
-
-        # How many different layout seeds there should be overall? After given amount of seeds has been used, the seed will loop over to zero and repeat the seed sequence. Zero or negative modulo parameter value disables the modulo feature.
+        repeat_len = self.cfg.env_params.env_layout_seed_repeat_sequence_length
+        env_layout_seed = int(i_episode / repeat_len) if repeat_len > 0 else i_episode
         if self.cfg.env_params.env_layout_seed_modulo > 0:
             env_layout_seed = (
                 env_layout_seed % self.cfg.env_params.env_layout_seed_modulo
             )
 
         kwargs["env_layout_seed"] = env_layout_seed
-
-        return (True, seed, options, args, kwargs)  # allow reset
+        return (True, seed, options, args, kwargs)
 
     def env_post_reset_callback(self, states, infos, seed, options, *args, **kwargs):
         self.state = states[self.id]
@@ -386,17 +349,10 @@ class SB3BaseAgent(AbstractAgent):
         self.infos = infos
 
         i_trial = self.i_trial
-        i_episode = (
-            self.next_episode_no - 1
-        )  # cannot use env.get_next_episode_no() here since its counter is reset for each new env_layout_seed
-        env_layout_seed = (
-            self.env.get_env_layout_seed()
-        )  # no need to substract 1 here since env_layout_seed value is overridden in env_pre_reset_callback
+        i_episode = self.next_episode_no - 1
+        env_layout_seed = self.env.get_env_layout_seed()
 
-        for (
-            agent,
-            info,
-        ) in infos.items():  # TODO: move this code to savanna_safetygrid.py
+        for agent, info in infos.items():
             info[INFO_trial] = i_trial
             info[INFO_EPISODE] = i_episode
             info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
@@ -410,7 +366,7 @@ class SB3BaseAgent(AbstractAgent):
                 self.model.policy.set_info(self.info)
 
     def env_pre_step_callback(self, actions):
-        return actions  # you can modify the actions in this method but keep in mind that the calling RL algorithm might not become aware of the modified actions later
+        return actions
 
     def parallel_env_post_step_callback(
         self,
@@ -427,32 +383,19 @@ class SB3BaseAgent(AbstractAgent):
             return
 
         i_trial = self.i_trial
-        i_episode = (
-            self.next_episode_no - 1
-        )  # cannot use env.get_next_episode_no() here since its counter is reset for each new env_layout_seed
-        env_layout_seed = (
-            self.env.get_env_layout_seed()
-        )  # no need to substract 1 here since env_layout_seed value is overridden in env_pre_reset_callback
-        step = (
-            self.env.get_step_no() - 1
-        )  # get_step_no() returned step indexes start with 1
+        i_episode = self.next_episode_no - 1
+        env_layout_seed = self.env.get_env_layout_seed()
+        step = self.env.get_step_no() - 1
 
         for agent, next_state in next_states.items():
             state = self.states[agent]
-            action = actions.get(
-                agent, None
-            )  # may be None in case of multi-agent scenarios
-            action = np.asarray(
-                action
-            ).item()  # SB3 sends actions in wrapped into an one-item array for some reason. np.asarray is also able to handle lists. Gridworlds is able to handle such wrapped actions ok.
+            action = actions.get(agent, None)
+            action = np.asarray(action).item()
             info = infos[agent]
             score = scores[agent]
-            score2 = info[
-                INFO_REWARD_DICT
-            ]  # do not use scores[agent] in env_step_info since it is scalarised
+            score2 = info[INFO_REWARD_DICT]
             done = terminateds[agent] or truncateds[agent]
 
-            # TODO: move this code to savanna_safetygrid.py
             info[INFO_trial] = i_trial
             info[INFO_EPISODE] = i_episode
             info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
@@ -470,7 +413,7 @@ class SB3BaseAgent(AbstractAgent):
                     info[INFO_AGENT_OBSERVATION_LAYERS_CUBE],
                     info[INFO_AGENT_INTEROCEPTION_VECTOR],
                 ),
-            ]  # NB! agent_step_info uses scalarised score
+            ]
 
             env_step_info = (
                 [score2.get(dimension, 0) for dimension in self.score_dimensions]
@@ -501,14 +444,14 @@ class SB3BaseAgent(AbstractAgent):
             self.model.policy.set_info(self.info)
 
         if self.state_log is not None:
-            board, layer_order, _ = self.env.board_state()
+            env_state = self.env.state
             self.state_log.log(
                 [
                     self.cfg.experiment_name,
                     i_trial,
                     i_episode,
                     step,
-                    (board, layer_order),
+                    (env_state["board"], env_state["layers"]),
                 ]
             )
 
@@ -529,13 +472,10 @@ class SB3BaseAgent(AbstractAgent):
 
         self.total_steps_across_episodes += 1
 
-        action = np.asarray(
-            action
-        ).item()  # SB3 sends actions in wrapped into an one-item array for some reason. np.asarray is also able to handle lists. Gridworlds is able to handle such wrapped actions ok.
+        action = np.asarray(action).item()
         done = terminated or truncated
-        score2 = info[
-            INFO_REWARD_DICT
-        ]  # do not use score in env_step_info since it is scalarised
+        score2 = info[INFO_REWARD_DICT]
+
         agent_step_info = [
             agent,
             self.state,
@@ -547,7 +487,7 @@ class SB3BaseAgent(AbstractAgent):
                 info[INFO_AGENT_OBSERVATION_LAYERS_CUBE],
                 info[INFO_AGENT_INTEROCEPTION_VECTOR],
             ),
-        ]  # NB! agent_step_info uses scalarised score
+        ]
 
         self.state = next_state
         self.info = info
@@ -559,17 +499,10 @@ class SB3BaseAgent(AbstractAgent):
         )
 
         i_trial = self.i_trial
-        i_episode = (
-            self.next_episode_no - 1
-        )  # cannot use env.get_next_episode_no() here since its counter is reset for each new env_layout_seed
-        env_layout_seed = (
-            self.env.get_env_layout_seed()
-        )  # no need to substract 1 here since env_layout_seed value is overridden in env_pre_reset_callback
-        step = (
-            self.env.get_step_no() - 1
-        )  # get_step_no() returned step indexes start with 1
+        i_episode = self.next_episode_no - 1
+        env_layout_seed = self.env.get_env_layout_seed()
+        step = self.env.get_step_no() - 1
 
-        # TODO: move this code to savanna_safetygrid.py
         self.info[INFO_trial] = i_trial
         self.info[INFO_EPISODE] = i_episode
         self.info[INFO_ENV_LAYOUT_SEED] = env_layout_seed
@@ -596,13 +529,13 @@ class SB3BaseAgent(AbstractAgent):
         )
 
         if self.state_log is not None:
-            board, layer_order, _ = self.env.board_state()
+            env_state = self.env.state
             self.state_log.log(
                 [
                     self.cfg.experiment_name,
                     i_trial,
                     i_episode,
                     step,
-                    (board, layer_order),
+                    (env_state["board"], env_state["layers"]),
                 ]
             )

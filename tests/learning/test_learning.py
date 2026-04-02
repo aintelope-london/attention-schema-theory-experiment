@@ -6,7 +6,7 @@ import pytest
 from omegaconf import OmegaConf
 
 from aintelope.__main__ import run
-from aintelope.analytics.metrics import (
+from aintelope.analytics.analytics import (
     assert_learning_improvement,
     report_optimal_policy,
 )
@@ -26,7 +26,9 @@ def test_sb3_ppo_learns(base_learning_config):
                     },
                 },
                 "agent_params": {
-                    "agent_0": {"agent_class": "sb3_ppo_agent"},
+                    "agents": {
+                        "agent_0": {"agent_class": "sb3_ppo_agent"},
+                    },
                     "num_conv_layers": 0,
                     "ppo_n_steps": 10,
                 },
@@ -55,23 +57,25 @@ def test_model_based_learns(base_learning_config):
                 },
                 "agent_params": {
                     "roi_mode": None,
-                    "agent_0": {
-                        "architecture": {
-                            "action": {
-                                "type": "ModelBased",
-                                "inputs": ["dynamic", "value"],
-                            },
-                            "reward": {
-                                "type": "RewardInference",
-                                "inputs": ["observation"],
-                            },
-                            "dynamic": {
-                                "type": "NextState-NN",
-                                "inputs": ["observation"],
-                            },
-                            "value": {
-                                "type": "StateValue-NN",
-                                "inputs": ["observation"],
+                    "agents": {
+                        "agent_0": {
+                            "architecture": {
+                                "action": {
+                                    "type": "ModelBased",
+                                    "inputs": ["dynamic", "value"],
+                                },
+                                "reward": {
+                                    "type": "RewardInference",
+                                    "inputs": ["observation"],
+                                },
+                                "dynamic": {
+                                    "type": "NextState-NN",
+                                    "inputs": ["observation"],
+                                },
+                                "value": {
+                                    "type": "StateValue-NN",
+                                    "inputs": ["observation"],
+                                },
                             },
                         },
                     },
@@ -102,8 +106,10 @@ def test_main_agent_dqn_optimal(base_learning_config):
                     "batch_size": 150,
                     "replay_buffer_size": 30000,
                     "gamma": 0.99,
-                    "agent_0": {
-                        "model": "fc_dqn",
+                    "agents": {
+                        "agent_0": {
+                            "model": "fc_dqn",
+                        },
                     },
                 },
                 "models": {
@@ -153,8 +159,10 @@ def test_main_agent_dqn_optimal(base_learning_config):
                     "batch_size": 350,
                     "replay_buffer_size": 30000,
                     "gamma": 0.99,
-                    "agent_0": {
-                        "model": "dqn_fc",
+                    "agents": {
+                        "agent_0": {
+                            "model": "dqn_fc",
+                        },
                     },
                 },
                 "models": {
@@ -205,8 +213,10 @@ def test_dqn_roi_optimal(base_learning_config):
                     "batch_size": 350,
                     "replay_buffer_size": 30000,
                     "gamma": 0.99,
-                    "agent_0": {
-                        "model": "dqn_fc_roi",
+                    "agents": {
+                        "agent_0": {
+                            "model": "dqn_fc_roi",
+                        },
                     },
                 },
                 "models": {
@@ -257,8 +267,10 @@ def test_main_agent_dqn_optimal(base_learning_config):
                     "batch_size": 550,
                     "replay_buffer_size": 30000,
                     "gamma": 0.99,
-                    "agent_0": {
-                        "model": "dqn_cnn",
+                    "agents": {
+                        "agent_0": {
+                            "model": "dqn_cnn",
+                        },
                     },
                 },
                 "models": {

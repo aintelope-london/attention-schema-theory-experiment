@@ -138,7 +138,7 @@ def run_summary(results, params):
     lines_all = []
     for block, data in results.items():
         cfg = data["cfg"]
-        agent_cfg = cfg.agent_params.agent_0
+        agent_cfg = cfg.agent_params.agents.agent_0
         lines = [f"Block:    {block}", f"Agent:    {agent_cfg.agent_class}"]
         if hasattr(agent_cfg, "architecture"):
             arch = {

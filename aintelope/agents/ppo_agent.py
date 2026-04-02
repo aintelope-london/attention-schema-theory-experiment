@@ -21,12 +21,6 @@ from aintelope.agents.sb3_base_agent import (
     SB3BaseAgent,
     CustomCNN,
     vec_env_args,
-    PolicyWithConfigFactory,
-    INFO_trial,
-    INFO_EPISODE,
-    INFO_ENV_LAYOUT_SEED,
-    INFO_STEP,
-    INFO_TEST_MODE,
 )
 from aintelope.aintelope_typing import ObservationFloat, PettingZooEnv
 from zoo_to_gym_multiagent_adapter.singleagent_zoo_to_gym_adapter import (
