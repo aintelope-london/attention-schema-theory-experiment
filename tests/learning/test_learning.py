@@ -6,7 +6,7 @@ import pytest
 from omegaconf import OmegaConf
 
 from aintelope.__main__ import run
-from aintelope.analytics.metrics import (
+from aintelope.analytics.analytics import (
     assert_learning_improvement,
     report_optimal_policy,
 )
