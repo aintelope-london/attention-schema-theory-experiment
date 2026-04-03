@@ -72,7 +72,6 @@ env_params:
     - left
     - right
     - backward
-    - wait
 
   # ── Savanna env params (env: savanna-safetygrid-v1) ───────────────
   env_layout_seed_repeat_sequence_length: -1  # @ui int -1 1000

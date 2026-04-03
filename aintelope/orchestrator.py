@@ -113,7 +113,7 @@ def run_experiments(cfg, main_config):
     results = {
         block: {
             "events": pd.concat(data["events"], ignore_index=True),
-            "states": data["states"],
+            "states": pd.concat(data["states"], ignore_index=True),
             "learning_df": pd.concat(data["learning"], ignore_index=True)
             if data["learning"]
             else pd.DataFrame(),

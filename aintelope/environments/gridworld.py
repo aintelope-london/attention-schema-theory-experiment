@@ -21,7 +21,7 @@ Board cube shape: (len(LAYERS), map_size+2, map_size+2)  — float32 boolean per
 
 Interoception channels (reset to zero each step, set by tile collision):
     [0]  food eaten this step
-    [1]  predator contact this step
+    [1]  contact this step: +1.0 = predator, -1.0 = wall
 
 Observation format "boolean_cube":
     (C, H, W) float32 boolean cube, agent-centric viewport, rotated so the
@@ -32,12 +32,13 @@ Action semantics (relative orientation):
     backward  -- reverse facing 180°, move one step in new direction
     left      -- rotate facing 90° CCW, move one step in new direction
     right     -- rotate facing 90° CW, move one step in new direction
-    wait      -- no-op
+    wait      -- no-op (available as a method but excluded from default config)
 
 Passability: floor, food, predator are passable.
              wall and other agents are not.
-Predator: passable (triggers interoception[1]) and persists on board after contact.
-Food: passable (triggers interoception[0]) and is consumed (removed from board).
+Predator: passable (triggers interoception[1] = +1.0) and persists on board after contact.
+Food: passable (triggers interoception[0] = +1.0) and is consumed (removed from board).
+Wall/agent collision: triggers interoception[1] = -1.0, agent does not move.
 """
 
 import numpy as np
@@ -168,13 +169,24 @@ class GridworldEnv(AbstractEnv):
     # ── Movement ──────────────────────────────────────────────────────────────
 
     def _move(self, aid, direction):
-        """Attempt move in direction. Returns interoception delta (2,)."""
+        """Attempt move in direction. Returns interoception delta (2,).
+
+        interoception[0]: +1.0 if food eaten this step, else 0.
+        interoception[1]: +1.0 if predator contact, -1.0 if wall/agent blocked,
+                          else 0.
+        """
         r, c = self._positions[aid]
         dr, dc = direction
         nr, nc = r + dr, c + dc
         tile = self._board[nr, nc]
         if tile not in _PASSABLE:
-            return np.zeros(2, np.float32)
+            # Wall hit or agent collision — signal ouch and do not move.
+            # Note: facing was already updated by the calling action method
+            # (backward/left/right) before _move was called, so the viewport
+            # will reflect the new facing next step regardless of this block.
+            intero = np.zeros(2, np.float32)
+            intero[1] = -1.0
+            return intero
         intero = np.zeros(2, np.float32)
         # Restore vacated cell
         self._board[r, c] = PREDATOR if (r, c) in self._predator_cells else FLOOR

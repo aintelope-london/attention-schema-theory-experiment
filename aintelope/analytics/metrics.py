@@ -1,18 +1,13 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
 """Metric computation for experiment results.
-
 Each function receives the full results dict and params, computes its metric
 across all blocks, and returns {block: data_dict}. No rendering or file I/O.
-
 results shape: {block_name: {events, states, learning_df, manifesto, cfg}}
 """
-
 import numpy as np
 import pandas as pd
-
 from aintelope.analytics.diagnostics import collector
 from aintelope.analytics.plot_primitives import aggregate_series, collapse
 from aintelope.analytics.recording import SERIALIZABLE_COLUMNS, deserialize_state
@@ -49,7 +44,6 @@ def deserialize_events(events):
 
 def first_reward(events):
     """Per-episode step index of first positive reward.
-
     Returns DataFrame[Episode, Trial, steps_to_reward].
     """
     positive = events[events["Reward"] > 0][["Episode", "Trial", "Step"]]
@@ -82,40 +76,79 @@ def _dist_to_nearest(vision, channel):
     return min(abs(r - cr) + abs(c - cc) for r, c in coords)
 
 
-def per_episode_efficiency(events):
-    """Compute per-episode optimality ratio (spawn_dist / steps_to_goal).
+def beelines_to_object(events, states, agent_id, target_position):
+    """Per-episode optimality: steps to reach nearest target vs Manhattan spawn distance.
 
-    spawn_dist is the Manhattan distance at episode start — the theoretical
-    minimum steps to goal, i.e. the Path Optimality Index (POI) denominator.
+    For each episode:
+      1. Spawn position: read from states at step -1, extract agent layer from board cube.
+      2. Target coordinate: read from first event row (retained from episode start).
+      3. Find first step where agent Position matches that retained coordinate.
+      4. efficiency = spawn_dist / steps_to_reach.
 
-    Returns list of {trial, episode, spawn_dist, steps_to_goal, efficiency}.
+    The target coordinate is retained from episode start — the tile may disappear
+    after being reached, but the coordinate persists within this computation.
+
+    Args:
+        events:          events DataFrame
+        states:          states DataFrame (must include step -1 reset rows)
+        agent_id:        filters Agent_id column; also identifies agent board layer
+        target_position: column name holding target coordinate(s) per step.
+                         Accepts a single (row, col) tuple or a list of tuples
+                         for future multi-object columns. Always uses nearest.
+
+    Returns list of {trial, episode, spawn_dist, steps_to_reach, efficiency}.
     """
-    step0 = filter_events(events, Step=0)
-    first = first_reward(events).set_index(["Episode", "Trial"])["steps_to_reward"]
+    agent_events = events[events["Agent_id"] == agent_id]
     out = []
-    for (episode, trial), group in step0.groupby(["Episode", "Trial"]):
-        row = group.iloc[0]
-        spawn_dist = abs(row["Position"][0] - row["Food_position"][0]) + abs(
-            row["Position"][1] - row["Food_position"][1]
+    for (trial, episode), group in agent_events.groupby(["Trial", "Episode"]):
+        group = group.sort_values("Step")
+        row0 = group.iloc[0]
+
+        # Agent spawn position from reset state at step -1.
+        spawn_row = states[
+            (states["Trial"] == trial)
+            & (states["Episode"] == episode)
+            & (states["Step"] == -1)
+        ]
+        if spawn_row.empty:
+            continue
+        board_cube, layers, _ = deserialize_state(spawn_row["Board"].iloc[0])
+        agent_layer = layers.index(agent_id)
+        ys, xs = np.where(board_cube[agent_layer] > 0)
+        if len(ys) == 0:
+            continue
+        agent_pos = (int(ys[0]), int(xs[0]))
+
+        target_val = row0[target_position]
+        if target_val is None:
+            continue
+
+        # Normalize to list — ready for future multi-object columns
+        targets = target_val if isinstance(target_val, list) else [target_val]
+
+        # Retain nearest target coordinate and spawn distance
+        spawn_dist, nearest = min(
+            ((abs(agent_pos[0] - t[0]) + abs(agent_pos[1] - t[1])), t) for t in targets
         )
-        steps_to_goal = (
-            int(first.loc[(episode, trial)]) + 1
-            if (episode, trial) in first.index
-            else float("inf")
+
+        # Find first step where agent position matches the retained coordinate
+        reached = group[group["Position"].apply(lambda p: p == nearest)]
+        steps_to_reach = (
+            int(reached["Step"].iloc[0]) + 1 if not reached.empty else float("inf")
         )
         efficiency = (
             1.0
             if spawn_dist == 0
             else 0.0
-            if steps_to_goal == float("inf")
-            else min(1.0, spawn_dist / steps_to_goal)
+            if steps_to_reach == float("inf")
+            else min(1.0, spawn_dist / steps_to_reach)
         )
         out.append(
             {
                 "trial": int(trial),
                 "episode": int(episode),
                 "spawn_dist": spawn_dist,
-                "steps_to_goal": steps_to_goal,
+                "steps_to_reach": steps_to_reach,
                 "efficiency": efficiency,
             }
         )
@@ -275,7 +308,9 @@ def optimal_efficiency(results, params):
     out = {}
     report_lines = []
     for block, data in results.items():
-        episodes = per_episode_efficiency(data["events"])
+        events = data["events"]
+        agent_id = params.get("agent_id", events["Agent_id"].iloc[0])
+        episodes = beelines_to_object(events, data["states"], agent_id, "Food_position")
         valid = [e["efficiency"] for e in episodes if e["efficiency"] is not None]
         mean_eff = float(np.mean(valid)) * 100 if valid else 0.0
         out[block] = {
@@ -286,20 +321,19 @@ def optimal_efficiency(results, params):
         }
         report_lines.append(f"Block: {block}")
         for ep in episodes:
-            dist = ep["spawn_dist"] if ep["spawn_dist"] is not None else "?"
-            steps = ep["steps_to_goal"] if ep["steps_to_goal"] is not None else "never"
-            eff = (
-                f"{ep['efficiency'] * 100:.0f}%"
-                if ep["efficiency"] is not None
-                else "N/A"
+            dist = ep["spawn_dist"]
+            steps = (
+                ep["steps_to_reach"]
+                if ep["steps_to_reach"] != float("inf")
+                else "never"
             )
+            eff = f"{ep['efficiency'] * 100:.0f}%"
             report_lines.append(
                 f"  Trial {ep['trial']:>2}, Episode {ep['episode']:>4}: "
-                f"spawn_dist={dist}, steps_to_goal={steps}, efficiency={eff}"
+                f"spawn_dist={dist}, steps_to_reach={steps}, efficiency={eff}"
             )
-        eff_str = f"{mean_eff:.1f}%" if mean_eff is not None else "N/A"
         report_lines.append(
-            f"  Efficiency: {eff_str} (mean over {len(episodes)} episodes)"
+            f"  Efficiency: {mean_eff:.1f}% (mean over {len(episodes)} episodes)"
         )
         report_lines.append("")
     collector.collect(
@@ -311,7 +345,9 @@ def optimal_efficiency(results, params):
 def efficiency_curve(results, params):
     out = {}
     for block, data in results.items():
-        episodes = per_episode_efficiency(data["events"])
+        events = data["events"]
+        agent_id = params.get("agent_id", events["Agent_id"].iloc[0])
+        episodes = beelines_to_object(events, data["states"], agent_id, "Food_position")
         df = pd.DataFrame(episodes).rename(
             columns={"episode": "Episode", "efficiency": "Efficiency"}
         )
@@ -376,20 +412,3 @@ def roi_food_alignment(results, params):
         )
         out[block] = {"series": aggregate_series(df, "Episode", "food_in_roi")}
     return out
-
-
-_METRICS = {
-    "run_summary": run_summary,
-    "learning_improvement": learning_improvement,
-    "learning_curve": learning_curve,
-    "loss_curve": loss_curve,
-    "epsilon_curve": epsilon_curve,
-    "reward_curve": reward_curve,
-    "steps_to_reward": steps_to_reward,
-    "optimal_efficiency": optimal_efficiency,
-    "efficiency_curve": efficiency_curve,
-    "visitation_heatmap": visitation_heatmap,
-    "action_distribution": action_distribution,
-    "roi_turn_distribution": roi_turn_distribution,
-    "roi_food_alignment": roi_food_alignment,
-}

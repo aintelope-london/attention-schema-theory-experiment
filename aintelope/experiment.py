@@ -89,6 +89,17 @@ def run_experiment(
         # Analytics use this coordinate to track when the agent reaches it.
         episode_food_position = state.get("food_position")
 
+        # Log reset state at step -1 — canonical episode start before any action.
+        states.log(
+            [
+                cfg.experiment_name,
+                i_trial,
+                i_episode,
+                -1,
+                (state["board"], state["layers"], None),
+            ]
+        )
+
         for agent in agents:
             agent.reset(observations[agent.id])
             dones[agent.id] = False
