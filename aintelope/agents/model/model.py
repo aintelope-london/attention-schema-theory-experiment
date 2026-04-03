@@ -155,6 +155,7 @@ class Model:
             k for k in self.activations if k.startswith("next_") or k == "done"
         ]:
             del self.activations[key]
+        report["step_reward"] = self.activations.get("reward", 0)
         return report
 
     def save(self, path):

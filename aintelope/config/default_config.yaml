@@ -61,6 +61,7 @@ env_params:
   map_size: 10                     # @ui int 3 50
   observation_radius: 5            # @ui int 1 20
   observation_format: boolean_cube # @ui str boolean_cube
+  termination: food                # @ui str food,null
   objects:
     food:
       count: 3                     # @ui int 0 20

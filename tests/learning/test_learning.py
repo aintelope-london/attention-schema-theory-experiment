@@ -89,7 +89,7 @@ def test_model_based_learns(base_learning_config):
 
 
 @pytest.mark.skip("100% with base DQN-FC 2x2")
-def test_main_agent_dqn_optimal(base_learning_config):
+def test_dqn_fc_2x2(base_learning_config):
     cfg = OmegaConf.merge(
         base_learning_config,
         {
@@ -108,7 +108,7 @@ def test_main_agent_dqn_optimal(base_learning_config):
                     "gamma": 0.99,
                     "agents": {
                         "agent_0": {
-                            "model": "fc_dqn",
+                            "model": "dqn_fc",
                         },
                     },
                 },
@@ -142,7 +142,7 @@ def test_main_agent_dqn_optimal(base_learning_config):
 
 
 @pytest.mark.skip("89% with base DQN-FC 5x5")
-def test_main_agent_dqn_optimal(base_learning_config):
+def test_dqn_fc_5x5(base_learning_config):
     cfg = OmegaConf.merge(
         base_learning_config,
         {
@@ -196,7 +196,7 @@ def test_main_agent_dqn_optimal(base_learning_config):
 
 
 @pytest.mark.skip("86% with roi DQN-FC")
-def test_dqn_roi_optimal(base_learning_config):
+def test_dqn_fc_roi(base_learning_config):
     cfg = OmegaConf.merge(
         base_learning_config,
         {
@@ -249,8 +249,8 @@ def test_dqn_roi_optimal(base_learning_config):
     report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
 
 
-@pytest.mark.skip("Curriculum DQN-CNN 5x5")
-def test_main_agent_dqn_optimal(base_learning_config):
+@pytest.mark.skip("Curriculum DQN-CNN 5x5 to 13x13")
+def test_dqn_curri(base_learning_config):
     cfg = OmegaConf.merge(
         base_learning_config,
         {
@@ -303,6 +303,72 @@ def test_main_agent_dqn_optimal(base_learning_config):
     result = run(cfg)
     report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
 
+
+#@pytest.mark.skip(reason="Test new env with 2x2")
+def test_gridworld_dqn_fc_learns(base_learning_config):
+    """main_agent with DQN-FC shows learning improvement on gridworld.
+ 
+    Smoke test for the new gridworld environment: verifies that reward
+    (food interoception via RewardInference) increases over training on
+    a small fixed map. Episodes do not terminate on food contact, so the
+    agent has the full step budget to improve its food-finding rate.
+    """
+    cfg = OmegaConf.merge(
+        base_learning_config,
+        {
+            "train": {
+                "run": {
+                    "trials": 3,
+                    "experiment": {
+                        "steps": 30,
+                        "episodes": 3000,
+                        "test_mode": False,
+                    },
+                },
+                "agent_params": {
+                    "batch_size": 128,
+                    "replay_buffer_size": 10000,
+                    "gamma": 0.99,
+                    "agents": {
+                        "agent_0": {
+                            "model": "dqn_fc",
+                        },
+                    },
+                },
+                "models": {
+                    "DQN": {
+                        "metadata": {"greedy_until": 0.5},
+                    },
+                },
+                "env_params": {
+                    "env": "gridworld-v1",
+                    "map_size": 2,
+                    "observation_radius": 3,
+                    "termination": "food",
+                    "objects": {
+                        "food": {"count": 1},
+                        "predator": {"count": 0},
+                    },
+                },
+            },
+            "test": {
+                "run": {
+                    "experiment": {
+                        "steps": 30,
+                        "episodes": 200,
+                        "test_mode": True,
+                    },
+                },
+                "models": {
+                    "DQN": {
+                        "metadata": {"greedy_until": 0.0},
+                    },
+                },
+            },
+        },
+    )
+    result = run(cfg)
+    assert_learning_improvement(result["analytics"]["learning_improvement"]["train"])
 
 if __name__ == "__main__":
     pytest.main([__file__])

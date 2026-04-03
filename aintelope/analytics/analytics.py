@@ -155,7 +155,7 @@ def _render_roi_turn_distribution(block_data):
 
 def _render_optimality_scatter(block_data):
     per_episode = block_data["per_episode"]
-    reached = [e for e in per_episode if e["steps_to_goal"] != float("inf")]
+    reached = [e for e in per_episode if e["steps_to_reach"] != float("inf")]
     if not reached:
         return None
     figure, ax = create_figure()
@@ -235,7 +235,7 @@ def report_optimal_policy(block_result):
     print("\n── Optimal Policy Report ─────────────────────────────")
     for ep in block_result["per_episode"]:
         dist = ep["spawn_dist"] if ep["spawn_dist"] is not None else "?"
-        steps = ep["steps_to_goal"] if ep["steps_to_goal"] is not None else "never"
+        steps = ep["steps_to_reach"] if ep["steps_to_reach"] != float("inf") else "never"
         eff = (
             f"{ep['efficiency'] * 100:.0f}%" if ep["efficiency"] is not None else "N/A"
         )

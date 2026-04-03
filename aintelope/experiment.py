@@ -14,21 +14,6 @@ from aintelope.analytics.recording import EventLog, StateLog, save_env_layout
 from aintelope.environments import get_env_class
 
 
-def _pos(state, layer_name):
-    """First (row, col) of a named layer in state, or None.
-
-    Works for any layer name present in state["layers"]. Used by event logging
-    to derive agent and food positions from the canonical state board without
-    requiring env-specific knowledge in this control file.
-    """
-    layers = state["layers"]
-    if layer_name not in layers:
-        return None
-    idx = layers.index(layer_name)
-    ys, xs = np.where(state["board"][idx])
-    return (int(ys[0]), int(xs[0])) if len(ys) > 0 else None
-
-
 def run_experiment(
     cfg: DictConfig,
     i_trial: int = 0,
@@ -38,9 +23,9 @@ def run_experiment(
 
     monitor = DiagnosticsMonitor(
         context={
-            "trial": i_trial,
+            "trial":    i_trial,
             "episodes": cfg.run.experiment.episodes,
-            "steps": cfg.run.experiment.steps,
+            "steps":    cfg.run.experiment.steps,
         }
     )
 
@@ -84,11 +69,11 @@ def run_experiment(
     if is_sb3 and not cfg.run.experiment.test_mode:
         _run_sb3_training(cfg, i_trial, env, agents, events, states, monitor)
         return {
-            "events": events.to_dataframe(),
-            "states": states.to_dataframe(),
-            "learning_df": monitor.learning_dataframe(),
+            "events":         events.to_dataframe(),
+            "states":         states.to_dataframe(),
+            "learning_df":    monitor.learning_dataframe(),
             "performance_df": monitor.performance_dataframe(),
-            "manifesto": env.manifesto,
+            "manifesto":      env.manifesto,
         }
 
     save_freq = cfg.agent_params.save_frequency
@@ -100,6 +85,9 @@ def run_experiment(
 
         observations, state = env.reset(seed=i_episode)
         states_by_seed[i_episode] = state
+        # Retain food position from episode start — remains valid even after food consumed.
+        # Analytics use this coordinate to track when the agent reaches it.
+        episode_food_position = state.get("food_position")
 
         for agent in agents:
             agent.reset(observations[agent.id])
@@ -108,8 +96,6 @@ def run_experiment(
         monitor.sample("reset")
 
         for step in range(cfg.run.experiment.steps):
-            pre_state = state
-
             actions = {}
             for agent in agents:
                 result = agent.get_action(
@@ -127,41 +113,36 @@ def run_experiment(
 
             for agent in agents:
                 observation = observations[agent.id]
-                score = state["scores"].get(agent.id, {})
                 done = dones[agent.id]
                 report = agent.update(observation=observation, done=done)
                 monitor.sample_learning(i_episode, step, report)
 
-                env_step_info = [score.get(dim, 0) for dim in score_dims]
                 events.log_event(
                     [
                         cfg.experiment_name,
                         i_trial,
                         i_episode,
-                        i_episode,  # seed column — episode index is the seed
+                        i_episode,
                         step,
                         cfg.run.experiment.test_mode,
                         agent.id,
                         agent.last_action,
-                        sum(score.values()),
+                        report.get("reward", 0),       # RI reward — canonical signal
                         done,
                         observation,
-                        pre_state["agent_positions"].get(agent.id),
-                        pre_state["food_position"],
+                        state["agent_positions"].get(agent.id),  # post-step position
+                        episode_food_position,                   # retained from episode start
                         actions[agent.id].get("internal_action"),
                     ]
-                    + env_step_info
                 )
 
-            states.log(
-                [
-                    cfg.experiment_name,
-                    i_trial,
-                    i_episode,
-                    step,
-                    (state["board"], state["layers"], None),
-                ]
-            )
+            states.log([
+                cfg.experiment_name,
+                i_trial,
+                i_episode,
+                step,
+                (state["board"], state["layers"], None),
+            ])
 
             if all(dones.values()):
                 break
@@ -170,9 +151,7 @@ def run_experiment(
 
         if cfg.run.write_outputs and save_freq > 0 and (i_episode + 1) % save_freq == 0:
             for agent in agents:
-                agent.save_model(
-                    checkpoint_path(cfg.run.outputs_dir, agent.id, i_trial)
-                )
+                agent.save_model(checkpoint_path(cfg.run.outputs_dir, agent.id, i_trial))
 
     gc.collect()
     monitor.report()
@@ -180,12 +159,8 @@ def run_experiment(
         for agent in agents:
             agent.save_model(checkpoint_path(cfg.run.outputs_dir, agent.id, i_trial))
         from aintelope.gui.renderer import (
-            StateRenderer,
-            Tileset,
-            find_tileset,
-            SavannaInterpreter,
+            StateRenderer, Tileset, find_tileset, SavannaInterpreter,
         )
-
         renderer = StateRenderer(Tileset(find_tileset()))
         interpreter = SavannaInterpreter()
         for seed, s in states_by_seed.items():
@@ -193,11 +168,11 @@ def run_experiment(
             save_env_layout(img, Path(cfg.run.outputs_dir) / cfg.experiment_name, seed)
 
     return {
-        "events": events.to_dataframe(),
-        "states": states.to_dataframe(),
-        "learning_df": monitor.learning_dataframe(),
+        "events":         events.to_dataframe(),
+        "states":         states.to_dataframe(),
+        "learning_df":    monitor.learning_dataframe(),
         "performance_df": monitor.performance_dataframe(),
-        "manifesto": env.manifesto,
+        "manifesto":      env.manifesto,
     }
 
 

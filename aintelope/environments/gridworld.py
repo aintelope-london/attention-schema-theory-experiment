@@ -57,16 +57,9 @@ _DEFAULT_FACING = _N
 _ROT = {_N: 0, _W: 1, _S: 2, _E: 3}
 
 
-def _cw(d):
-    return (d[1], -d[0])
-
-
-def _ccw(d):
-    return (-d[1], d[0])
-
-
-def _flip(d):
-    return (-d[0], -d[1])
+def _cw(d):   return (d[1], -d[0])
+def _ccw(d):  return (-d[1], d[0])
+def _flip(d): return (-d[0], -d[1])
 
 
 def _agents_from_cfg(cfg):
@@ -85,10 +78,10 @@ class GridworldEnv(AbstractEnv):
         self._manifesto = None
         self.state = {}
         # Mutable episode state
-        self._board = None  # (H, W) int8
-        self._facing = {}  # {agent_id: (dr, dc)}
-        self._positions = {}  # {agent_id: (r, c)}
-        self._predator_cells = set()  # cells that always hold a predator
+        self._board = None           # (H, W) int8
+        self._facing = {}            # {agent_id: (dr, dc)}
+        self._positions = {}         # {agent_id: (r, c)}
+        self._predator_cells = set() # cells that always hold a predator
         self._step_rng = None
 
     # ── AbstractEnv contract ───────────────────────────────────────────────────
@@ -122,7 +115,12 @@ class GridworldEnv(AbstractEnv):
         for aid in order:
             name = self._manifesto["action_names"][actions[aid]["action"]]
             interoceptions[aid] = getattr(self, name)(aid)
-        self._refresh_state(dones={aid: False for aid in self.agents})
+        termination = self._cfg.env_params.get("termination", None)
+        dones = {
+            aid: (termination == "food" and interoceptions[aid][0] > 0)
+            for aid in self.agents
+        }
+        self._refresh_state(dones)
         return self._observations(interoceptions), self.state
 
     def step_sequential(self, actions):
@@ -198,16 +196,14 @@ class GridworldEnv(AbstractEnv):
         idx = 0
 
         for i, aid in enumerate(self.agents):
-            pos = cells[idx]
-            idx += 1
+            pos = cells[idx]; idx += 1
             self._positions[aid] = pos
             self._board[pos] = _N_BASE + i
 
         for tile_name, params in self._cfg.env_params.objects.items():
             tile_int = self.layers.index(tile_name)
             for _ in range(params.count):
-                pos = cells[idx]
-                idx += 1
+                pos = cells[idx]; idx += 1
                 self._board[pos] = tile_int
                 if tile_int == PREDATOR:
                     self._predator_cells.add(pos)
@@ -221,15 +217,13 @@ class GridworldEnv(AbstractEnv):
         ).astype(np.float32)
         food_ys, food_xs = np.where(self._board == FOOD)
         self.state = {
-            "board": cube,
-            "layers": self.layers,
-            "directions": dict(self._facing),
-            "dones": dones,
-            "scores": {aid: {} for aid in self.agents},
+            "board":           cube,
+            "layers":          self.layers,
+            "directions":      dict(self._facing),
+            "dones":           dones,
+            "scores":          {aid: {} for aid in self.agents},
             "agent_positions": dict(self._positions),
-            "food_position": (int(food_ys[0]), int(food_xs[0]))
-            if len(food_ys)
-            else None,
+            "food_position":   (int(food_ys[0]), int(food_xs[0])) if len(food_ys) else None,
         }
 
     # ── Observation encoding ───────────────────────────────────────────────────
@@ -239,7 +233,7 @@ class GridworldEnv(AbstractEnv):
         encode = getattr(self, f"_encode_{self._cfg.env_params.observation_format}")
         return {
             aid: {
-                "vision": encode(aid),
+                "vision":        encode(aid),
                 "interoception": interoceptions.get(aid, np.zeros(2, np.float32)),
             }
             for aid in self.agents
@@ -257,13 +251,13 @@ class GridworldEnv(AbstractEnv):
         sr, sc = max(0, -r0), max(0, -c0)
         er, ec = min(v, h - r0), min(v, w - c0)
         patch[sr:er, sc:ec] = self._board[
-            max(0, r0) : max(0, r0) + (er - sr),
-            max(0, c0) : max(0, c0) + (ec - sc),
+            max(0, r0):max(0, r0) + (er - sr),
+            max(0, c0):max(0, c0) + (ec - sc),
         ]
         patch = np.rot90(patch, k=_ROT[self._facing[aid]])
-        return np.stack([patch == i for i in range(len(self.layers))], axis=0).astype(
-            np.float32
-        )
+        return np.stack(
+            [patch == i for i in range(len(self.layers))], axis=0
+        ).astype(np.float32)
 
     # ── Manifesto ─────────────────────────────────────────────────────────────
 
@@ -272,12 +266,12 @@ class GridworldEnv(AbstractEnv):
         v = 2 * radius + 1
         actions = list(self._cfg.env_params.actions)
         return {
-            "layers": self.layers,
+            "layers":             self.layers,
             "observation_shapes": {
-                "vision": (len(self.layers), v, v),
+                "vision":        (len(self.layers), v, v),
                 "interoception": (2,),
             },
-            "action_space": actions,
-            "action_names": {i: name for i, name in enumerate(actions)},
-            "food_ind": self.layers.index("food"),
+            "action_space":  actions,
+            "action_names":  {i: name for i, name in enumerate(actions)},
+            "food_ind":      self.layers.index("food"),
         }

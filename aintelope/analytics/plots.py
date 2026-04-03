@@ -19,7 +19,7 @@ import numpy as np
 
 from aintelope.analytics.metrics import (
     first_reward,
-    per_episode_efficiency,
+    beelines_to_object,
     _episode_windows,
 )
 from aintelope.analytics.plot_primitives import (
