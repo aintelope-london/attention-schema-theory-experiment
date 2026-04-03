@@ -235,7 +235,9 @@ def report_optimal_policy(block_result):
     print("\n── Optimal Policy Report ─────────────────────────────")
     for ep in block_result["per_episode"]:
         dist = ep["spawn_dist"] if ep["spawn_dist"] is not None else "?"
-        steps = ep["steps_to_reach"] if ep["steps_to_reach"] != float("inf") else "never"
+        steps = (
+            ep["steps_to_reach"] if ep["steps_to_reach"] != float("inf") else "never"
+        )
         eff = (
             f"{ep['efficiency'] * 100:.0f}%" if ep["efficiency"] is not None else "N/A"
         )
