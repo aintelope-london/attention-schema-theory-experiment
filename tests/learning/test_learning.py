@@ -304,10 +304,10 @@ def test_dqn_curri(base_learning_config):
     report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
 
 
-#@pytest.mark.skip(reason="Test new env with 2x2")
+# @pytest.mark.skip(reason="Test new env with 2x2")
 def test_gridworld_dqn_fc_learns(base_learning_config):
     """main_agent with DQN-FC shows learning improvement on gridworld.
- 
+
     Smoke test for the new gridworld environment: verifies that reward
     (food interoception via RewardInference) increases over training on
     a small fixed map. Episodes do not terminate on food contact, so the
@@ -369,6 +369,7 @@ def test_gridworld_dqn_fc_learns(base_learning_config):
     )
     result = run(cfg)
     assert_learning_improvement(result["analytics"]["learning_improvement"]["train"])
+
 
 if __name__ == "__main__":
     pytest.main([__file__])

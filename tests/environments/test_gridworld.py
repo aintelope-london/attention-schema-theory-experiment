@@ -11,49 +11,64 @@ from omegaconf import OmegaConf
 
 from aintelope.environments.gridworld import (
     GridworldEnv,
-    FLOOR, WALL, PREDATOR, FOOD, _N_BASE,
-    _N, _E, _S, _W, _cw, _ccw, _flip,
+    FLOOR,
+    WALL,
+    PREDATOR,
+    FOOD,
+    _N_BASE,
+    _N,
+    _E,
+    _S,
+    _W,
+    _cw,
+    _ccw,
+    _flip,
 )
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+
 def _cfg(map_size=9, objects=None, obs_radius=3):
     objects = objects or {"food": {"count": 0}, "predator": {"count": 0}}
-    return OmegaConf.create({
-        "run": {"seed": 0},
-        "env_params": {
-            "map_size": map_size,
-            "objects": objects,
-            "actions": ["forward", "left", "right", "backward", "wait"],
-            "observation_radius": obs_radius,
-            "observation_format": "boolean_cube",
-        },
-        "agent_params": {
-            "agents": {
-                "agent_0": {"agent_class": "main_agent"},
-            }
-        },
-    })
+    return OmegaConf.create(
+        {
+            "run": {"seed": 0},
+            "env_params": {
+                "map_size": map_size,
+                "objects": objects,
+                "actions": ["forward", "left", "right", "backward", "wait"],
+                "observation_radius": obs_radius,
+                "observation_format": "boolean_cube",
+            },
+            "agent_params": {
+                "agents": {
+                    "agent_0": {"agent_class": "main_agent"},
+                }
+            },
+        }
+    )
 
 
 def _two_agent_cfg(map_size=9):
-    return OmegaConf.create({
-        "run": {"seed": 42},
-        "env_params": {
-            "map_size": map_size,
-            "objects": {"food": {"count": 0}, "predator": {"count": 0}},
-            "actions": ["forward", "left", "right", "backward", "wait"],
-            "observation_radius": 3,
-            "observation_format": "boolean_cube",
-        },
-        "agent_params": {
-            "agents": {
-                "agent_0": {"agent_class": "main_agent"},
-                "agent_1": {"agent_class": "main_agent"},
-            }
-        },
-    })
+    return OmegaConf.create(
+        {
+            "run": {"seed": 42},
+            "env_params": {
+                "map_size": map_size,
+                "objects": {"food": {"count": 0}, "predator": {"count": 0}},
+                "actions": ["forward", "left", "right", "backward", "wait"],
+                "observation_radius": 3,
+                "observation_format": "boolean_cube",
+            },
+            "agent_params": {
+                "agents": {
+                    "agent_0": {"agent_class": "main_agent"},
+                    "agent_1": {"agent_class": "main_agent"},
+                }
+            },
+        }
+    )
 
 
 def _make(map_size=9, objects=None, obs_radius=3):
@@ -76,14 +91,18 @@ def _place(env, pos, facing=_N):
     env._facing["agent_0"] = facing
 
 
-def _pos(env):   return env._positions["agent_0"]
-def _face(env):  return env._facing["agent_0"]
+def _pos(env):
+    return env._positions["agent_0"]
+
+
+def _face(env):
+    return env._facing["agent_0"]
 
 
 # ── Orientation ────────────────────────────────────────────────────────────────
 
-class TestOrientation:
 
+class TestOrientation:
     def test_default_facing_north(self):
         env, _, _ = _make()
         assert _face(env) == _N
@@ -128,8 +147,8 @@ class TestOrientation:
 
 # ── Movement ───────────────────────────────────────────────────────────────────
 
-class TestMovement:
 
+class TestMovement:
     def _center(self, facing=_N):
         env, _, _ = _make()
         env._board[1:-1, 1:-1] = FLOOR
@@ -185,12 +204,12 @@ class TestMovement:
 
 # ── Blocking ───────────────────────────────────────────────────────────────────
 
-class TestBlocking:
 
+class TestBlocking:
     def test_wall_blocks_movement(self):
         env, _, _ = _make()
         env._board[1:-1, 1:-1] = FLOOR
-        _place(env, (1, 5), _N)   # adjacent to north wall
+        _place(env, (1, 5), _N)  # adjacent to north wall
         before = _pos(env)
         env.step_parallel(_act(env, "forward"))
         assert _pos(env) == before
@@ -205,19 +224,21 @@ class TestBlocking:
         env._board[4, 5] = _N_BASE + 1
         env._facing["agent_0"] = _N
         env._facing["agent_1"] = _S
-        fwd  = env.manifesto["action_space"].index("forward")
+        fwd = env.manifesto["action_space"].index("forward")
         wait = env.manifesto["action_space"].index("wait")
-        env.step_parallel({
-            "agent_0": {"action": fwd},
-            "agent_1": {"action": wait},
-        })
+        env.step_parallel(
+            {
+                "agent_0": {"action": fwd},
+                "agent_1": {"action": wait},
+            }
+        )
         assert env._positions["agent_0"] == (5, 5)
 
 
 # ── Food ───────────────────────────────────────────────────────────────────────
 
-class TestFood:
 
+class TestFood:
     def _with_food(self, food_pos):
         env, _, _ = _make()
         env._board[1:-1, 1:-1] = FLOOR
@@ -257,8 +278,8 @@ class TestFood:
 
 # ── Predator ───────────────────────────────────────────────────────────────────
 
-class TestPredator:
 
+class TestPredator:
     def _with_predator(self, pred_pos):
         env, _, _ = _make()
         env._board[1:-1, 1:-1] = FLOOR
@@ -286,21 +307,23 @@ class TestPredator:
 
 # ── Termination ───────────────────────────────────────────────────────────────
 
-class TestTermination:
 
+class TestTermination:
     def _cfg_with_termination(self, termination):
-        return OmegaConf.create({
-            "run": {"seed": 0},
-            "env_params": {
-                "map_size": 9,
-                "objects": {"food": {"count": 0}, "predator": {"count": 0}},
-                "actions": ["forward", "left", "right", "backward", "wait"],
-                "observation_radius": 3,
-                "observation_format": "boolean_cube",
-                "termination": termination,
-            },
-            "agent_params": {"agents": {"agent_0": {"agent_class": "main_agent"}}},
-        })
+        return OmegaConf.create(
+            {
+                "run": {"seed": 0},
+                "env_params": {
+                    "map_size": 9,
+                    "objects": {"food": {"count": 0}, "predator": {"count": 0}},
+                    "actions": ["forward", "left", "right", "backward", "wait"],
+                    "observation_radius": 3,
+                    "observation_format": "boolean_cube",
+                    "termination": termination,
+                },
+                "agent_params": {"agents": {"agent_0": {"agent_class": "main_agent"}}},
+            }
+        )
 
     def test_done_on_food_when_termination_food(self):
         env = GridworldEnv(self._cfg_with_termination("food"))
@@ -339,9 +362,7 @@ class TestTermination:
         assert state["dones"]["agent_0"] is False
 
 
-
 class TestInteroceptionReset:
-
     def test_resets_to_zero_next_step(self):
         env, _, _ = _make()
         env._board[1:-1, 1:-1] = FLOOR
@@ -355,8 +376,8 @@ class TestInteroceptionReset:
 
 # ── State ──────────────────────────────────────────────────────────────────────
 
-class TestState:
 
+class TestState:
     def test_agent_positions_in_state(self):
         env, _, state = _make()
         assert "agent_0" in state["agent_positions"]
@@ -376,8 +397,8 @@ class TestState:
 
 # ── Manifesto ─────────────────────────────────────────────────────────────────
 
-class TestManifesto:
 
+class TestManifesto:
     def test_food_ind_matches_layers(self):
         env, _, _ = _make()
         assert env.manifesto["food_ind"] == env.layers.index("food")
@@ -385,14 +406,21 @@ class TestManifesto:
     def test_action_names(self):
         env, _, _ = _make()
         assert list(env.manifesto["action_names"].values()) == [
-            "forward", "left", "right", "backward", "wait"
+            "forward",
+            "left",
+            "right",
+            "backward",
+            "wait",
         ]
 
     def test_observation_shapes(self):
         env, obs, _ = _make(obs_radius=3)
         v = 2 * 3 + 1
         assert env.manifesto["observation_shapes"]["vision"] == (len(env.layers), v, v)
-        assert obs["agent_0"]["vision"].shape == env.manifesto["observation_shapes"]["vision"]
+        assert (
+            obs["agent_0"]["vision"].shape
+            == env.manifesto["observation_shapes"]["vision"]
+        )
 
     def test_agent_layers_in_layers(self):
         env, _, _ = _make()

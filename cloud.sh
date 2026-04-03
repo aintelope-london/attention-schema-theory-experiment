@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # cloud.sh — Cloud instance bootstrap for aintelope experiments.
 # Two-command setup from a fresh instance:
-#   wget https://raw.githubusercontent.com/YOUR_ORG/YOUR_REPO/main/cloud.sh
+#   wget https://raw.githubusercontent.com/aintelope-london/attention-schema-theory-experiment/main/cloud.sh
 #   bash cloud.sh
 
 set -euo pipefail
@@ -10,6 +10,12 @@ set -euo pipefail
 REPO_URL="https://github.com/aintelope-london/attention-schema-theory-experiment.git"
 REPO_DIR="repo"
 INSTALL_SCRIPT="install.py"
+VENV="venv_aintelope"
+
+# ── System dependencies ────────────────────────────────────────────────────────
+echo "--- Installing system dependencies ---"
+sudo apt update -qq
+sudo apt install -y build-essential python3-venv python3.10-dev
 
 # ── Clone repo ─────────────────────────────────────────────────────────────────
 if [ ! -d "$REPO_DIR" ]; then
@@ -22,6 +28,10 @@ cd "$REPO_DIR"
 echo "--- Running $INSTALL_SCRIPT ---"
 python3 "$INSTALL_SCRIPT"
 
+echo "--- Installing dev dependencies ---"
+source "$VENV/bin/activate"
+make install-dev
+
 # ── Done ───────────────────────────────────────────────────────────────────────
 INSTANCE_IP=$(curl -s ifconfig.me)
 
@@ -29,10 +39,10 @@ echo ""
 echo "=== Setup complete ==="
 echo ""
 echo "Activate with:"
-echo "  source venv_aintelope/bin/activate"
+echo "  source $REPO_DIR/$VENV/bin/activate"
 echo ""
 echo "Then run:"
-echo "  aintelope-gui"
+echo "  make tests-learning"
 echo ""
 echo "When done with experiments, pull results from your local machine with:"
-echo "  scp -r ubuntu@$INSTANCE_IP:~/repo/outputs ./outputs"
+echo "  scp -r ubuntu@$INSTANCE_IP:~/$REPO_DIR/outputs ./outputs"
