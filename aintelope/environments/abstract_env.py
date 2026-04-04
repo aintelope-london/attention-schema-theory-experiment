@@ -39,6 +39,14 @@ Manifesto schema (minimum)
         "action_names":       {index: name},
         "food_ind":           int | None,
     }
+
+Render manifest schema
+----------------------
+    {layer_name: keyword}
+
+Maps each env layer name to a renderer keyword (e.g. "food" → "FOOD").
+Default is an empty dict — renders as blank floor. Envs override to enable
+layout image output.
 """
 
 from abc import ABC, abstractmethod
@@ -88,3 +96,12 @@ class AbstractEnv(ABC):
 
         Returns [] for environments where reward inference is agent-side.
         """
+
+    @property
+    def render_manifest(self):
+        """Layer name → renderer keyword mapping for layout image output.
+
+        Default returns empty dict — renders as blank floor.
+        Override to enable visible layout images.
+        """
+        return {}

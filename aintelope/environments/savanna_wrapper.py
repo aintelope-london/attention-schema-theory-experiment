@@ -21,7 +21,17 @@ from aintelope.environments.savanna_safetygrid import (
     INFO_REWARD_DICT,
     AGENT_CHR1,
     AGENT_CHR2,
+    ALL_AGENTS_LAYER,
+    DANGER_TILE_CHR,
+    DRINK_CHR,
     FOOD_CHR,
+    GAP_CHR,
+    GOLD_CHR,
+    PREDATOR_NPC_CHR,
+    SILVER_CHR,
+    SMALL_DRINK_CHR,
+    SMALL_FOOD_CHR,
+    WALL_CHR,
     Actions,
 )
 
@@ -214,6 +224,23 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         from aintelope.config.config_utils import get_score_dimensions
 
         return get_score_dimensions(self._cfg)
+
+    @property
+    def render_manifest(self):
+        return {
+            GAP_CHR: "VOID",
+            WALL_CHR: "WALL",
+            DANGER_TILE_CHR: "DANGER",
+            PREDATOR_NPC_CHR: "PREDATOR",
+            DRINK_CHR: "DRINK",
+            SMALL_DRINK_CHR: "DRINK_SMALL",
+            FOOD_CHR: "FOOD",
+            SMALL_FOOD_CHR: "FOOD_SMALL",
+            GOLD_CHR: "GOLD",
+            SILVER_CHR: "SILVER",
+            AGENT_CHR1: "AGENT_0",
+            AGENT_CHR2: "AGENT_1",
+        }
 
     def observation_space(self, agent_id):
         from gymnasium.spaces import Box

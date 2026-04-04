@@ -88,7 +88,7 @@ def test_model_based_learns(base_learning_config):
     assert_learning_improvement(result["analytics"]["learning_improvement"]["train"])
 
 
-@pytest.mark.skip("100% with base DQN-FC 2x2")
+#@pytest.mark.skip("100% with base DQN-FC 2x2")
 def test_dqn_fc_2x2(base_learning_config):
     cfg = OmegaConf.merge(
         base_learning_config,
@@ -118,7 +118,9 @@ def test_dqn_fc_2x2(base_learning_config):
                     },
                 },
                 "env_params": {
+                    "env": "savanna-safetygrid-v1",
                     "goal": "reach_food",
+                    "map_max": 4,
                 },
             },
             "test": {
@@ -304,7 +306,7 @@ def test_dqn_curri(base_learning_config):
     report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
 
 
-# @pytest.mark.skip(reason="Test new env with 2x2")
+@pytest.mark.skip(reason="Test new env with 2x2")
 def test_gridworld_dqn_fc_learns(base_learning_config):
     """main_agent with DQN-FC shows learning improvement on gridworld.
 

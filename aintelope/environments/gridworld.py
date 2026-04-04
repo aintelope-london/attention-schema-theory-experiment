@@ -146,6 +146,17 @@ class GridworldEnv(AbstractEnv):
     def max_num_agents(self):
         return len(self.agents)
 
+    @property
+    def render_manifest(self):
+        manifest = {
+            "wall": "WALL",
+            "predator": "PREDATOR",
+            "food": "FOOD",
+        }
+        for i, aid in enumerate(self.agents):
+            manifest[aid] = f"AGENT_{i}"
+        return manifest
+
     # ── Action methods ─────────────────────────────────────────────────────────
 
     def forward(self, aid):

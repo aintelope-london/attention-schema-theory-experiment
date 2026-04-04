@@ -5,10 +5,10 @@ Contains:
     Tileset — reads a sprite strip BMP, tile size parsed from filename.
     StateRenderer — agnostic, composites tiles onto a PIL Image.
     overlay — composites colored boolean masks onto a rendered image.
-    SavannaInterpreter — maps savanna env layer keys to keywords.
+    Interpreter — maps env layer names to keywords via a render_manifest dict.
 
-To support a new environment, add an interpreter that maps env layer
-keys to tile keywords via a MANIFEST dict, and implements interpret(state).
+To support a new environment, implement render_manifest on the env class
+returning a {layer_name: keyword} dict. No changes needed here.
 """
 
 import re
@@ -16,22 +16,6 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image
-
-from aintelope.environments.savanna_safetygrid import (
-    AGENT_CHR1,
-    AGENT_CHR2,
-    ALL_AGENTS_LAYER,
-    DANGER_TILE_CHR,
-    DRINK_CHR,
-    FOOD_CHR,
-    GAP_CHR,
-    GOLD_CHR,
-    PREDATOR_NPC_CHR,
-    SILVER_CHR,
-    SMALL_DRINK_CHR,
-    SMALL_FOOD_CHR,
-    WALL_CHR,
-)
 
 
 # =============================================================================
@@ -66,6 +50,21 @@ TILE_INDEX = {
     **{agent: 10 + i for i, agent in enumerate(AGENTS)},
     FLOOR: 20,
 }
+
+# Paint order: left = bottom, right = top.
+_DRAW_ORDER = (
+    VOID,
+    WALL,
+    DRINK_SMALL,
+    DRINK,
+    FOOD_SMALL,
+    FOOD,
+    GOLD,
+    SILVER,
+    DANGER,
+    PREDATOR,
+    *AGENTS,
+)
 
 
 # =============================================================================
@@ -122,86 +121,36 @@ def overlay(image, masks, colors, alpha):
 
 
 # =============================================================================
-# Interpreters — one per environment
+# Interpreter — driven by env's render_manifest
 # =============================================================================
 
 
-class SavannaInterpreter:
-    """Maps savanna env layer keys to renderer keywords."""
+class Interpreter:
+    """Maps env layer names to renderer keywords via a render_manifest dict."""
 
-    MANIFEST = {
-        GAP_CHR: VOID,
-        WALL_CHR: WALL,
-        DANGER_TILE_CHR: DANGER,
-        PREDATOR_NPC_CHR: PREDATOR,
-        DRINK_CHR: DRINK,
-        SMALL_DRINK_CHR: DRINK_SMALL,
-        FOOD_CHR: FOOD,
-        SMALL_FOOD_CHR: FOOD_SMALL,
-        GOLD_CHR: GOLD,
-        SILVER_CHR: SILVER,
-        AGENT_CHR1: AGENTS[0],
-        AGENT_CHR2: AGENTS[1],
-        ALL_AGENTS_LAYER: None,
-    }
-
-    # Paint order: left = bottom, right = top. Edit to taste.
-    DRAW_ORDER = (
-        VOID,
-        WALL,
-        DRINK_SMALL,
-        DRINK,
-        FOOD_SMALL,
-        FOOD,
-        GOLD,
-        SILVER,
-        DANGER,
-        PREDATOR,
-        *AGENTS,
-    )
+    def __init__(self, manifest):
+        self._manifest = manifest
+        self._priority = {kw: i for i, kw in enumerate(_DRAW_ORDER)}
 
     def interpret(self, state):
         """Extract renderable layers from env state.
 
         Args:
-            state: (cube, layer_order) tuple from states.csv.
+            state: (board_cube, layer_names) tuple.
 
         Returns:
-            (cube, layers, floor) where layers is [(index, keyword), ...].
+            (cube, layers, floor_keyword) where layers is [(index, keyword), ...].
         """
         cube, layer_order = state
-        priority = {kw: i for i, kw in enumerate(self.DRAW_ORDER)}
         layers = sorted(
             [
-                (idx, self.MANIFEST[key])
-                for idx, key in enumerate(layer_order[: cube.shape[0]])
-                if key in self.MANIFEST and self.MANIFEST[key] is not None
+                (idx, self._manifest[name])
+                for idx, name in enumerate(layer_order[: cube.shape[0]])
+                if name in self._manifest
             ],
-            key=lambda pair: priority.get(pair[1], -1),
+            key=lambda pair: self._priority.get(pair[1], -1),
         )
         return cube, layers, FLOOR
-
-    def agent_positions(self, state, agent_ids):
-        """Extract agent positions from board state.
-
-        Args:
-            state: (cube, layer_order) tuple.
-            agent_ids: list of agent_id strings to look up.
-
-        Returns:
-            {agent_id: (row, col)}
-        """
-        cube, layer_order = state
-        layer_map = {
-            self.MANIFEST.get(key): idx
-            for idx, key in enumerate(layer_order[: cube.shape[0]])
-        }
-        positions = {}
-        for agent_id in agent_ids:
-            agent_idx = int(agent_id.split("_")[1])
-            ys, xs = np.where(cube[layer_map[AGENTS[agent_idx]]])
-            positions[agent_id] = (int(ys[0]), int(xs[0]))
-        return positions
 
 
 # =============================================================================
