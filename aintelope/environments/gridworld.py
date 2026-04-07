@@ -21,7 +21,7 @@ Board cube shape: (len(LAYERS), map_size+2, map_size+2)  — float32 boolean per
 
 Interoception channels (reset to zero each step, set by tile collision):
     [0]  food eaten this step
-    [1]  predator contact this step
+    [1]  contact this step: +1.0 = predator, -1.0 = wall
 
 Observation format "boolean_cube":
     (C, H, W) float32 boolean cube, agent-centric viewport, rotated so the
@@ -32,12 +32,13 @@ Action semantics (relative orientation):
     backward  -- reverse facing 180°, move one step in new direction
     left      -- rotate facing 90° CCW, move one step in new direction
     right     -- rotate facing 90° CW, move one step in new direction
-    wait      -- no-op
+    wait      -- no-op (available as a method but excluded from default config)
 
 Passability: floor, food, predator are passable.
              wall and other agents are not.
-Predator: passable (triggers interoception[1]) and persists on board after contact.
-Food: passable (triggers interoception[0]) and is consumed (removed from board).
+Predator: passable (triggers interoception[1] = +1.0) and persists on board after contact.
+Food: passable (triggers interoception[0] = +1.0) and is consumed (removed from board).
+Wall/agent collision: triggers interoception[1] = -1.0, agent does not move.
 """
 
 import numpy as np
@@ -145,6 +146,17 @@ class GridworldEnv(AbstractEnv):
     def max_num_agents(self):
         return len(self.agents)
 
+    @property
+    def render_manifest(self):
+        manifest = {
+            "wall": "WALL",
+            "predator": "PREDATOR",
+            "food": "FOOD",
+        }
+        for i, aid in enumerate(self.agents):
+            manifest[aid] = f"AGENT_{i}"
+        return manifest
+
     # ── Action methods ─────────────────────────────────────────────────────────
 
     def forward(self, aid):
@@ -168,15 +180,21 @@ class GridworldEnv(AbstractEnv):
     # ── Movement ──────────────────────────────────────────────────────────────
 
     def _move(self, aid, direction):
-        """Attempt move in direction. Returns interoception delta (2,)."""
+        """Attempt move in direction. Returns interoception delta (2,).
+
+        interoception[0]: +1.0 if food eaten this step, else 0.
+        interoception[1]: +1.0 if predator contact, -1.0 if wall/agent blocked,
+                          else 0.
+        """
         r, c = self._positions[aid]
         dr, dc = direction
         nr, nc = r + dr, c + dc
         tile = self._board[nr, nc]
         if tile not in _PASSABLE:
-            return np.zeros(2, np.float32)
+            intero = np.zeros(2, np.float32)
+            intero[1] = -1.0
+            return intero
         intero = np.zeros(2, np.float32)
-        # Restore vacated cell
         self._board[r, c] = PREDATOR if (r, c) in self._predator_cells else FLOOR
         self._positions[aid] = (nr, nc)
         if tile == FOOD:
@@ -225,6 +243,7 @@ class GridworldEnv(AbstractEnv):
             [self._board == i for i in range(len(self.layers))], axis=0
         ).astype(np.float32)
         food_ys, food_xs = np.where(self._board == FOOD)
+        h, w = self._board.shape
         self.state = {
             "board": cube,
             "layers": self.layers,
@@ -235,6 +254,7 @@ class GridworldEnv(AbstractEnv):
             "food_position": (int(food_ys[0]), int(food_xs[0]))
             if len(food_ys)
             else None,
+            "mask": np.zeros((len(self.agents), h, w), dtype=np.float32),
         }
 
     # ── Observation encoding ───────────────────────────────────────────────────

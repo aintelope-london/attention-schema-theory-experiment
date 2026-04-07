@@ -10,6 +10,7 @@ import os
 import zlib
 from pathlib import Path
 
+from omegaconf import OmegaConf
 import numpy as np
 import pandas as pd
 import pickle
@@ -55,23 +56,17 @@ class EventLog:
 
 
 class StateLog:
-    """Per-step environment state accumulator. One row per step, not per agent."""
-
     def __init__(self):
         self.columns = STATE_COLUMNS
         self._rows = []
 
     def log(self, row):
+        row = list(row)
+        row[-1] = serialize_state(row[-1])
         self._rows.append(row)
 
     def to_dataframe(self):
-        df = pd.DataFrame(self._rows, columns=self.columns)
-        for col in SERIALIZABLE_COLUMNS:
-            if col in df.columns:
-                df[col] = df[col].apply(
-                    lambda x: serialize_state(x) if x is not None else None
-                )
-        return df
+        return pd.DataFrame(self._rows, columns=self.columns)
 
 
 def write_csv(path, df):
@@ -79,6 +74,16 @@ def write_csv(path, df):
     path = Path(path)
     path.parent.mkdir(exist_ok=True, parents=True)
     df.to_csv(path, index=False)
+
+
+def write_cfg(block_dir, cfg):
+    path = Path(block_dir) / "cfg.yaml"
+    path.parent.mkdir(exist_ok=True, parents=True)
+    OmegaConf.save(cfg, path)
+
+
+def read_cfg(block_dir):
+    return OmegaConf.load(Path(block_dir) / "cfg.yaml")
 
 
 def _write_grouped_csv(outputs_dir, frames, filename):

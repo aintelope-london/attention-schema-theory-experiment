@@ -35,7 +35,7 @@ def run_experiment(
 
     # Event logging
     score_dims = env.score_dimensions
-    events = EventLog(list(cfg.run.experiment.event_columns) + score_dims)
+    events = EventLog(list(cfg.run.experiment.event_columns))
     events.experiment_name = cfg.experiment_name
     states = StateLog()
 
@@ -89,6 +89,8 @@ def run_experiment(
         # Analytics use this coordinate to track when the agent reaches it.
         episode_food_position = state.get("food_position")
 
+        states.log([cfg.experiment_name, i_trial, i_episode, -1, state])
+
         for agent in agents:
             agent.reset(observations[agent.id])
             dones[agent.id] = False
@@ -136,15 +138,7 @@ def run_experiment(
                     ]
                 )
 
-            states.log(
-                [
-                    cfg.experiment_name,
-                    i_trial,
-                    i_episode,
-                    step,
-                    (state["board"], state["layers"], None),
-                ]
-            )
+            states.log([cfg.experiment_name, i_trial, i_episode, step, state])
 
             if all(dones.values()):
                 break
@@ -166,11 +160,11 @@ def run_experiment(
             StateRenderer,
             Tileset,
             find_tileset,
-            SavannaInterpreter,
+            Interpreter,
         )
 
         renderer = StateRenderer(Tileset(find_tileset()))
-        interpreter = SavannaInterpreter()
+        interpreter = Interpreter(env.render_manifest)
         for seed, s in states_by_seed.items():
             img = renderer.render(*interpreter.interpret((s["board"], s["layers"])))
             save_env_layout(img, Path(cfg.run.outputs_dir) / cfg.experiment_name, seed)

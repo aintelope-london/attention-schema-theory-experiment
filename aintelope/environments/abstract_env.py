@@ -7,7 +7,6 @@ environment internals.
 Canonical state schema
 ----------------------
 Both reset() and step_parallel() return a state dict with at minimum:
-
     {
         "board":           ndarray (C, H, W) float32  — full layer cube,
                            one boolean channel per layer; complete world snapshot.
@@ -21,6 +20,9 @@ Both reset() and step_parallel() return a state dict with at minimum:
                            but provided directly to avoid layer-naming resolution
                            in consumers.
         "food_position":   (row, col) | None  — first food tile, or None.
+        "mask":            ndarray (N_agents, H, W) float32  — per-agent ROI masks
+                           in absolute board coordinates. Zero array for environments
+                           without ROI components.
     }
 
 Observations schema
@@ -39,6 +41,15 @@ Manifesto schema (minimum)
         "action_names":       {index: name},
         "food_ind":           int | None,
     }
+
+Render manifest schema
+----------------------
+    {layer_name: keyword}
+
+Maps each layer name (as it appears in state["layers"]) to a canonical renderer
+keyword (e.g. "food" → "FOOD", "agent_0" → "AGENT_0"). The keyword vocabulary
+is defined in renderer.py. Default is an empty dict — renders as blank floor.
+Envs override to enable layout image output.
 """
 
 from abc import ABC, abstractmethod
@@ -88,3 +99,14 @@ class AbstractEnv(ABC):
 
         Returns [] for environments where reward inference is agent-side.
         """
+
+    @property
+    def render_manifest(self):
+        """Layer name → renderer keyword mapping for layout image output.
+
+        Keys must match strings that appear in state["layers"].
+        Values are canonical renderer keywords defined in renderer.py.
+        Default returns empty dict — renders as blank floor.
+        Override to enable visible layout images.
+        """
+        return {}

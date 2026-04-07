@@ -31,18 +31,15 @@ class RewardScheme(ABC):
 
 
 class FoodInteroception(RewardScheme):
-    """Reward from food interoception signal.
+    def __init__(self, scale: float = 10.0):
+        self.scale = scale
 
-    Reads interoception[0] directly as the reward value.
-    Positive when the agent is eating, zero otherwise. No state.
-    """
-
-    def activate(self, activations: dict, env_manifesto: dict) -> float:
+    def activate(self, activations, env_manifesto):
         interoception = activations.get(
             "next_interoception", activations.get("interoception", np.array([]))
         )
         if len(interoception) > 0 and interoception[0] > 0:
-            return float(interoception[0])
+            return float(interoception[0]) * self.scale
         return 0.0
 
 

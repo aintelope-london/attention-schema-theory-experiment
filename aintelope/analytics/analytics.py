@@ -14,13 +14,8 @@ The GUI renders its own figures interactively from loaded CSVs via PLOT_TYPES.
 import numpy as np
 from pathlib import Path
 
-from aintelope.analytics.diagnostics import collector
-from aintelope.analytics.metrics import (
-    _METRICS,
-    _episode_windows,
-    per_episode_efficiency,
-    text,
-)
+import aintelope.analytics.metrics as _metrics
+from aintelope.analytics.metrics import _episode_windows
 from aintelope.analytics.plot_primitives import (
     create_figure,
     create_figure_grid,
@@ -160,7 +155,7 @@ def _render_optimality_scatter(block_data):
         return None
     figure, ax = create_figure()
     xs = [e["spawn_dist"] for e in reached]
-    ys = [e["steps_to_goal"] for e in reached]
+    ys = [e["steps_to_reach"] for e in reached]
     render_scatter(ax, xs, ys, "Optimality Scatter")
     return figure
 
@@ -186,7 +181,7 @@ def analyze(results):
     out = {}
 
     for name, params in cfg.run.analytics.items():
-        metric_data = _METRICS[name](results, params)
+        metric_data = getattr(_metrics, name)(results, params)
         out[name] = metric_data
 
         if name in _SERIES_SPECS:
@@ -234,7 +229,7 @@ def report_optimal_policy(block_result):
     """
     print("\n── Optimal Policy Report ─────────────────────────────")
     for ep in block_result["per_episode"]:
-        dist = ep["spawn_dist"] if ep["spawn_dist"] is not None else "?"
+        dist = ep["spawn_dist"]
         steps = (
             ep["steps_to_reach"] if ep["steps_to_reach"] != float("inf") else "never"
         )
@@ -242,7 +237,7 @@ def report_optimal_policy(block_result):
             f"{ep['efficiency'] * 100:.0f}%" if ep["efficiency"] is not None else "N/A"
         )
         print(
-            f"  Episode {ep['episode']:>4}: spawn_dist={dist}, steps_to_goal={steps}, efficiency={eff}"
+            f"  Episode {ep['episode']:>4}: spawn_dist={dist}, steps_to_reach={steps}, efficiency={eff}"
         )
     mean_eff = block_result["efficiency_pct"]
     n = block_result["n_episodes"]

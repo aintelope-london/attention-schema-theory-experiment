@@ -127,10 +127,11 @@ def plot_roi_turn_distribution(ax, df, metric, groups, group_col):
 def plot_optimality_scatter(ax, df, metric, groups, group_col):
     """Steps to goal vs spawn distance (Path Optimality Index). Points on y=x achieved POI=1."""
     ax.clear()
-    episodes = per_episode_efficiency(df)
-    reached = [e for e in episodes if e["steps_to_goal"] != float("inf")]
+    agent_id = df["Agent_id"].iloc[0]
+    episodes = beelines_to_object(df, agent_id, "Food_position")
+    reached = [e for e in episodes if e["steps_to_reach"] != float("inf")]
     if not reached:
         return
     xs = [e["spawn_dist"] for e in reached]
-    ys = [e["steps_to_goal"] for e in reached]
+    ys = [e["steps_to_reach"] for e in reached]
     render_scatter(ax, xs, ys, "Optimality Scatter")

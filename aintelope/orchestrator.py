@@ -26,7 +26,7 @@ from aintelope.utils.seeding import set_global_seeds
 from aintelope.utils.progress import ProgressReporter
 from aintelope.utils.concurrency import find_workers
 from aintelope.analytics.analytics import analyze
-from aintelope.analytics.recording import write_results, write_csv
+from aintelope.analytics.recording import write_results, write_csv, write_cfg
 
 
 def run_trial(cfg_dict, main_config_dict, i_trial):
@@ -113,7 +113,7 @@ def run_experiments(cfg, main_config):
     results = {
         block: {
             "events": pd.concat(data["events"], ignore_index=True),
-            "states": data["states"],
+            "states": pd.concat(data["states"], ignore_index=True),
             "learning_df": pd.concat(data["learning"], ignore_index=True)
             if data["learning"]
             else pd.DataFrame(),
@@ -140,8 +140,11 @@ def run_experiments(cfg, main_config):
                         / "performance_report.csv",
                         perf_df,
                     )
+                    write_cfg(
+                        Path(cfg.run.outputs_dir) / block_name,
+                        from_picklable(data["cfg_dict"]),
+                    )
 
-            # archive_code(cfg)
     finally:
         if cfg.run.write_outputs:
             elapsed = time.monotonic() - t0
