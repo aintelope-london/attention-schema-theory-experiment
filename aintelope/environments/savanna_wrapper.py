@@ -62,7 +62,7 @@ _OWN_ATTRS = frozenset(
         "_sb3_training",
         "_infos",
         "_dones",
-        "_last_aux_mask",
+        "_mask",
         "_n_agents",
         "state",
     }
@@ -128,7 +128,7 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         self._infos = {}
         self._dones = {}
         self.state = {}
-        self._last_aux_mask = np.zeros(
+        self._mask = np.zeros(
             (self._n_agents, cfg.env_params.map_height, cfg.env_params.map_width),
             dtype=np.float32,
         )
@@ -159,9 +159,8 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         self._update_state(raw_infos)
         observations = self._to_dict_obs(raw_obs)
         board_h, board_w = self.state["board"].shape[1:]
-        self._last_aux_mask = np.zeros(
-            (self._n_agents, board_h, board_w), dtype=np.float32
-        )
+        self._mask = np.zeros((self._n_agents, board_h, board_w), dtype=np.float32)
+        self.state["mask"] = self._mask
         observations = self._append_roi_layer(observations)
 
         if self._sb3_training:
@@ -202,13 +201,14 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         observations = self._to_dict_obs(raw_obs)
 
         board_h, board_w = self.state["board"].shape[1:]
-        self._last_aux_mask = np.zeros((self._n_agents, board_h, board_w), dtype=bool)
+        self._mask = np.zeros((self._n_agents, board_h, board_w), dtype=bool)
         for i, aid in enumerate(sorted(actions.keys())):
             mask = actions[aid].get("roi")
             if mask is not None:
                 _blit_viewport_to_absolute(
-                    mask, self._infos[aid]["position"], self._last_aux_mask[i]
+                    mask, self._infos[aid]["position"], self._mask[i]
                 )
+        self.state["mask"] = self._mask
         observations = self._append_roi_layer(observations)
         return observations, self.state
 
@@ -238,8 +238,7 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
             SMALL_FOOD_CHR: "FOOD_SMALL",
             GOLD_CHR: "GOLD",
             SILVER_CHR: "SILVER",
-            AGENT_CHR1: "AGENT_0",
-            AGENT_CHR2: "AGENT_1",
+            **{f"agent_{i}": f"AGENT_{i}" for i in range(self._n_agents)},
         }
 
     def observation_space(self, agent_id):
@@ -291,14 +290,14 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         truncateds = truncateds or {}
         raw_scores = raw_scores or {}
 
-        board = next(iter(self._env.observe_absolute_bitmaps().values()))
+        board = next(iter(self._env.observe_absolute_bitmaps().values())).copy()
         layer_order = list(
             next(iter(self._env.relative_observation_layers_order().values()))
         )
         board_shape = board.shape[1:]
         directions = self._read_directions()
 
-        # Extract positions and food
+        # Extract positions using raw savanna chars
         positions = {}
         for i in range(self._env.max_num_agents):
             agent_id = f"agent_{i}"
@@ -310,6 +309,11 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
         if FOOD_CHR in layer_order:
             ys, xs = np.where(board[layer_order.index(FOOD_CHR)])
             food_pos = (int(ys[0]), int(xs[0])) if len(ys) > 0 else None
+
+        # Translate savanna chars to canonical agent ids before storing
+        for i, chr in enumerate(_AGENT_CHRS):
+            if chr in layer_order:
+                layer_order[layer_order.index(chr)] = f"agent_{i}"
 
         self._dones = {
             aid: (terminateds.get(aid, False) or truncateds.get(aid, False))
@@ -353,7 +357,7 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
             pos = self._infos[aid]["position"]
             layers = [
                 _crop_absolute_to_viewport(
-                    self._last_aux_mask[i],
+                    self._mask[i],
                     pos,
                     obs["vision"].shape[1:],
                 ).astype(np.float32)[np.newaxis]
@@ -388,6 +392,9 @@ class SavannaWrapper(AbstractEnv, ParallelEnv):
             "action_space": action_space,
             "action_names": action_names,
             "food_ind": food_ind,
+            "agent_layers": {
+                f"agent_{i}": _AGENT_CHRS[i] for i in range(self._n_agents)
+            },
         }
 
     # ── Internal ──────────────────────────────────────────────────────

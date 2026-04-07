@@ -191,15 +191,10 @@ class GridworldEnv(AbstractEnv):
         nr, nc = r + dr, c + dc
         tile = self._board[nr, nc]
         if tile not in _PASSABLE:
-            # Wall hit or agent collision — signal ouch and do not move.
-            # Note: facing was already updated by the calling action method
-            # (backward/left/right) before _move was called, so the viewport
-            # will reflect the new facing next step regardless of this block.
             intero = np.zeros(2, np.float32)
             intero[1] = -1.0
             return intero
         intero = np.zeros(2, np.float32)
-        # Restore vacated cell
         self._board[r, c] = PREDATOR if (r, c) in self._predator_cells else FLOOR
         self._positions[aid] = (nr, nc)
         if tile == FOOD:
@@ -248,6 +243,7 @@ class GridworldEnv(AbstractEnv):
             [self._board == i for i in range(len(self.layers))], axis=0
         ).astype(np.float32)
         food_ys, food_xs = np.where(self._board == FOOD)
+        h, w = self._board.shape
         self.state = {
             "board": cube,
             "layers": self.layers,
@@ -258,6 +254,7 @@ class GridworldEnv(AbstractEnv):
             "food_position": (int(food_ys[0]), int(food_xs[0]))
             if len(food_ys)
             else None,
+            "mask": np.zeros((len(self.agents), h, w), dtype=np.float32),
         }
 
     # ── Observation encoding ───────────────────────────────────────────────────

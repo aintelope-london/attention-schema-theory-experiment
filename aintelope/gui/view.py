@@ -20,6 +20,7 @@ from aintelope.analytics.recording import (
     list_runs,
     list_blocks,
     read_events,
+    read_cfg,
     save_frames,
 )
 from aintelope.config.config_utils import (
@@ -27,6 +28,7 @@ from aintelope.config.config_utils import (
     load_experiment_config,
     save_experiment_config,
 )
+from aintelope.environments import get_env_class
 from aintelope.gui.gui import (
     Frame,
     Label,
@@ -52,7 +54,7 @@ from aintelope.gui.gui import (
     HORIZONTAL,
 )
 from aintelope.gui.renderer import (
-    SavannaInterpreter,
+    Interpreter,
     StateRenderer,
     Tileset,
     find_tileset,
@@ -85,7 +87,7 @@ class MainWindow:
         self.default_values = OmegaConf.to_container(default_cfg, resolve=True)
         self.ui_schema = load_ui_schema()
         self.agent_template = copy.deepcopy(
-            self.default_values["agent_params"]["agent_0"]
+            self.default_values["agent_params"]["agents"]["agent_0"]
         )
         self.exp_tabs = []
 
@@ -283,7 +285,7 @@ class MainWindow:
             current_path = f"{path}.{key}" if path else key
 
             # Agent entries are rendered by _build_agents_area
-            if path == "agent_params" and key.startswith(AGENT_PREFIX):
+            if path == "agent_params.agents" and key.startswith(AGENT_PREFIX):
                 continue
 
             if isinstance(value, dict):
@@ -363,7 +365,7 @@ class MainWindow:
         for child in container.winfo_children():
             child.destroy()
         for key in list(tab["widgets"]):
-            if key.startswith(f"agent_params.{AGENT_PREFIX}"):
+            if key.startswith(f"agent_params.agents.{AGENT_PREFIX}"):
                 del tab["widgets"][key]
 
         row = 0
@@ -386,7 +388,11 @@ class MainWindow:
             fields_frame = Frame(container)
             fields_frame.grid(row=row, column=0, columnspan=3, sticky=W)
             self._build_param_tree(
-                fields_frame, agent_cfg, tab, f"agent_params.{agent_id}", level + 1
+                fields_frame,
+                agent_cfg,
+                tab,
+                f"agent_params.agents.{agent_id}",
+                level + 1,
             )
             row += 1
 
@@ -399,7 +405,7 @@ class MainWindow:
     def _get_agent_configs(self, tab):
         return {
             k: v
-            for k, v in sorted(tab["current"]["agent_params"].items())
+            for k, v in sorted(tab["current"]["agent_params"]["agents"].items())
             if k.startswith(AGENT_PREFIX)
         }
 
@@ -407,28 +413,32 @@ class MainWindow:
         agents = self._get_agent_configs(tab)
         new_id = f"agent_{len(agents)}"
         new_cfg = copy.deepcopy(self.agent_template)
-        tab["current"]["agent_params"][new_id] = new_cfg
-        self._set_nested(tab["diff"], ["agent_params", new_id], copy.deepcopy(new_cfg))
+        tab["current"]["agent_params"]["agents"][new_id] = new_cfg
+        self._set_nested(
+            tab["diff"], ["agent_params", "agents", new_id], copy.deepcopy(new_cfg)
+        )
         self._populate_agents(tab)
         self.status.set(f"Added: {new_id}")
 
     def _remove_agent(self, tab, agent_id):
         agents = self._get_agent_configs(tab)
         remaining = [(k, v) for k, v in agents.items() if k != agent_id]
-        for k in list(tab["current"]["agent_params"]):
+        for k in list(tab["current"]["agent_params"]["agents"]):
             if k.startswith(AGENT_PREFIX):
-                del tab["current"]["agent_params"][k]
-        if "agent_params" in tab["diff"]:
-            for k in list(tab["diff"]["agent_params"]):
+                del tab["current"]["agent_params"]["agents"][k]
+        if "agent_params" in tab["diff"] and "agents" in tab["diff"]["agent_params"]:
+            for k in list(tab["diff"]["agent_params"]["agents"]):
                 if k.startswith(AGENT_PREFIX):
-                    del tab["diff"]["agent_params"][k]
+                    del tab["diff"]["agent_params"]["agents"][k]
         for i, (_, cfg) in enumerate(remaining):
             new_id = f"agent_{i}"
-            tab["current"]["agent_params"][new_id] = cfg
-            default_agent = self.default_values["agent_params"].get(new_id)
+            tab["current"]["agent_params"]["agents"][new_id] = cfg
+            default_agent = self.default_values["agent_params"]["agents"].get(new_id)
             if default_agent is None or cfg != default_agent:
                 self._set_nested(
-                    tab["diff"], ["agent_params", new_id], copy.deepcopy(cfg)
+                    tab["diff"],
+                    ["agent_params", "agents", new_id],
+                    copy.deepcopy(cfg),
                 )
         self._populate_agents(tab)
         self.status.set(f"Removed: {agent_id}")
@@ -590,7 +600,11 @@ class MainWindow:
 
         self.df = read_events(str(block_dir / "events.csv"))
         self.states = read_events(str(block_dir / "states.csv"))
-        self.interpreter = SavannaInterpreter()
+
+        block_cfg = read_cfg(block_dir)
+        env = get_env_class(block_cfg.env_params.env)(cfg=block_cfg)
+        env.reset()
+        self.interpreter = Interpreter(env.render_manifest)
 
         index_cols = {"Trial", "Episode", "Step", "Agent_id", "Experiment"}
         numeric_cols = self.df.select_dtypes(include="number").columns
@@ -779,15 +793,14 @@ class MainWindow:
 
     def _get_frame(self, step):
         episode = int(self.episode_var.get())
-        state_row = self.states[
+        state = self.states[
             (self.states["Episode"] == episode) & (self.states["Step"] == step)
-        ].iloc[0]
-        board_data = state_row["Board"]
+        ].iloc[0]["Board"]
         img = self.renderer.render(
-            *self.interpreter.interpret((board_data[0], board_data[1]))
+            *self.interpreter.interpret((state["board"], state["layers"]))
         )
-        colors = [ROI_COLOR] * board_data[2].shape[0]
-        img = overlay(img, board_data[2], colors, ROI_ALPHA)
+        colors = [ROI_COLOR] * state["mask"].shape[0]
+        img = overlay(img, state["mask"], colors, ROI_ALPHA)
         return img
 
     def _render_state(self):

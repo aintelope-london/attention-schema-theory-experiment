@@ -48,7 +48,7 @@ TILE_INDEX = {
     GOLD: 8,
     SILVER: 9,
     **{agent: 10 + i for i, agent in enumerate(AGENTS)},
-    FLOOR: 20,
+    FLOOR: 0,
 }
 
 # Paint order: left = bottom, right = top.

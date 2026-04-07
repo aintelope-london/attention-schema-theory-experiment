@@ -88,7 +88,7 @@ def test_model_based_learns(base_learning_config):
     assert_learning_improvement(result["analytics"]["learning_improvement"]["train"])
 
 
-#@pytest.mark.skip("100% with base DQN-FC 2x2")
+# @pytest.mark.skip("100% with base DQN-FC 2x2")
 def test_dqn_fc_2x2(base_learning_config):
     cfg = OmegaConf.merge(
         base_learning_config,

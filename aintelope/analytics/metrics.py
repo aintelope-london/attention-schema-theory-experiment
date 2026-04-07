@@ -112,7 +112,8 @@ def beelines_to_object(events, states, agent_id, target_position):
         ]
         if spawn_row.empty:
             continue
-        board_cube, layers, _ = deserialize_state(spawn_row["Board"].iloc[0])
+        state = deserialize_state(spawn_row["Board"].iloc[0])
+        board_cube, layers = state["board"], state["layers"]
         agent_layer = layers.index(agent_id)
         ys, xs = np.where(board_cube[agent_layer] > 0)
         if len(ys) == 0:
