@@ -19,9 +19,9 @@ class Component(ABC):
     def activate(self, activations: Dict[str, Any]) -> None:
         raise NotImplementedError
 
-    @abstractmethod
-    def update(self, signals=None) -> Any:
-        raise NotImplementedError
+    def update(self, signals=None) -> dict:
+        """Propagate learning. Returns a report dict (empty if no learning occurs)."""
+        return {}
 
     def reset(self) -> None:
         """Episode boundary reset. Override in stateful components."""

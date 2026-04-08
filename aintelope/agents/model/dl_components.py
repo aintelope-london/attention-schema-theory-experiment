@@ -438,9 +438,6 @@ class ModelBased(Component):
         best_action = self.mcts.search(activations, value_fn, dynamics_fn)
         activations[self.component_id] = best_action
 
-    def update(self, signals=None):
-        return None
-
     def reset(self):
         pass
 

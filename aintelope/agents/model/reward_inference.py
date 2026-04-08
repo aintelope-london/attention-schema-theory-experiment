@@ -158,6 +158,3 @@ class RewardInference(Component):
     def reset(self) -> None:
         for scheme in self.rewards:
             scheme.reset()
-
-    def update(self, signals=None):
-        return None

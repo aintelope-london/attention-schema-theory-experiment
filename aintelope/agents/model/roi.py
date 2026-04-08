@@ -176,6 +176,3 @@ class ROI(Component):
         vision[:-1] *= np.where(mask, 1.0, self._darkening_factor)  # darken outside ROI
         vision[-1] = mask.astype(np.float32)  # write ROI layer slot
         activations[self.component_id] = mask
-
-    def update(self, signals=None):
-        return None

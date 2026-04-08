@@ -126,17 +126,14 @@ class GridworldEnv(AbstractEnv):
             observations: {agent_id: {"vision": ndarray, "interoception": ndarray}}
             state:        canonical world snapshot dict (see module docstring)
         """
-        interoceptions = {}
+        interoceptions, ate_food = {}, {}
         order = list(actions.keys())
         self._step_rng.shuffle(order)
         for aid in order:
             name = self._manifesto["action_names"][actions[aid]["action"]]
-            interoceptions[aid] = getattr(self, name)(aid)
+            interoceptions[aid], ate_food[aid] = getattr(self, name)(aid)
         termination = self._cfg.env_params.get("termination", None)
-        dones = {
-            aid: (termination == "food" and interoceptions[aid][0] > 0)
-            for aid in self.agents
-        }
+        dones = {aid: termination == "food" and ate_food[aid] for aid in self.agents}
         self._refresh_state(dones)
         return self._observations(interoceptions), self.state
 
@@ -184,25 +181,26 @@ class GridworldEnv(AbstractEnv):
         return self._move(aid, self._facing[aid])
 
     def wait(self, aid):
-        return np.zeros(2, np.float32)
+        return np.zeros(2, np.float32), False
 
     # ── Movement ──────────────────────────────────────────────────────────────
 
     def _move(self, aid, direction):
-        """Attempt move in direction. Returns interoception delta (2,).
+        """Attempt move in direction. Returns (interoception (2,), ate_food bool).
 
         interoception[0]: +1.0 if food eaten this step, else 0.
         interoception[1]: +1.0 if predator contact, -1.0 if wall/agent blocked,
                           else 0.
+        ate_food: True if food tile was consumed this step.
         """
         r, c = self._positions[aid]
         dr, dc = direction
         nr, nc = r + dr, c + dc
-        tile = self._board[nr, nc]
+        tile = int(self._board[nr, nc])
         if tile not in _PASSABLE:
             intero = np.zeros(2, np.float32)
             intero[1] = -1.0
-            return intero
+            return intero, False
         intero = np.zeros(2, np.float32)
         self._board[r, c] = PREDATOR if (r, c) in self._predator_cells else FLOOR
         self._positions[aid] = (nr, nc)
@@ -211,7 +209,7 @@ class GridworldEnv(AbstractEnv):
         elif tile == PREDATOR:
             intero[1] = 1.0
         self._board[nr, nc] = _N_BASE + self.agents.index(aid)
-        return intero
+        return intero, tile == FOOD
 
     # ── Board initialisation ──────────────────────────────────────────────────
 
