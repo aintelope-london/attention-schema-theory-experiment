@@ -38,7 +38,7 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
     cfg = from_picklable(cfg_dict)
     main_config = from_picklable(main_config_dict)
 
-    trial_seed = cfg.run.seed + i_trial
+    trial_seed = cfg.run.seed + i_trial * 10000
     set_global_seeds(trial_seed)
 
     trial_results = {}

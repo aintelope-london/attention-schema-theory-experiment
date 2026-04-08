@@ -75,6 +75,15 @@ def _agents_from_cfg(cfg):
     return sorted(cfg.agent_params.agents.keys())
 
 
+def _scramble_seed(seed: int) -> int:
+    """SplitMix64 finalizer — maps sequential ints to uniform 64-bit space.
+    Ensures np.default_rng is well-initialized even for small sequential seeds."""
+    seed = seed & 0xFFFFFFFFFFFFFFFF  # keep 64-bit
+    seed = ((seed ^ (seed >> 30)) * 0xBF58476D1CE4E5B9) & 0xFFFFFFFFFFFFFFFF
+    seed = ((seed ^ (seed >> 27)) * 0x94D049BB133111EB) & 0xFFFFFFFFFFFFFFFF
+    return (seed ^ (seed >> 31)) & 0xFFFFFFFFFFFFFFFF
+
+
 class GridworldEnv(AbstractEnv):
     """Minimal randomised gridworld. No PettingZoo / gym dependencies."""
 
@@ -99,7 +108,7 @@ class GridworldEnv(AbstractEnv):
 
         Accepts keyword 'seed' (episode index) which offsets cfg.run.seed.
         """
-        seed = self._cfg.run.seed + kwargs.get("seed", 0)
+        seed = _scramble_seed(self._cfg.run.seed + kwargs.get("seed", 0))
         layout_rng = np.random.default_rng(seed)
         self._step_rng = np.random.default_rng(seed + 1)
         self._place_board(layout_rng)
