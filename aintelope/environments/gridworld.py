@@ -75,6 +75,15 @@ def _agents_from_cfg(cfg):
     return sorted(cfg.agent_params.agents.keys())
 
 
+def _scramble_seed(seed: int) -> int:
+    """SplitMix64 finalizer — maps sequential ints to uniform 64-bit space.
+    Ensures np.default_rng is well-initialized even for small sequential seeds."""
+    seed = seed & 0xFFFFFFFFFFFFFFFF  # keep 64-bit
+    seed = ((seed ^ (seed >> 30)) * 0xBF58476D1CE4E5B9) & 0xFFFFFFFFFFFFFFFF
+    seed = ((seed ^ (seed >> 27)) * 0x94D049BB133111EB) & 0xFFFFFFFFFFFFFFFF
+    return (seed ^ (seed >> 31)) & 0xFFFFFFFFFFFFFFFF
+
+
 class GridworldEnv(AbstractEnv):
     """Minimal randomised gridworld. No PettingZoo / gym dependencies."""
 
@@ -99,7 +108,7 @@ class GridworldEnv(AbstractEnv):
 
         Accepts keyword 'seed' (episode index) which offsets cfg.run.seed.
         """
-        seed = self._cfg.run.seed + kwargs.get("seed", 0)
+        seed = _scramble_seed(self._cfg.run.seed + kwargs.get("seed", 0))
         layout_rng = np.random.default_rng(seed)
         self._step_rng = np.random.default_rng(seed + 1)
         self._place_board(layout_rng)
@@ -117,17 +126,14 @@ class GridworldEnv(AbstractEnv):
             observations: {agent_id: {"vision": ndarray, "interoception": ndarray}}
             state:        canonical world snapshot dict (see module docstring)
         """
-        interoceptions = {}
+        interoceptions, ate_food = {}, {}
         order = list(actions.keys())
         self._step_rng.shuffle(order)
         for aid in order:
             name = self._manifesto["action_names"][actions[aid]["action"]]
-            interoceptions[aid] = getattr(self, name)(aid)
+            interoceptions[aid], ate_food[aid] = getattr(self, name)(aid)
         termination = self._cfg.env_params.get("termination", None)
-        dones = {
-            aid: (termination == "food" and interoceptions[aid][0] > 0)
-            for aid in self.agents
-        }
+        dones = {aid: termination == "food" and ate_food[aid] for aid in self.agents}
         self._refresh_state(dones)
         return self._observations(interoceptions), self.state
 
@@ -175,25 +181,26 @@ class GridworldEnv(AbstractEnv):
         return self._move(aid, self._facing[aid])
 
     def wait(self, aid):
-        return np.zeros(2, np.float32)
+        return np.zeros(2, np.float32), False
 
     # ── Movement ──────────────────────────────────────────────────────────────
 
     def _move(self, aid, direction):
-        """Attempt move in direction. Returns interoception delta (2,).
+        """Attempt move in direction. Returns (interoception (2,), ate_food bool).
 
         interoception[0]: +1.0 if food eaten this step, else 0.
         interoception[1]: +1.0 if predator contact, -1.0 if wall/agent blocked,
                           else 0.
+        ate_food: True if food tile was consumed this step.
         """
         r, c = self._positions[aid]
         dr, dc = direction
         nr, nc = r + dr, c + dc
-        tile = self._board[nr, nc]
+        tile = int(self._board[nr, nc])
         if tile not in _PASSABLE:
             intero = np.zeros(2, np.float32)
             intero[1] = -1.0
-            return intero
+            return intero, False
         intero = np.zeros(2, np.float32)
         self._board[r, c] = PREDATOR if (r, c) in self._predator_cells else FLOOR
         self._positions[aid] = (nr, nc)
@@ -202,7 +209,7 @@ class GridworldEnv(AbstractEnv):
         elif tile == PREDATOR:
             intero[1] = 1.0
         self._board[nr, nc] = _N_BASE + self.agents.index(aid)
-        return intero
+        return intero, tile == FOOD
 
     # ── Board initialisation ──────────────────────────────────────────────────
 
