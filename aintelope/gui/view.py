@@ -56,8 +56,6 @@ from aintelope.gui.gui import (
 from aintelope.gui.renderer import (
     Interpreter,
     StateRenderer,
-    Tileset,
-    find_tileset,
     overlay,
 )
 from aintelope.gui.ui_schema_manager import load_ui_schema, get_field_spec
@@ -96,7 +94,7 @@ class MainWindow:
         self.df = None
         self.states = None
         self.interpreter = None
-        self.renderer = StateRenderer(Tileset(find_tileset()))
+        self.renderer = StateRenderer()
         self._photo = None
 
         self._create_ui()

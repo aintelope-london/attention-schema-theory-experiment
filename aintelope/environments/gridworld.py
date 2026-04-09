@@ -1,60 +1,28 @@
-"""Minimal randomised MOMA gridworld.
-
-Config keys consumed (all under env_params unless noted):
-    cfg.run.seed                -- base RNG seed; per-episode seed = base + episode index
-    cfg.env_params.map_size     -- interior play-area side length (walls added silently)
-    cfg.env_params.objects      -- {tile_name: {count: N}}  e.g. {food: {count: 3}}
-    cfg.env_params.actions      -- ordered list of action strings
-    cfg.env_params.observation_radius  -- viewport half-size (viewport = 2r+1 square)
-    cfg.env_params.observation_format  -- encoder key; add _encode_<key> to extend
-    cfg.agent_params.agents     -- agent_* keys enumerate agents (SSOT for agent list)
-
-Tile layer order — LAYERS is the canonical reference for all channel indexing.
-Layer i in the board cube corresponds to LAYERS[i]:
-    0  floor
-    1  wall
-    2  predator
-    3  food
-    4+ one layer per agent (index = 4 + agent index in sorted agent list)
-
-Board cube shape: (len(LAYERS), map_size+2, map_size+2)  — float32 boolean per tile.
-
-Interoception channels (reset to zero each step, set by tile collision):
-    [0]  food eaten this step
-    [1]  contact this step: +1.0 = predator, -1.0 = wall
-
-Observation format "boolean_cube":
-    (C, H, W) float32 boolean cube, agent-centric viewport, rotated so the
-    agent's facing direction is always "up" in the frame.
-
-Action semantics (relative orientation):
-    forward   -- move one step in facing direction
-    backward  -- reverse facing 180°, move one step in new direction
-    left      -- rotate facing 90° CCW, move one step in new direction
-    right     -- rotate facing 90° CW, move one step in new direction
-    wait      -- no-op (available as a method but excluded from default config)
-
-Passability: floor, food, predator are passable.
-             wall and other agents are not.
-Predator: passable (triggers interoception[1] = +1.0) and persists on board after contact.
-Food: passable (triggers interoception[0] = +1.0) and is consumed (removed from board).
-Wall/agent collision: triggers interoception[1] = -1.0, agent does not move.
-"""
-
 import numpy as np
 from aintelope.environments.abstract_env import AbstractEnv
 
 # ── Tile indices ───────────────────────────────────────────────────────────────
-FLOOR, WALL, PREDATOR, FOOD = 0, 1, 2, 3
-_N_BASE = 4  # number of base tile types; agent tiles begin at _N_BASE
+FLOOR, WALL, PREDATOR, FOOD, FOOD_UNRIPE, FOOD_ROTTEN, ROCK, WATER = (
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+)
+_N_BASE = 8  # agent tiles begin here
 
-_PASSABLE = {FLOOR, FOOD, PREDATOR}
+_NEXT_STAGE = {FOOD_UNRIPE: FOOD, FOOD: FOOD_ROTTEN}
+_FOOD_STAGES = (FOOD_UNRIPE, FOOD, FOOD_ROTTEN)
+_PASSABLE = {FLOOR, FOOD, FOOD_UNRIPE, FOOD_ROTTEN, PREDATOR}
+_FOOD_REWARD = {FOOD}
 
 # ── Orientation ────────────────────────────────────────────────────────────────
 _N, _E, _S, _W = (-1, 0), (0, 1), (1, 0), (0, -1)
 _DEFAULT_FACING = _N
 
-# CCW 90° rotations needed to bring each facing direction "up" in the viewport
 _ROT = {_N: 0, _W: 1, _S: 2, _E: 3}
 
 
@@ -71,17 +39,35 @@ def _flip(d):
 
 
 def _agents_from_cfg(cfg):
-    """Sorted canonical agent ID list. SSOT: cfg.agent_params.agents keys."""
     return sorted(cfg.agent_params.agents.keys())
 
 
 def _scramble_seed(seed: int) -> int:
-    """SplitMix64 finalizer — maps sequential ints to uniform 64-bit space.
-    Ensures np.default_rng is well-initialized even for small sequential seeds."""
-    seed = seed & 0xFFFFFFFFFFFFFFFF  # keep 64-bit
+    seed = seed & 0xFFFFFFFFFFFFFFFF
     seed = ((seed ^ (seed >> 30)) * 0xBF58476D1CE4E5B9) & 0xFFFFFFFFFFFFFFFF
     seed = ((seed ^ (seed >> 27)) * 0x94D049BB133111EB) & 0xFFFFFFFFFFFFFFFF
     return (seed ^ (seed >> 31)) & 0xFFFFFFFFFFFFFFFF
+
+
+def _blit_roi(viewport_mask, position, facing, board_shape):
+    """Blit a viewport-space ROI mask to absolute board coordinates.
+
+    Undoes the facing rotation before blitting — the ROI component operates
+    on the rotated viewport, so we rotate back before placing on the board.
+    """
+    h, w = board_shape
+    v = viewport_mask.shape[0]
+    half = v // 2
+    r, c = position
+    unrotated = np.rot90(viewport_mask.astype(np.float32), k=(4 - _ROT[facing]) % 4)
+    absolute = np.zeros((h, w), dtype=np.float32)
+    b_r, b_c = r - half, c - half
+    s_r, d_r = max(0, b_r), max(0, -b_r)
+    s_c, d_c = max(0, b_c), max(0, -b_c)
+    eh = min(v - d_r, h - s_r)
+    ew = min(v - d_c, w - s_c)
+    absolute[s_r : s_r + eh, s_c : s_c + ew] = unrotated[d_r : d_r + eh, d_c : d_c + ew]
+    return absolute
 
 
 class GridworldEnv(AbstractEnv):
@@ -90,51 +76,52 @@ class GridworldEnv(AbstractEnv):
     def __init__(self, cfg):
         self._cfg = cfg
         self.agents = _agents_from_cfg(cfg)
-        # Layers: base tiles then one layer per agent in sorted order
-        self.layers = ["floor", "wall", "predator", "food"] + self.agents
+        self.layers = [
+            "floor",
+            "wall",
+            "predator",
+            "food",
+            "food_unripe",
+            "food_rotten",
+            "rock",
+            "water",
+        ] + self.agents
+        self._ripening_period = cfg.env_params.get("ripening", 0)
+        self._initial_food_tile = FOOD_UNRIPE if self._ripening_period > 0 else FOOD
         self._manifesto = None
         self.state = {}
-        # Mutable episode state
-        self._board = None  # (H, W) int8
-        self._facing = {}  # {agent_id: (dr, dc)}
-        self._positions = {}  # {agent_id: (r, c)}
-        self._predator_cells = set()  # cells that always hold a predator
+        self._board = None
+        self._facing = {}
+        self._positions = {}
+        self._predator_cells = set()
+        self._food_age = {}
         self._step_rng = None
 
     # ── AbstractEnv contract ───────────────────────────────────────────────────
 
     def reset(self, **kwargs):
-        """Place board, return (observations, state).
-
-        Accepts keyword 'seed' (episode index) which offsets cfg.run.seed.
-        """
         seed = _scramble_seed(self._cfg.run.seed + kwargs.get("seed", 0))
         layout_rng = np.random.default_rng(seed)
         self._step_rng = np.random.default_rng(seed + 1)
         self._place_board(layout_rng)
         self._manifesto = self._build_manifesto()
-        self._refresh_state(dones={aid: False for aid in self.agents})
+        self._refresh_state(dones={aid: False for aid in self.agents}, roi_masks={})
         return self._observations(), self.state
 
     def step_parallel(self, actions):
-        """Execute all agent actions simultaneously (shuffled order for fairness).
-
-        Args:
-            actions: {agent_id: {"action": int, ...}}
-
-        Returns:
-            observations: {agent_id: {"vision": ndarray, "interoception": ndarray}}
-            state:        canonical world snapshot dict (see module docstring)
-        """
         interoceptions, ate_food = {}, {}
         order = list(actions.keys())
         self._step_rng.shuffle(order)
         for aid in order:
             name = self._manifesto["action_names"][actions[aid]["action"]]
             interoceptions[aid], ate_food[aid] = getattr(self, name)(aid)
+        self._ripen()
         termination = self._cfg.env_params.get("termination", None)
         dones = {aid: termination == "food" and ate_food[aid] for aid in self.agents}
-        self._refresh_state(dones)
+        roi_masks = {
+            aid: actions[aid]["roi"] for aid in self.agents if "roi" in actions[aid]
+        }
+        self._refresh_state(dones, roi_masks)
         return self._observations(interoceptions), self.state
 
     def step_sequential(self, actions):
@@ -154,14 +141,7 @@ class GridworldEnv(AbstractEnv):
 
     @property
     def render_manifest(self):
-        manifest = {
-            "wall": "WALL",
-            "predator": "PREDATOR",
-            "food": "FOOD",
-        }
-        for i, aid in enumerate(self.agents):
-            manifest[aid] = f"AGENT_{i}"
-        return manifest
+        return {layer: layer for layer in self.layers}
 
     # ── Action methods ─────────────────────────────────────────────────────────
 
@@ -186,13 +166,6 @@ class GridworldEnv(AbstractEnv):
     # ── Movement ──────────────────────────────────────────────────────────────
 
     def _move(self, aid, direction):
-        """Attempt move in direction. Returns (interoception (2,), ate_food bool).
-
-        interoception[0]: +1.0 if food eaten this step, else 0.
-        interoception[1]: +1.0 if predator contact, -1.0 if wall/agent blocked,
-                          else 0.
-        ate_food: True if food tile was consumed this step.
-        """
         r, c = self._positions[aid]
         dr, dc = direction
         nr, nc = r + dr, c + dc
@@ -204,22 +177,61 @@ class GridworldEnv(AbstractEnv):
         intero = np.zeros(2, np.float32)
         self._board[r, c] = PREDATOR if (r, c) in self._predator_cells else FLOOR
         self._positions[aid] = (nr, nc)
-        if tile == FOOD:
+        if tile in _FOOD_REWARD:
             intero[0] = 1.0
         elif tile == PREDATOR:
             intero[1] = 1.0
+        if tile in _PASSABLE - {FLOOR, PREDATOR}:
+            self._food_age.pop((nr, nc), None)
         self._board[nr, nc] = _N_BASE + self.agents.index(aid)
-        return intero, tile == FOOD
+        return intero, tile in _FOOD_REWARD
+
+    # ── Ripening ──────────────────────────────────────────────────────────────
+
+    def _ripen(self):
+        if not self._ripening_period:
+            return
+        despawned = []
+        for pos in list(self._food_age):
+            self._food_age[pos] += 1
+            if self._food_age[pos] % self._ripening_period:
+                continue
+            next_stage = _NEXT_STAGE.get(int(self._board[pos]))
+            if next_stage is None:
+                despawned.append(pos)
+            else:
+                self._board[pos] = next_stage
+        for pos in despawned:
+            self._board[pos] = FLOOR
+            del self._food_age[pos]
+            self._spawn_food()
+
+    def _spawn_food(self):
+        floor_ys, floor_xs = np.where(self._board == FLOOR)
+        if not len(floor_ys):
+            return
+        idx = self._step_rng.integers(len(floor_ys))
+        pos = (int(floor_ys[idx]), int(floor_xs[idx]))
+        self._board[pos] = FOOD_UNRIPE
+        self._food_age[pos] = 0
 
     # ── Board initialisation ──────────────────────────────────────────────────
 
     def _place_board(self, rng):
+        layout = self._cfg.env_params.get("map_layout", None)
+        if layout:
+            self._place_board_from_layout(layout)
+        else:
+            self._place_board_random(rng)
+
+    def _place_board_random(self, rng):
         sz = self._cfg.env_params.map_size
         h = w = sz + 2
         self._board = np.full((h, w), FLOOR, dtype=np.int8)
         self._board[0, :] = self._board[-1, :] = WALL
         self._board[:, 0] = self._board[:, -1] = WALL
         self._predator_cells = set()
+        self._food_age = {}
         self._facing = {aid: _DEFAULT_FACING for aid in self.agents}
         self._positions = {}
 
@@ -234,23 +246,70 @@ class GridworldEnv(AbstractEnv):
             self._board[pos] = _N_BASE + i
 
         for tile_name, params in self._cfg.env_params.objects.items():
-            tile_int = self.layers.index(tile_name)
+            tile_int = (
+                self._initial_food_tile
+                if tile_name == "food"
+                else self.layers.index(tile_name)
+            )
             for _ in range(params.count):
                 pos = cells[idx]
                 idx += 1
                 self._board[pos] = tile_int
                 if tile_int == PREDATOR:
                     self._predator_cells.add(pos)
+                if tile_int in _FOOD_STAGES:
+                    self._food_age[pos] = 0
+
+    _LAYOUT_CHARS = {
+        ".": FLOOR,
+        "#": WALL,
+        "P": PREDATOR,
+        "F": FOOD,
+        "u": FOOD_UNRIPE,
+        "x": FOOD_ROTTEN,
+        "r": ROCK,
+        "w": WATER,
+    }
+
+    def _place_board_from_layout(self, layout):
+        rows = [r for r in layout.strip().splitlines()]
+        h, w = len(rows), max(len(r) for r in rows)
+        self._board = np.full((h, w), FLOOR, dtype=np.int8)
+        self._predator_cells = set()
+        self._food_age = {}
+        self._facing = {aid: _DEFAULT_FACING for aid in self.agents}
+        self._positions = {}
+        agent_iter = iter(enumerate(self.agents))
+
+        for r, row in enumerate(rows):
+            for c, ch in enumerate(row):
+                if ch in self._LAYOUT_CHARS:
+                    tile = self._LAYOUT_CHARS[ch]
+                    self._board[r, c] = tile
+                    if tile == PREDATOR:
+                        self._predator_cells.add((r, c))
+                    if tile in _FOOD_STAGES:
+                        self._food_age[(r, c)] = 0
+                elif ch == "A":
+                    i, aid = next(agent_iter)
+                    self._positions[aid] = (r, c)
+                    self._board[r, c] = _N_BASE + i
 
     # ── State ─────────────────────────────────────────────────────────────────
 
-    def _refresh_state(self, dones):
-        """Rebuild self.state from current board. Called after every reset/step."""
+    def _refresh_state(self, dones, roi_masks):
         cube = np.stack(
             [self._board == i for i in range(len(self.layers))], axis=0
         ).astype(np.float32)
-        food_ys, food_xs = np.where(self._board == FOOD)
+        food_tiles = np.isin(self._board, list(_FOOD_STAGES))
+        food_ys, food_xs = np.where(food_tiles)
         h, w = self._board.shape
+        mask = np.zeros((len(self.agents), h, w), dtype=np.float32)
+        for i, aid in enumerate(self.agents):
+            if aid in roi_masks:
+                mask[i] = _blit_roi(
+                    roi_masks[aid], self._positions[aid], self._facing[aid], (h, w)
+                )
         self.state = {
             "board": cube,
             "layers": self.layers,
@@ -261,7 +320,7 @@ class GridworldEnv(AbstractEnv):
             "food_position": (int(food_ys[0]), int(food_xs[0]))
             if len(food_ys)
             else None,
-            "mask": np.zeros((len(self.agents), h, w), dtype=np.float32),
+            "mask": mask,
         }
 
     # ── Observation encoding ───────────────────────────────────────────────────
@@ -278,7 +337,6 @@ class GridworldEnv(AbstractEnv):
         }
 
     def _encode_boolean_cube(self, aid):
-        """Agent-centric viewport boolean cube. Facing direction is always 'up'."""
         radius = self._cfg.env_params.observation_radius
         r, c = self._positions[aid]
         h, w = self._board.shape

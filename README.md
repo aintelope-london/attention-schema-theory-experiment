@@ -136,29 +136,6 @@ Additionally, when `observation_direction_mode` = 2 or `action_direction_mode` =
 ```
 By default, the separate turning actions are turned off.
 
-## Human-playable demos
-
-In the folder `aintelope/environments/demos/gridworlds/` are located the human-playable demo environments, which have same configuration as the benchmarks in our orchestrator. Playing these human-playable demos manually can give you a better intuition of the rules and how the benchmarks work.
-
-You can launch these Python files without additional arguments. 
-
-You can move the agents around using arrow keys (left, right, up, down). For no-op action you can use space key. 
-
-In food sharing environment there are two agents. In a human-playable demo these agents take turns. In an RL setting they agents take actions concurrently and the environment implements their actions in a random order (randomising the order for each turn).
-
-The human-playable benchmark environments are in the following files:
-```
-food_unbounded.py
-danger_tiles.py
-predators.py
-food_homeostasis.py
-food_sustainability.py
-food_drink_homeostasis.py
-food_drink_homeostasis_gold.py
-food_drink_homeostasis_gold_silver.py
-food_sharing.py
-```
-
 ---
 
 ## Attribution & License

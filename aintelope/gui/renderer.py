@@ -1,94 +1,52 @@
 """Rendering for episode playback and animation export.
 
 Contains:
-    TILE_INDEX — keyword → tile index within a tileset sprite strip.
-    Tileset — reads a sprite strip BMP, tile size parsed from filename.
-    StateRenderer — agnostic, composites tiles onto a PIL Image.
-    overlay — composites colored boolean masks onto a rendered image.
-    Interpreter — maps env layer names to keywords via a render_manifest dict.
+    StateRenderer  — agnostic, composites tiles onto a PIL Image.
+    overlay        — composites colored boolean masks onto a rendered image.
+    Interpreter    — maps env layer names to keywords via a render_manifest dict.
 
 To support a new environment, implement render_manifest on the env class
 returning a {layer_name: keyword} dict. No changes needed here.
+To add a tile, drop a PNG into gui/tiles/. No code changes needed.
 """
 
-import re
 from pathlib import Path
 
 import numpy as np
 from PIL import Image
 
-
 # =============================================================================
-# Tile keywords — canonical vocabulary the renderer understands
+# Tile keywords — each is the exact stem of its PNG file in gui/tiles/
 # =============================================================================
 
-VOID = "VOID"
-WALL = "WALL"
-DANGER = "DANGER"
-PREDATOR = "PREDATOR"
-DRINK = "DRINK"
-DRINK_SMALL = "DRINK_SMALL"
-FOOD = "FOOD"
-FOOD_SMALL = "FOOD_SMALL"
-GOLD = "GOLD"
-SILVER = "SILVER"
-FLOOR = "FLOOR"
-AGENTS = [f"AGENT_{i}" for i in range(10)]
-
-# Keyword → tile index within the sprite strip
-TILE_INDEX = {
-    VOID: 0,
-    WALL: 1,
-    DANGER: 2,
-    PREDATOR: 3,
-    DRINK: 4,
-    DRINK_SMALL: 5,
-    FOOD: 6,
-    FOOD_SMALL: 7,
-    GOLD: 8,
-    SILVER: 9,
-    **{agent: 10 + i for i, agent in enumerate(AGENTS)},
-    FLOOR: 0,
-}
+WALL = "wall"
+DANGER = "danger"
+PREDATOR = "predator"
+WATER = "water"
+WATER_SMALL = "water_small"
+FOOD = "food"
+FOOD_UNRIPE = "food_unripe"
+FOOD_ROTTEN = "food_rotten"
+FLOOR = "floor"
+ROCK = "rock"
+WATER = "water"
+AGENTS = [f"agent_{i}" for i in range(4)]
 
 # Paint order: left = bottom, right = top.
 _DRAW_ORDER = (
-    VOID,
     WALL,
-    DRINK_SMALL,
-    DRINK,
-    FOOD_SMALL,
+    WATER_SMALL,
+    WATER,
+    ROCK,
     FOOD,
-    GOLD,
-    SILVER,
+    FOOD_UNRIPE,
+    FOOD_ROTTEN,
     DANGER,
     PREDATOR,
     *AGENTS,
 )
 
-
-# =============================================================================
-# Tileset — agnostic sprite strip reader
-# =============================================================================
-
-
-class Tileset:
-    """Reads a sprite strip. Tile size parsed from '_WxH' in filename."""
-
-    def __init__(self, path):
-        self.image = Image.open(path)
-        w, h = re.search(r"(\d+)x(\d+)", Path(path).stem).groups()
-        self.tile_w, self.tile_h = int(w), int(h)
-
-    def tile(self, index):
-        x = index * self.tile_w
-        return self.image.crop((x, 0, x + self.tile_w, self.tile_h))
-
-
-def find_tileset(directory=None):
-    """Find the first BMP tileset in the given directory (default: gui/)."""
-    directory = directory or Path(__file__).parent
-    return str(next(Path(directory).glob("*.bmp")))
+_TILE_DIR = Path(__file__).parent / "tiles"
 
 
 # =============================================================================
@@ -97,7 +55,7 @@ def find_tileset(directory=None):
 
 
 def overlay(image, masks, colors, alpha):
-    """Composite colored masks onto a rendered image.
+    """Composite colored boolean masks onto a rendered image.
 
     Args:
         image: PIL.Image.Image (RGB).
@@ -114,7 +72,7 @@ def overlay(image, masks, colors, alpha):
     tw = base.width // masks.shape[2]
 
     for i in range(masks.shape[0]):
-        pixel_mask = masks[i].repeat(th, axis=0).repeat(tw, axis=1)
+        pixel_mask = masks[i].repeat(th, axis=0).repeat(tw, axis=1).astype(bool)
         arr[pixel_mask] = (*colors[i], alpha)
 
     return Image.alpha_composite(base, Image.fromarray(arr, "RGBA"))
@@ -159,20 +117,17 @@ class Interpreter:
 
 
 class StateRenderer:
-    """Composites tiles onto a PIL Image from a 3D boolean cube.
+    """Composites tiles onto a PIL Image from a 3D boolean cube."""
 
-    Speaks only keywords. Unknown keywords default to FLOOR.
-    """
+    def __init__(self):
+        self._tiles = {
+            p.stem: Image.open(p).convert("RGB") for p in _TILE_DIR.glob("*.png")
+        }
+        ref = next(iter(self._tiles.values()))
+        self.tile_w, self.tile_h = ref.size
 
-    def __init__(self, tileset):
-        self.tileset = tileset
-        self._cache = {}
-
-    def _get_tile(self, keyword):
-        if keyword not in self._cache:
-            idx = TILE_INDEX.get(keyword, TILE_INDEX[FLOOR])
-            self._cache[keyword] = self.tileset.tile(idx)
-        return self._cache[keyword]
+    def _tile(self, keyword):
+        return self._tiles.get(keyword, self._tiles[FLOOR])
 
     def render(self, cube, layers, floor):
         """Produce a PIL Image from observation data.
@@ -185,17 +140,17 @@ class StateRenderer:
         Returns:
             PIL.Image.Image
         """
-        tw, th = self.tileset.tile_w, self.tileset.tile_h
+        tw, th = self.tile_w, self.tile_h
         height, width = cube.shape[1], cube.shape[2]
         img = Image.new("RGB", (width * tw, height * th))
 
-        floor_tile = self._get_tile(floor)
+        floor_tile = self._tile(floor)
         for y in range(height):
             for x in range(width):
                 img.paste(floor_tile, (x * tw, y * th))
 
         for layer_idx, keyword in layers:
-            tile = self._get_tile(keyword)
+            tile = self._tile(keyword)
             for y in range(height):
                 for x in range(width):
                     if cube[layer_idx, y, x]:
