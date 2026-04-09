@@ -141,17 +141,6 @@ def register_resolvers() -> None:
     )
 
 
-def get_score_dimensions(cfg: DictConfig):
-    scores = cfg.env_params.scores
-    dimensions = set()
-    for event_name, score_dims_dict in scores.items():
-        score_dims_dict = literal_eval(score_dims_dict)
-        for dimension, value in score_dims_dict.items():
-            if value != 0:
-                dimensions.add(dimension)
-    return sorted(dimensions)
-
-
 def set_priorities():
     try:
         import psutil
@@ -175,17 +164,11 @@ def set_priorities():
 
 
 def set_memory_limits():
-    if os.name == "nt":
-        from aintelope.config.windows_jobobject import set_mem_commit_limit
+    import resource
+    import psutil
 
-        try:
-            set_mem_commit_limit(os.getpid(), 40 * 1024**3, 5 * 1024**3)
-        except Exception:
-            print("run pip install psutil")
-    else:
-        from aintelope.config.linux_rlimit import set_mem_limits
-
-        set_mem_limits(40 * 1024**3, 400 * 1024**3)
+    limit = psutil.virtual_memory().available
+    resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
 
 
 def select_gpu(gpu_index=None):
@@ -254,7 +237,6 @@ def archive_code(cfg):
         ),
     )
     archive_code_in_dir(
-        os.path.join(code_directory_path, "..", "ai_safety_gridworlds"),
         os.path.join(
             os.path.normpath(cfg.run.outputs_dir), "gridworlds_code_archive.zip"
         ),

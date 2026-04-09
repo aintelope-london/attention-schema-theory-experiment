@@ -71,7 +71,7 @@ def _blit_roi(viewport_mask, position, facing, board_shape):
 
 
 class GridworldEnv(AbstractEnv):
-    """Minimal randomised gridworld. No PettingZoo / gym dependencies."""
+    """Minimal randomised gridworld."""
 
     def __init__(self, cfg):
         self._cfg = cfg
