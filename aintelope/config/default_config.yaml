@@ -54,7 +54,7 @@ agent_params:
   ppo_n_steps: 64                  # @ui int 32 8192
 
 env_params:
-  env: gridworld-v1                # @ui str gridworld-v1,savanna-safetygrid-v1
+  env: gridworld-v1                # @ui str gridworld-v1
   mode: parallel                   # @ui str parallel
 
   # ── Gridworld env params (env: gridworld-v1) ───────────────────────
