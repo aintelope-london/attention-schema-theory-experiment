@@ -375,7 +375,7 @@ GUI widget types, ranges, and choices are declared as `@ui` comments directly in
 
 ### Code archiving
 
-On each run, the current source of both `aintelope/` and `ai_safety_gridworlds/` is zipped into the outputs directory. This is a reproducibility measure: the exact code that produced a set of results is always bundled alongside them.
+On each run, the current source of `aintelope/` is zipped into the outputs directory. This is a reproducibility measure: the exact code that produced a set of results is always bundled alongside them.
 
 ### Agent-owned models
 
@@ -399,9 +399,6 @@ The environment receives the viewport-space ROI mask from the agent's action dic
 | `radius` | `radius` in `roi_features` | actions, clamped to `[circle_radius_min, circle_radius_max]` |
 | `distance` | `roi_mode: circle` | fixed, seeded from `circle_distance` |
 
-### Savanna wrapper
-
-`savanna_wrapper.py` is the interface that allows the legacy savanna gridworld environment to work with the system's `AbstractEnv` contract. It is the sole file that imports from `savanna_safetygrid`. It translates savanna's PettingZoo-derived interface into the canonical MDP contract: dict-format observations `{"vision": ndarray, "interoception": ndarray}`, augmented infos with position and direction data, and a manifesto built on each reset. Legacy-format observations and PettingZoo compatibility are maintained through the `step()` method for SB3 agents.
 
 ### Reward inference
 
@@ -507,7 +504,7 @@ Both analytics follow the null-object pattern: absent ROI data flows through as 
 
 ### GridworldEnv
 
-Minimal randomised MOMA gridworld. No PettingZoo or gym dependencies.
+Minimal randomised MOMA gridworld.
 
 **Tile layer order** (`LAYERS` is the canonical reference for all channel indexing):
 

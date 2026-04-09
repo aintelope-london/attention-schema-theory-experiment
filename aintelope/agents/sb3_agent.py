@@ -4,10 +4,9 @@
 
 """SB3 baseline agent.
 
-Single class for all SB3 algorithms. Algorithm is config-driven
-(cfg.agent_params.algorithm: ppo | dqn | a2c).
+Algorithm is config-driven (cfg.agent_params.algorithm: ppo | dqn | a2c).
 
-Remove by: deleting this file and gridworld_pz_wrapper.py,
+Remove by: deleting this file and gridworld_gym_wrapper.py,
            one register_agent_class line in agents/__init__.py,
            one if-branch in experiment.py.
 """
@@ -24,12 +23,11 @@ import stable_baselines3
 from stable_baselines3 import A2C, DQN, PPO
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
-from zoo_to_gym_multiagent_adapter.singleagent_zoo_to_gym_adapter import (
-    SingleAgentZooToGymAdapter,
-)
-
 from aintelope.agents.abstract_agent import AbstractAgent
-from aintelope.environments.gridworld_pz_wrapper import GridworldPZWrapper, flatten_obs
+from aintelope.environments.gridworld_gym_wrapper import (
+    GridworldGymWrapper,
+    flatten_obs,
+)
 
 _ALGORITHMS = {"ppo": PPO, "dqn": DQN, "a2c": A2C}
 
@@ -43,8 +41,7 @@ class _CustomCNN(BaseFeaturesExtractor):
     def __init__(self, observation_space, features_dim=256, num_conv_layers=2):
         super().__init__(observation_space, features_dim)
         C, H, W = observation_space.shape
-        layers = []
-        in_ch = C
+        layers, in_ch = [], C
         for i in range(num_conv_layers):
             out_ch = 32 if i == 0 else 64
             stride = 1 if i == 0 else 2
@@ -130,9 +127,7 @@ class SB3Agent(AbstractAgent):
 
         stable_baselines3.common.save_util.is_json_serializable = _is_json_serializable
 
-        wrapper = GridworldPZWrapper(env)
-        gym_env = SingleAgentZooToGymAdapter(wrapper, agent_id)
-        self.model = _build_model(gym_env, cfg)
+        self.model = _build_model(GridworldGymWrapper(env, agent_id), cfg)
 
         if checkpoint:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -164,16 +159,14 @@ class SB3Agent(AbstractAgent):
     def training(env, num_total_steps: int, cfg: DictConfig, i_trial: int) -> None:
         """Runs SB3's internal training loop. Called once per train block.
 
-        Owns the wrapper, gym adapter, model lifecycle, and checkpoint saving.
+        Owns the wrapper, model lifecycle, and checkpoint saving.
         Nothing outside this method needs to know how SB3 training works.
         """
         from aintelope.agents.model.dl_utils import checkpoint_path
 
         stable_baselines3.common.save_util.is_json_serializable = _is_json_serializable
         agent_id = next(iter(cfg.agent_params.agents))
-        wrapper = GridworldPZWrapper(env)
-        gym_env = SingleAgentZooToGymAdapter(wrapper, agent_id)
-        model = _build_model(gym_env, cfg)
+        model = _build_model(GridworldGymWrapper(env, agent_id), cfg)
         model.learn(total_timesteps=num_total_steps)
         path = checkpoint_path(cfg.run.outputs_dir, agent_id, i_trial)
         os.makedirs(os.path.dirname(path), exist_ok=True)

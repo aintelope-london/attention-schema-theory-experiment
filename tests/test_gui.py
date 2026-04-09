@@ -54,7 +54,7 @@ class TestGetFieldSpec:
 
     def test_deep_nested_key(self, ui_schema):
         """Deeply nested key returns correct spec."""
-        spec = get_field_spec(ui_schema, "env_params.scores.GOLD_SCORE")
+        spec = get_field_spec(ui_schema, "env_params.objects.food.count")
         assert spec is not None
         assert len(spec) == 2
 

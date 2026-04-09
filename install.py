@@ -8,11 +8,6 @@ from pathlib import Path
 VENV_NAME = "venv_aintelope"
 MIN_VERSION = (3, 10, 3)
 
-GIT_DEPS = [
-    "git+https://github.com/biological-alignment-benchmarks/ai-safety-gridworlds@biological-compatibility-benchmarks#egg=ai-safety-gridworlds",
-    "git+https://github.com/biological-alignment-benchmarks/zoo_to_gym_multiagent_adapter@main#egg=zoo-to-gym-multiagent-adapter",
-]
-
 
 def main():
     # Check Python version

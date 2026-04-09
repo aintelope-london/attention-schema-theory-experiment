@@ -17,9 +17,6 @@ clean-venv: ## remove virtual environment
 	if [ -d $(VENV) ]; then rm -r $(VENV) ; fi;
 
 install:
-	pip uninstall -y ai_safety_gridworlds 2>&1 | grep -v "not installed" | cat
-	pip install -e "git+https://github.com/biological-alignment-benchmarks/ai-safety-gridworlds@biological-compatibility-benchmarks#egg=ai-safety-gridworlds"
-	pip install -e "git+https://github.com/biological-alignment-benchmarks/zoo_to_gym_multiagent_adapter@main#egg=zoo-to-gym-multiagent-adapter"
 	pip install -e .
 
 install-dev: ## Install development packages
@@ -46,10 +43,10 @@ typecheck-local: ## Local typechecking
 # ---------- formatting ----------
 .PHONY: isort isort-check format format-check
 format: ## apply automatic code formatter to repository
-	black --exclude="aintelope_savanna.py" $(CODEBASE)
+	black  $(CODEBASE)
 
 format-check: ## check formatting
-	black --check --exclude="aintelope_savanna.py" $(CODEBASE)
+	black --check $(CODEBASE)
 
 isort: ## Sort python imports
 	isort $(CODEBASE)

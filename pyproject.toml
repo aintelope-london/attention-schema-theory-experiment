@@ -35,19 +35,15 @@ dependencies = [
   "omegaconf==2.3.0",
   "openai==1.55.3",
   "pandas==1.5.3",
-  "PettingZoo==1.24.1",
   "Pillow>=10.0.0",
-  "posix-ipc==1.1.1; platform_system != 'Windows'",
   "progressbar2==4.2.0",
   "psutil==5.9.4",
   "pygame==2.4",
   "scipy==1.15.0",
   "seaborn==0.12.2",
-  "semaphore-win-ctypes==0.1.2; platform_system == 'Windows'",
   "tensorboard==2.18.0",
   "torch==2.1.0",
   "stable-baselines3==2.3.2",
-  "supersuit==3.9.3",
   "tenacity==8.2.2",
   "tiktoken==0.9.0",
 ]
@@ -77,14 +73,9 @@ norecursedirs = ["tests/learning"]
 line-length = 88
 force-exclude = '''
 /(
-ai_safety_gridworlds
-| gymnasium
+gymnasium
 | outputs
-| pettingzoo
-| pycolab
 | stable_baselines3
-| supersuit
-| zoo_to_gym_multiagent_adapter
 | \.vshistory
 )/
 '''
@@ -92,7 +83,6 @@ ai_safety_gridworlds
 [tool.flake8]
 max-line-length = 88
 extend-ignore = "E121,E123,E126,E226,E24,E704,W503,W504,E203,E501,F401,W291,E266,F403,F405,F841,E265,F811"
-exclude = "ai_safety_gridworlds"
 
 [tool.isort]
 profile = "black"
