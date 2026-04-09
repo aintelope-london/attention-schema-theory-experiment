@@ -1,0 +1,87 @@
+roi_contracting:
+  env_params:
+    map_size: 13
+    map_layout: |
+      ###############
+      #.............#
+      #.............#
+      #.............#
+      #.............#
+      #.............#
+      #.............#
+      #......F......#
+      #.............#
+      #.............#
+      #......A......#
+      #.............#
+      #.............#
+      #.............#
+      ###############
+    objects: {}
+    actions: [forward, left, right, backward, wait]
+    observation_radius: 7
+    observation_format: boolean_cube
+    ripening: 0
+  agent_params:
+    agents:
+      agent_0:
+        agent_class: dummy_agent
+        script: ROI_CONTRACTING
+        architecture:
+          roi:
+            type: ROI
+            inputs: []
+            outputs: [roi]
+            roi_mode: circle
+            roi_features: [angle, radius]
+            n_internal_actions: 6
+            darkening_factor: 0.0
+            turn_step: 0.7854
+            radius_step: 0.5
+            circle_distance: 3.0
+            circle_radius: 4.5
+            circle_radius_min: 0.5
+            circle_radius_max: 4.5
+  run:
+    experiment:
+      episodes: 1
+      steps: 9
+
+food_ripening_closeup:
+  env_params:
+    map_size: 7
+    map_layout: |
+      #########
+      #.......#
+      #...u...#
+      #.......#
+      #.......#
+      #...A...#
+      #.......#
+      #.......#
+      #########
+    ripening: 3
+  agent_params:
+    agents:
+      agent_0:
+        script: FOOD_RIPENING_CLOSEUP
+  run:
+    experiment:
+      steps: 6
+
+food_ripening_wander:
+  env_params:
+    map_size: 13
+    map_layout: ~
+    objects:
+      food: {count: 4}
+      water: {count: 4}
+      rock: {count: 4}
+    ripening: 4
+  agent_params:
+    agents:
+      agent_0:
+        script: FOOD_RIPENING_WANDER
+  run:
+    experiment:
+      steps: 17
