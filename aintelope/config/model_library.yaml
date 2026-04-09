@@ -168,10 +168,11 @@ architectures:
       outputs: [roi]
       n_internal_actions: 3
       roi_mode: cone
+      roi_features: [angle]
       darkening_factor: 0.1
-      half_arc: 0.7854    # pi/4 -- half-opening of the cone (45 deg)
-      turn_step: 0.7854   # pi/4 -- angle delta per action step (45 deg)
-      cone_radius: 2      # cone reach in cells
+      half_arc: 0.7854
+      turn_step: 0.7854
+      cone_radius: 2
     q_net:
       type: DQN-FC-NN
       inputs: [roi, observation]
@@ -187,12 +188,16 @@ architectures:
       type: ROI
       inputs: [internal_action]
       outputs: [roi]
-      n_internal_actions: 3
+      n_internal_actions: 6
       roi_mode: circle
+      roi_features: [angle, radius]
       darkening_factor: 0.1
-      turn_step: 0.7854     # pi/4 -- angle delta per action step (45 deg)
-      circle_distance: 3.0  # orbit radius -- agent center to spotlight center (cells)
-      circle_radius: 1.5    # spotlight coverage radius (cells)
+      turn_step: 0.7854
+      radius_step: 0.5
+      circle_distance: 3.0
+      circle_radius: 4.5
+      circle_radius_min: 0.5
+      circle_radius_max: 4.5
     q_net:
       type: DQN-FC-NN
       inputs: [roi, observation]
@@ -210,10 +215,11 @@ architectures:
       outputs: [roi]
       n_internal_actions: 3
       roi_mode: cone
+      roi_features: [angle]
       darkening_factor: 0.1
-      half_arc: 0.7854    # pi/4 -- half-opening of the cone (45 deg)
-      turn_step: 0.7854   # pi/4 -- angle delta per action step (45 deg)
-      cone_radius: 2      # cone reach in cells
+      half_arc: 0.7854
+      turn_step: 0.7854
+      cone_radius: 2
     q_net:
       type: DQN-CNN-NN
       inputs: [roi, observation]
@@ -229,12 +235,64 @@ architectures:
       type: ROI
       inputs: [internal_action]
       outputs: [roi]
+      n_internal_actions: 6
+      roi_mode: circle
+      roi_features: [angle, radius]
+      darkening_factor: 0.1
+      turn_step: 0.7854
+      radius_step: 0.5
+      circle_distance: 2.0
+      circle_radius: 4.5
+      circle_radius_min: 0.5
+      circle_radius_max: 4.5
+    q_net:
+      type: DQN-CNN-NN
+      inputs: [roi, observation]
+    action:
+      type: DQN
+      inputs: [q_net]
+    reward:
+      type: RewardInference
+      inputs: [observation]
+
+  dqn_fc_roi_radius:
+    roi:
+      type: ROI
+      inputs: [internal_action]
+      outputs: [roi]
       n_internal_actions: 3
       roi_mode: circle
+      roi_features: [radius]
       darkening_factor: 0.1
-      turn_step: 0.7854     # pi/4 -- angle delta per action step (45 deg)
-      circle_distance: 2.0  # orbit radius -- agent center to spotlight center (cells)
-      circle_radius: 2.0    # spotlight coverage radius (cells)
+      radius_step: 0.5
+      circle_distance: 0.0
+      circle_radius: 4.5
+      circle_radius_min: 0.5
+      circle_radius_max: 4.5
+    q_net:
+      type: DQN-FC-NN
+      inputs: [roi, observation]
+    action:
+      type: DQN
+      inputs: [q_net]
+    reward:
+      type: RewardInference
+      inputs: [observation]
+
+  dqn_cnn_roi_radius:
+    roi:
+      type: ROI
+      inputs: [internal_action]
+      outputs: [roi]
+      n_internal_actions: 3
+      roi_mode: circle
+      roi_features: [radius]
+      darkening_factor: 0.1
+      radius_step: 0.5
+      circle_distance: 0.0
+      circle_radius: 4.5
+      circle_radius_min: 0.5
+      circle_radius_max: 4.5
     q_net:
       type: DQN-CNN-NN
       inputs: [roi, observation]

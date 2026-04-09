@@ -111,6 +111,7 @@ Agents and environments use a registry pattern: a string key in config maps to a
 ```
 "main_agent"      → MainAgent
 "random_agent"    → RandomAgent
+"dummy_agent"     → DummyAgent
 "sb3_ppo_agent"   → PPOAgent
 "sb3_dqn_agent"   → DQNAgent
 "sb3_a2c_agent"   → A2CAgent
@@ -119,6 +120,7 @@ Agents and environments use a registry pattern: a string key in config maps to a
 **Environment registry** (`environments/__init__.py`):
 ```
 "savanna-safetygrid-v1" → SavannaWrapper
+"gridworld-v1"          → GridworldEnv
 ```
 
 ### Data flow
@@ -155,8 +157,6 @@ Configs are saved per-block in a diff-style fashion: only the overrides are stor
 `agent_0.model` in `default_config.yaml` holds the name of the chosen architecture (e.g., `dqn_fc_roi`). `init_config` resolves this name against the library and injects the corresponding architecture into `cfg.agent_params.agents.agent_0.architecture` before any block overrides are applied. `model.py` is unaware of this indirection — it reads `cfg.agent_params.agents.[agent_id].architecture` and `cfg.models` as always.
 
 One model per experiment set — all blocks in a config share the same architecture. Switching models means choosing a different name in `agent_0.model`; there is no per-block model override.
-
-Currently available named architectures: Claude, fix this when you see it, raise it with me.
 
 ### Custom OmegaConf resolvers
 
@@ -327,7 +327,7 @@ At the end of each experiment block, when `write_outputs` is enabled, a JPEG is 
 
 *Each entry documents a deliberate architectural decision, its justification, and any special permissions it grants to break the standard design patterns.*
 
-### 1. Concurrency model
+### Concurrency model
 
 Trials run through a single `ProcessPoolExecutor` path. The worker count is controlled by `cfg.run.max_workers`: set to 0 for auto-detection, or any positive integer to cap manually. Serial execution is simply `max_workers=1`: no separate code path.
 
@@ -335,11 +335,11 @@ Auto-detection (`find_workers`) picks the minimum of available CPUs (or GPU coun
 
 The intent is that a basic user never has to think about hardware utilization. If edge cases arise (e.g., mixed CPU/GPU workloads, cloud-specific constraints), the system can be extended: but the single-variable, single-path design stays.
 
-### 2. Sequential and simultaneous environment modes
+### Sequential and simultaneous environment modes
 
 Multi-agent environments can follow two execution models: sequential (agents act one at a time, observing each other's intermediate effects) or simultaneous (all agents commit actions before the environment advances). The active mode is set by `cfg.env_params.mode` and branched cleanly in `experiments.py`.
 
-### 3. SB3 baseline training path (special permission)
+### SB3 baseline training path (special permission)
 
 Stable Baselines 3 agents (`sb3_*`) use an alternate training path. When an SB3 agent is training, control is handed to SB3's own `.learn()` loop, bypassing the main episode/step loop entirely. During test mode, SB3 agents rejoin the standard path. SB3 agent initialization and training are isolated into `_init_sb3_agents()` and `_run_sb3_training()` in `experiments.py`.
 
@@ -347,13 +347,13 @@ Stable Baselines 3 agents (`sb3_*`) use an alternate training path. When an SB3 
 
 **Special permission:** This is an accepted parallel execution path. It exists to provide a credible RL baseline while the project develops its own agent implementations. The expectation is that this path will be deprecated once native agents replace the SB3 dependency.
 
-### 4. Agent and environment registries (factory pattern)
+### Agent and environment registries (factory pattern)
 
 Agents and environments are instantiated via string-keyed registries (`AGENT_REGISTRY`, `ENV_REGISTRY`). A config value like `agent_class: "main_agent"` maps to a class through `get_agent_class()`, and `env: "savanna-safetygrid-v1"` maps through `get_env_class()`. Adding a new agent or environment means implementing the interface, registering it with one line, and making it available in config: no control file changes needed.
 
 This is the mechanism that makes the system agent- and environment-agnostic. The orchestrator does not know or care what it is running, only that it conforms to the expected interface.
 
-### 5. Event-based recording
+### Event-based recording
 
 All experiment runs produce an event log: one row per agent per step, capturing state, action, reward dimensions, and serialized observations. `EventLog` accumulates rows during the experiment, converts to a DataFrame, and is written to CSV per run via `write_results()`.
 
@@ -361,7 +361,7 @@ All experiment runs produce an event log: one row per agent per step, capturing 
 
 **Format:** CSV was chosen for accessibility to scientists working with standard data tools. State columns (observations, board state) are compressed and base64-encoded to keep file sizes manageable while preserving the full state needed for visualization and future analytical replay.
 
-### 6. Results viewer variables (special permission)
+### Results viewer variables (special permission)
 
 Variables controlling analytical output: plot ranges, grouping, display parameters: live in the results viewer GUI, not in the experiment config. This is a deliberate exception to the config-driven pattern.
 
@@ -369,52 +369,53 @@ Variables controlling analytical output: plot ranges, grouping, display paramete
 
 **Scope:** The results viewer provides predefined plot libraries that group and present event data in standard ways. The experimenter controls the view parameters; the plot logic itself is in code and can be extended when new analytical needs arise.
 
-### 7. `@ui` config annotations
+### `@ui` config annotations
 
 GUI widget types, ranges, and choices are declared as `@ui` comments directly in `default_config.yaml`, parsed at runtime by `ui_schema_manager.py`. Fields without annotations render as read-only. This keeps the variable definition and its GUI specification in the same file, so there is no separate schema to maintain: adding or changing a config field and its GUI behavior is a single edit in one place.
 
-### 8. Environment demo scripts (legacy)
-
-The scripts under `environments/demos/gridworlds/` launch individual environments in interactive curses mode, bypassing the orchestrator. Their purpose is to let scientists and end-users familiarize themselves with an environment before running agents in it.
-
-### 9. Code archiving
+### Code archiving
 
 On each run, the current source of both `aintelope/` and `ai_safety_gridworlds/` is zipped into the outputs directory. This is a reproducibility measure: the exact code that produced a set of results is always bundled alongside them.
 
-### 10. Agent-owned models
+### Agent-owned models
 
 Each agent owns its Model instance directly. Models handle PyTorch internally: device resolution, neural networks, memory buffers, optimization. Instance lifecycle handles cleanup naturally — when agents go out of scope between experiment blocks, their models are garbage collected. Torch is imported only inside the `agents/model/` package and the bootstrap GPU preload in `config_utils`.
 
-### 11. ROI (Region of Interest)
+### ROI (Region of Interest)
 
-ROI appends per-agent boolean attention masks to the vision component of each agent's observation. It currently lives as a separate layer-addition step within `experiments.py`, applied after each environment step. The intent is to move ROI into the agents as an internal attention mechanism.
+The ROI component is a vision pre-filter in the agent's connectome DAG. It reads `activations["internal_action"]` from the previous step, updates its internal `roi_state` for each declared feature, computes a boolean mask, darkens `vision[:-1]` outside the mask, writes the mask into `vision[-1]`, and surfaces it in `activations[component_id]` for the environment to blit into `state["mask"]`.
 
-Because SB3's training loop bypasses `experiments.py`, the savanna wrapper applies ROI directly inside its PettingZoo-compatible `step()` method — ensuring SB3 agents receive ROI-augmented observations through their own training path.
+`roi_features` in the architecture entry declares which state dimensions are agent-controllable. Each feature contributes exactly 3 internal actions (neg, stay, pos). `n_internal_actions` is declared explicitly in the yaml as `len(roi_features) * 3` — the config is the authority, no dynamic computation in code.
 
-The ROI component works as follows: it reads `activations["internal_action"]` from the previous step (this value persists between steps via the activations dict), darkens `vision[:-1]` outside the cone, writes the cone mask into `vision[-1]`, and surfaces `activations["roi"]` as an output for the environment to blit. The `n_internal_actions: 3` declaration in the architecture entry is read generically by `fill_plans` via `entry.get("n_internal_actions", 0)` to extend the q_net's output vector — no component names are mentioned in `model.py`. Any future component that contributes internal action slots uses the same mechanism.
+When ROI is absent from the architecture entirely, the env wrapper still appends a zero channel as `vision[-1]` for consistent observation shapes. `ROI.activate()` is simply never called — no vestigial branches needed.
 
-### 12. Savanna wrapper
+The environment receives the viewport-space ROI mask from the agent's action dict (`actions[aid]["roi"]`), blits it to absolute board coordinates via `_blit_roi()`, and stores it in `state["mask"]` as an `(N_agents, H, W)` float32 array. This makes each agent's ROI visible to all other agents through the shared state. The results viewer reads `state["mask"]` directly from `states.csv` to render the overlay — no geometry is recomputed at display time.
+
+`roi_state` keys:
+
+| Key | Present when | Driven by |
+|---|---|---|
+| `angle` | always for `circle` mode | actions if in `roi_features`, else fixed at 0.0 |
+| `radius` | `radius` in `roi_features` | actions, clamped to `[circle_radius_min, circle_radius_max]` |
+| `distance` | `roi_mode: circle` | fixed, seeded from `circle_distance` |
+
+### Savanna wrapper
 
 `savanna_wrapper.py` is the interface that allows the legacy savanna gridworld environment to work with the system's `AbstractEnv` contract. It is the sole file that imports from `savanna_safetygrid`. It translates savanna's PettingZoo-derived interface into the canonical MDP contract: dict-format observations `{"vision": ndarray, "interoception": ndarray}`, augmented infos with position and direction data, and a manifesto built on each reset. Legacy-format observations and PettingZoo compatibility are maintained through the `step()` method for SB3 agents.
 
-### 13. Reward inference
+### Reward inference
 
 In canonical RL, reward is an external signal provided by the environment. This system takes a different approach: reward inference resides within the agent's brain. In nature, organisms infer reward from their sensory observations — they are not handed a scalar by the world. The agent's `RewardInference` component evaluates the observation (after the transition, via `post_activate`) and produces an internal reward signal.
 
 This is also the reason the environment manifesto exists as a feature. The manifesto informs the reward inference about what entities are present in the environment (e.g., which observation layer corresponds to food), so rewards can be inferred correctly regardless of how any particular environment presents its observations. The reward logic is hand-crafted per environment — necessarily so, since what constitutes reward depends on the environment's dynamics — but the manifesto makes the component agnostic to observation format.
 
-### 14. Abstract contracts
+### Abstract contracts
 
 Agents conform to `AbstractAgent`: `reset(state, **kwargs)`, `get_action(observation, **kwargs)`, `update(observation, **kwargs)`, `save_model(path, **kwargs)`. The `**kwargs` pattern allows the orchestrator to pass context (step, episode, trial, info, done) uniformly without the abstract class prescribing what each agent needs.
 
 Environments conform to `AbstractEnv`: `reset(**kwargs)`, `step_parallel(actions)`, `step_sequential(actions)`, `manifesto` property, `board_state()`, `score_dimensions` property. The contract is a minimal multi-agent MDP interface. It does not prescribe agent enumeration, observation spaces, or action spaces — that information lives in the manifesto and config.
 
-## Architectural state
-
-SB3 baselines and the savanna gridworld environment are legacy: maintained for validation, but the system is moving toward new agents and environments. Agents and environments both conform to abstract contracts, making the system agnostic to their implementation. Observations follow a canonical dict format. The environment manifesto pattern provides agents with the structural information they need to self-configure.
-
-
-### 15. Component connectome
+### Component connectome
 
 The agent's `Model` class manages a **connectome**: a dict of named components that form a directed acyclic graph (DAG) for both activation and learning.
 
@@ -494,8 +495,7 @@ All components implement the `Component` ABC:
 
 Components receive a `context` dict at init containing: `cfg`, `device`, `components`, `memory`, `activations`, `env_manifesto`, `agent_id`, `component_id`, `inputs` (expanded), and `plans` (the library card).
 
-
-### 15. ROI analytics
+### ROI analytics
 
 Two analytics track whether agents with ROI components are using their attention meaningfully.
 
@@ -504,6 +504,52 @@ Two analytics track whether agents with ROI components are using their attention
 **`roi_food_alignment`**: plots the rate at which food appears inside the agent's ROI across episode windows. Computed directly from the logged `Observation`: the food channel (`manifesto["food_ind"]`) and the ROI channel (last vision channel, always appended by the env) are ANDed per step. No geometry is re-implemented — the mask the agent actually used is what was logged. Works for any entity present in the observation space (predators, other agents) by channel index; food is the first use case.
 
 Both analytics follow the null-object pattern: absent ROI data flows through as empty and produces no output, with no branching needed.
+
+### GridworldEnv
+
+Minimal randomised MOMA gridworld. No PettingZoo or gym dependencies.
+
+**Tile layer order** (`LAYERS` is the canonical reference for all channel indexing):
+
+| Index | Name | Notes |
+|---|---|---|
+| 0 | floor | |
+| 1 | wall | |
+| 2 | predator | persists after contact |
+| 3 | food | ripe food |
+| 4 | food_unripe | ripening mode only |
+| 5 | food_rotten | ripening mode only |
+| 6+ | agent_N | one layer per agent in sorted order |
+
+**Ripening cycle** (active when `env_params.ripening > 0`): each food cell advances `unripe → ripe → rotten` every `ripening` steps. On expiry of the rotten stage the cell clears and a new `food_unripe` spawns on a random floor cell. Only `food` contact fires `interoception[0]` and counts as `ate_food` — the two signals are always identical.
+
+**Interoception channels:** `[0]` food reward this step, `[1]` contact (`+1.0` predator, `-1.0` wall/agent block).
+
+**Observation encoding** is selected by `env_params.observation_format`; add `_encode_<key>()` to extend without touching anything else.
+
+**ASCII map layout:** when `env_params.map_layout` is set, the board is initialised from a multiline string instead of random placement. Character vocabulary: `.` floor, `#` wall, `F` food, `u` food_unripe, `x` food_rotten, `P` predator, `A` agent (assigned in sorted order). When `map_layout` is absent, random placement is used with `env_params.map_size` and `env_params.objects`.
+
+### File-based tileset
+
+Tiles are loaded from individual PNG files in `gui/tiles/`. The keyword for each tile is its filename stem (e.g. `food.png` → keyword `"food"`). Adding a new tile requires only dropping a PNG into the directory — no code changes. Draw order is declared in `_DRAW_ORDER` in `renderer.py` and must be updated when new tile types are added. All tiles in the directory must be the same pixel dimensions.
+
+### DummyAgent and animation scripts
+
+`DummyAgent` is a scripted agent that replays a named action sequence from `agents/scripts.py`. It conforms fully to `AbstractAgent` and is registered as `"dummy_agent"` in the agent registry. No model, no learning — `update` and `save_model` are no-ops.
+
+The script name is declared in config under `agent_params.agents.[id].script` and resolves to a list of `{"action": int, ...}` dicts in `scripts.py`. When the sequence is exhausted the agent emits `wait` indefinitely.
+
+If the agent's architecture entry contains an ROI component, `DummyAgent` instantiates it directly (without a full Model) and drives it with `internal_action` from the script each step, returning the resulting mask as `"roi"` in the action dict. This allows ROI animations to be authored as plain integer sequences in `scripts.py` while reusing the ROI component code exactly.
+
+Animation configs live in `animation_config.yaml` as named blocks, following the same block structure as experiment configs. Each block sets `env`, `map_layout` (or `objects`), agent script, and episode/step counts. Animations are run and exported through the standard results viewer export path.
+
+---
+
+## Architectural state
+
+SB3 baselines and the savanna gridworld environment are legacy: maintained for validation, but the system is moving toward new agents and environments. Agents and environments both conform to abstract contracts, making the system agnostic to their implementation. Observations follow a canonical dict format. The environment manifesto pattern provides agents with the structural information they need to self-configure.
+
+---
 
 ## Cloud setup
 
@@ -555,11 +601,10 @@ Note: the GUI is not available on headless SSH instances.
 
 ### Retrieving results
 
-Instance storage is ephemeral — results must be pulled before terminating the instance. Use the `scp` command printed at the end of `cloud.sh` output, run from your local machine (INSTANCE_IP should be replaced with the IP-address you see on the lambda-dashboard):
+Instance storage is ephemeral — results must be pulled before terminating the instance. Use the `scp` command printed at the end of `cloud.sh` output, run from your local machine:
 
 ```bash
 scp -r ubuntu@INSTANCE_IP:~/repo/outputs ./outputs
 ```
 
 Closing your local SSH terminal does not terminate the instance — it keeps running until explicitly terminated from the provider dashboard.
-

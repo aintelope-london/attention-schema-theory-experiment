@@ -62,11 +62,12 @@ env_params:
   observation_radius: 5            # @ui int 1 20
   observation_format: boolean_cube # @ui str boolean_cube
   termination: food                # @ui str food,null
+  ripening: 4
   objects:
     food:
-      count: 3                     # @ui int 0 20
+      count: 1                     # @ui int 0 20
     predator:
-      count: 1                     # @ui int 0 10
+      count: 0                     # @ui int 0 10
   actions:
     - forward
     - left

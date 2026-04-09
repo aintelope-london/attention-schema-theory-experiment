@@ -14,6 +14,7 @@ from aintelope.agents.ppo_agent import PPOAgent
 from aintelope.agents.a2c_agent import A2CAgent
 from aintelope.agents.dqn_agent import DQNAgent
 from aintelope.agents.random_agent import RandomAgent
+from aintelope.agents.dummy_agent import DummyAgent
 
 AGENT_REGISTRY: Mapping[str, Type[AbstractAgent]] = {}
 
@@ -36,3 +37,4 @@ register_agent_class("main_agent", MainAgent)
 register_agent_class("sb3_ppo_agent", PPOAgent)
 register_agent_class("sb3_dqn_agent", DQNAgent)
 register_agent_class("sb3_a2c_agent", A2CAgent)
+register_agent_class("dummy_agent", DummyAgent)
