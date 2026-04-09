@@ -31,11 +31,7 @@ def main():
     print("Installing dependencies...")
     subprocess.run([str(pip_path), "install", "-e", "."], check=True)
 
-    # Install git dependencies as editable
-    print("Installing git dependencies...")
-    for dep in GIT_DEPS:
-        subprocess.run([str(pip_path), "install", "-e", dep], check=True)
-
+    
     # Print activation instructions
     print("\n" + "=" * 50)
     print("Setup complete!")

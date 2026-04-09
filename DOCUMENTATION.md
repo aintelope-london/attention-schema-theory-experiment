@@ -119,7 +119,6 @@ Agents and environments use a registry pattern: a string key in config maps to a
 
 **Environment registry** (`environments/__init__.py`):
 ```
-"savanna-safetygrid-v1" → SavannaWrapper
 "gridworld-v1"          → GridworldEnv
 ```
 
@@ -349,7 +348,7 @@ Stable Baselines 3 agents (`sb3_*`) use an alternate training path. When an SB3 
 
 ### Agent and environment registries (factory pattern)
 
-Agents and environments are instantiated via string-keyed registries (`AGENT_REGISTRY`, `ENV_REGISTRY`). A config value like `agent_class: "main_agent"` maps to a class through `get_agent_class()`, and `env: "savanna-safetygrid-v1"` maps through `get_env_class()`. Adding a new agent or environment means implementing the interface, registering it with one line, and making it available in config: no control file changes needed.
+Agents and environments are instantiated via string-keyed registries (`AGENT_REGISTRY`, `ENV_REGISTRY`). A config value like `agent_class: "main_agent"` maps to a class through `get_agent_class()`, and `env: "gridworld-v1"` maps through `get_env_class()`. Adding a new agent or environment means implementing the interface, registering it with one line, and making it available in config: no control file changes needed.
 
 This is the mechanism that makes the system agent- and environment-agnostic. The orchestrator does not know or care what it is running, only that it conforms to the expected interface.
 
@@ -544,7 +543,7 @@ Animation configs live in `animation_config.yaml` as named blocks, following the
 
 ## Architectural state
 
-SB3 baselines and the savanna gridworld environment are legacy: maintained for validation, but the system is moving toward new agents and environments. Agents and environments both conform to abstract contracts, making the system agnostic to their implementation. Observations follow a canonical dict format. The environment manifesto pattern provides agents with the structural information they need to self-configure.
+SB3 baselines ais legacy: maintained for validation, but the system is moving toward new agents and environments. Agents and environments both conform to abstract contracts, making the system agnostic to their implementation. Observations follow a canonical dict format. The environment manifesto pattern provides agents with the structural information they need to self-configure.
 
 ---
 

@@ -118,7 +118,6 @@ def test_dqn_fc_2x2(base_learning_config):
                     },
                 },
                 "env_params": {
-                    "env": "savanna-safetygrid-v1",
                     "goal": "reach_food",
                     "map_max": 4,
                 },
