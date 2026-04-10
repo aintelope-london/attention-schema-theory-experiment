@@ -23,7 +23,7 @@ from aintelope.config.config_utils import (
 from aintelope.analytics.diagnostics import collector
 from aintelope.experiment import run_experiment
 from aintelope.utils.seeding import set_global_seeds
-from aintelope.utils.progress import ProgressReporter
+from aintelope.utils.progress import ProgressReporter, terminal_callback
 from aintelope.utils.concurrency import find_workers
 from aintelope.analytics.analytics import analyze
 from aintelope.analytics.recording import write_results, write_csv, write_cfg
@@ -47,8 +47,12 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
         cfg = prepare_experiment_cfg(
             cfg, main_config[experiment_name], experiment_name, trial_seed
         )
-        reporter = ProgressReporter(["episode"], on_update=None)
+        reporter = ProgressReporter(
+            ["episode"],
+            on_update=terminal_callback(i_trial, experiment_name),
+        )
         result = run_experiment(cfg, i_trial=i_trial, reporter=reporter)
+        print(f"trial {i_trial} | {experiment_name} | done", flush=True)
         trial_results[experiment_name] = {
             "events": result["events"],
             "states": result["states"],

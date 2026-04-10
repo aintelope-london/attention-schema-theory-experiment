@@ -77,43 +77,52 @@ Edit the `PYTHONPATH` in `launch.json` to point to your local repo path.
 
 ## Cloud setup
 
-Experiments can be run on cloud GPU instances using `cloud.sh`, a bootstrap script located at the repo root. It is provider-agnostic and has been tested on Lambda Labs (Ubuntu 22.04 base image, no Lambda Stack).
-
 ### Choosing an instance
-
 Use a plain Ubuntu 22.04 base image. Avoid provider-managed ML stacks (e.g. Lambda Stack) — `install.py` manages all dependencies explicitly, and pre-installed frameworks risk version conflicts.
 
 A single A100 instance is sufficient for the current workload. Multi-node clusters (e.g. Lambda 1-Click Clusters) are out of scope.
 
 ### One-time configuration
-
 Set `REPO_URL` at the top of `cloud.sh` to the HTTPS URL of the repository and commit the file. This is the only configuration required.
 
-### Per-instance workflow
-
-On a fresh instance, run:
-
+### SSH key setup (one-time per machine)
+Generate a key and register it with the provider before launching an instance:
 ```bash
-wget https://raw.githubusercontent.com/YOUR_ORG/YOUR_REPO/main/cloud.sh
+ssh-keygen -t ed25519 -C "your_email@example.com" -f ~/.ssh/lambda
+```
+Paste the contents of `~/.ssh/lambda.pub` into the provider's SSH key dashboard. The full string including the `ssh-ed25519` prefix and email suffix is required.
+
+### Per-instance workflow
+Find the instance IP in the provider dashboard once the instance is running. SSH in:
+```bash
+ssh -i ~/.ssh/lambda ubuntu@INSTANCE_IP
+```
+
+Run the bootstrap script:
+```bash
+wget https://raw.githubusercontent.com/aintelope-london/attention-schema-theory-experiment/main/cloud.sh
 bash cloud.sh
 ```
 
-This clones the repo, runs `install.py`, and prints a ready-to-use `scp` command for pulling results. After setup, activate the environment and launch:
-
+Start a persistent tmux session so the run survives disconnects and can be reattached from any future SSH:
 ```bash
-source repo/venv_aintelope/bin/activate
-aintelope-gui
+tmux new -s main
 ```
 
+Activate the environment and run experiments:
+```bash
+source repo/venv_aintelope/bin/activate
+make tests-learning
+```
+
+To detach from the session (leaves it running): `Ctrl+B, D`  
+To reattach after reconnecting via SSH: `tmux attach -t main`
+
 ### Retrieving results
-
-Instance storage is ephemeral — results must be pulled before terminating the instance. At the end of `cloud.sh` output, a copy-pasteable command is printed with the instance's current IP:
-
+Instance storage is ephemeral — results must be pulled before terminating the instance. Use the `scp` command printed at the end of `cloud.sh` output, run from your local machine:
 ```bash
 scp -r ubuntu@INSTANCE_IP:~/repo/outputs ./outputs
 ```
-
-Run this from your local machine before terminating the instance.
 
 ---
 

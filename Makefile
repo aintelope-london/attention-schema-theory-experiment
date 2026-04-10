@@ -29,11 +29,11 @@ install-all: install install-dev ## install all packages
 
 # ---------- testing ----------
 .PHONY: tests-local tests-learning
-tests-local: ## Run fast unit tests (no learning, no file output)
-	python -m pytest tests/ --ignore=tests/learning --tb=native --cov=$(CODEBASE)
+tests-local: ## Run fast unit tests (no validation, no file output)
+	python -m pytest tests/ --ignore=tests/validation --tb=native --cov=$(CODEBASE)
 
-tests-learning: ## Run learning diagnostics — slow, writes outputs/
-	python -m pytest tests/learning/ --tb=native -v
+tests-validation: ## Run validation, writes outputs/
+	python -m pytest tests/validation/ --tb=native -v
 
 # ---------- type checking ----------
 .PHONY: typecheck-local
