@@ -7,7 +7,7 @@ Contains:
 
 To support a new environment, implement render_manifest on the env class
 returning a {layer_name: keyword} dict. No changes needed here.
-To add a tile, drop a PNG into gui/tiles/. No code changes needed.
+To add a tile, drop a PNG into gui/tiles/ and add its name to TILES.
 """
 
 from pathlib import Path
@@ -16,35 +16,29 @@ import numpy as np
 from PIL import Image
 
 # =============================================================================
-# Tile keywords — each is the exact stem of its PNG file in gui/tiles/
+# TILES — canonical tile registry and draw order (bottom to top).
+# Each entry is the exact stem of its PNG file in gui/tiles/.
 # =============================================================================
 
-WALL = "wall"
-DANGER = "danger"
-PREDATOR = "predator"
-WATER = "water"
-WATER_SMALL = "water_small"
-FOOD = "food"
-FOOD_UNRIPE = "food_unripe"
-FOOD_ROTTEN = "food_rotten"
-FLOOR = "floor"
-ROCK = "rock"
-WATER = "water"
-AGENTS = [f"agent_{i}" for i in range(4)]
-
-# Paint order: left = bottom, right = top.
-_DRAW_ORDER = (
-    WALL,
-    WATER_SMALL,
-    WATER,
-    ROCK,
-    FOOD,
-    FOOD_UNRIPE,
-    FOOD_ROTTEN,
-    DANGER,
-    PREDATOR,
-    *AGENTS,
+TILES = (
+    "floor",
+    "wall",
+    "water_small",
+    "water",
+    "rock",
+    "bush",
+    "food_unripe",
+    "food",
+    "food_rotten",
+    "danger",
+    "predator",
+    "agent_0",
+    "agent_1",
+    "agent_2",
+    "agent_3",
 )
+
+FLOOR = "floor"
 
 _TILE_DIR = Path(__file__).parent / "tiles"
 
@@ -88,7 +82,7 @@ class Interpreter:
 
     def __init__(self, manifest):
         self._manifest = manifest
-        self._priority = {kw: i for i, kw in enumerate(_DRAW_ORDER)}
+        self._priority = {kw: i for i, kw in enumerate(TILES)}
 
     def interpret(self, state):
         """Extract renderable layers from env state.

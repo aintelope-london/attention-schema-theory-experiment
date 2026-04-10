@@ -7,6 +7,7 @@ from aintelope.agents.abstract_agent import AbstractAgent
 from aintelope.agents.main_agent import MainAgent
 from aintelope.agents.random_agent import RandomAgent
 from aintelope.agents.sb3_agent import SB3Agent
+from aintelope.agents.dummy_agent import DummyAgent
 
 AGENT_REGISTRY: Mapping[str, Type[AbstractAgent]] = {}
 
@@ -26,3 +27,4 @@ def get_agent_class(agent_id: str) -> Type[AbstractAgent]:
 register_agent_class("random_agent", RandomAgent)
 register_agent_class("main_agent", MainAgent)
 register_agent_class("sb3_agent", SB3Agent)
+register_agent_class("dummy_agent", DummyAgent)

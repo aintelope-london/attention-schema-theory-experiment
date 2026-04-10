@@ -149,19 +149,7 @@ def run_experiment(
     if cfg.run.write_outputs:
         for agent in agents:
             agent.save_model(checkpoint_path(cfg.run.outputs_dir, agent.id, i_trial))
-        from aintelope.gui.renderer import (
-            StateRenderer,
-            Tileset,
-            find_tileset,
-            Interpreter,
-        )
-
-        renderer = StateRenderer(Tileset(find_tileset()))
-        interpreter = Interpreter(env.render_manifest)
-        for seed, s in states_by_seed.items():
-            img = renderer.render(*interpreter.interpret((s["board"], s["layers"])))
-            save_env_layout(img, Path(cfg.run.outputs_dir) / cfg.experiment_name, seed)
-
+     
     return {
         "events": events.to_dataframe(),
         "states": states.to_dataframe(),

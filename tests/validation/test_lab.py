@@ -62,5 +62,63 @@ def test_model_based_learns(base_learning_config):
     assert_learning_improvement(result["analytics"]["learning_improvement"]["train"])
 
 
+# @pytest.mark.skip("89% with base DQN-FC 5x5")
+def test_foraging_dqn_fc_5x5(base_learning_config):
+    cfg = OmegaConf.merge(
+        base_learning_config,
+        {
+            "train": {
+                "run": {
+                    "trials": 5,
+                    "experiment": {
+                        "steps": 20,
+                        "episodes": 7500,
+                        "test_mode": False,
+                    },
+                },
+                "agent_params": {
+                    "batch_size": 350,
+                    "replay_buffer_size": 30000,
+                    "gamma": 0.99,
+                    "agents": {
+                        "agent_0": {
+                            "model": "dqn_fc",
+                        },
+                    },
+                },
+                "models": {
+                    "DQN": {
+                        "metadata": {"greedy_until": 0.3},
+                    },
+                },
+                "env_params": {
+                    "map_max": 5,
+                    "goal": "reach_food",
+                },
+            },
+            "test": {
+                "run": {
+                    "experiment": {
+                        "steps": 10,
+                        "episodes": 500,
+                        "test_mode": True,
+                    },
+                    "analytics": {
+                        "optimal_efficiency": {"min_efficiency_pct": 0.8},
+                    },
+                },
+                "models": {
+                    "DQN": {
+                        "metadata": {"greedy_until": 0.0},
+                    },
+                },
+            },
+        },
+    )
+    result = run(cfg)
+    report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
+
+
+
 if __name__ == "__main__":
     pytest.main([__file__])
