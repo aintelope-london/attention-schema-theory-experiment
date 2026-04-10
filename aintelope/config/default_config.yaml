@@ -46,7 +46,7 @@ agent_params:
   gamma: 0.99                      # @ui float 0.0 1.0
   agents:
     agent_0:
-      agent_class: main_agent      # @ui str main_agent,random_agent,sb3_ppo_agent,sb3_a2c_agent
+      agent_class: main_agent      # @ui str main_agent,random_agent,sb3_agent,dummy_agent
       model: dqn_fc                # @ui str dqn_fc,dqn_cnn,dqn_fc_roi,dqn_cnn_roi,dqn_fc_roi_circle,dqn_cnn_roi_circle
   # SB3 model parameters
   num_conv_layers: 0               # @ui int 0 3

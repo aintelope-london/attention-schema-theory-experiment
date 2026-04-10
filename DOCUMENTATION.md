@@ -112,9 +112,7 @@ Agents and environments use a registry pattern: a string key in config maps to a
 "main_agent"      → MainAgent
 "random_agent"    → RandomAgent
 "dummy_agent"     → DummyAgent
-"sb3_ppo_agent"   → PPOAgent
-"sb3_dqn_agent"   → DQNAgent
-"sb3_a2c_agent"   → A2CAgent
+"sb3_agent"       → SB3Agent
 ```
 
 **Environment registry** (`environments/__init__.py`):
@@ -174,7 +172,7 @@ Fields in `default_config.yaml` can carry `@ui` annotations in comments. These a
 
 ```yaml
 learning_rate: 0.001  # @ui float 0.0001 0.1
-agent_class: main_agent  # @ui str main_agent,random_agent,sb3_ppo_agent
+agent_class: main_agent  # @ui str main_agent,random_agent,sb3_agent,dummy_agent
 test_mode: false      # @ui bool
 map_max: 1            # (no annotation → locked/read-only in GUI)
 ```
@@ -340,7 +338,7 @@ Multi-agent environments can follow two execution models: sequential (agents act
 
 ### SB3 baseline training path (special permission)
 
-Stable Baselines 3 agents (`sb3_*`) use an alternate training path. When an SB3 agent is training, control is handed to SB3's own `.learn()` loop, bypassing the main episode/step loop entirely. During test mode, SB3 agents rejoin the standard path. SB3 agent initialization and training are isolated into `_init_sb3_agents()` and `_run_sb3_training()` in `experiments.py`.
+Stable Baselines 3 agents (`sb3_*`) use an alternate training path. When an SB3 agent is training, control is handed to SB3's own `.learn()` loop, bypassing the main episode/step loop entirely. During test mode, SB3 agents rejoin the standard path. SB3 agent initialization and training are isolated into `sb3_agent.py`.
 
 **Why:** Classical RL frameworks assume ownership of the training loop: the agent drives environment interaction internally. This is architecturally incompatible with our mediator pattern where the control file owns the loop. Wrapping SB3's loop to match ours would require reimplementing significant framework internals for no functional gain.
 
@@ -515,7 +513,9 @@ Minimal randomised MOMA gridworld.
 | 3 | food | ripe food |
 | 4 | food_unripe | ripening mode only |
 | 5 | food_rotten | ripening mode only |
-| 6+ | agent_N | one layer per agent in sorted order |
+| 6 | rock | |
+| 7 | water | |
+| 8+ | agent_N | one layer per agent in sorted order |
 
 **Ripening cycle** (active when `env_params.ripening > 0`): each food cell advances `unripe → ripe → rotten` every `ripening` steps. On expiry of the rotten stage the cell clears and a new `food_unripe` spawns on a random floor cell. Only `food` contact fires `interoception[0]` and counts as `ate_food` — the two signals are always identical.
 
@@ -538,12 +538,6 @@ The script name is declared in config under `agent_params.agents.[id].script` an
 If the agent's architecture entry contains an ROI component, `DummyAgent` instantiates it directly (without a full Model) and drives it with `internal_action` from the script each step, returning the resulting mask as `"roi"` in the action dict. This allows ROI animations to be authored as plain integer sequences in `scripts.py` while reusing the ROI component code exactly.
 
 Animation configs live in `animation_config.yaml` as named blocks, following the same block structure as experiment configs. Each block sets `env`, `map_layout` (or `objects`), agent script, and episode/step counts. Animations are run and exported through the standard results viewer export path.
-
----
-
-## Architectural state
-
-SB3 baselines ais legacy: maintained for validation, but the system is moving toward new agents and environments. Agents and environments both conform to abstract contracts, making the system agnostic to their implementation. Observations follow a canonical dict format. The environment manifesto pattern provides agents with the structural information they need to self-configure.
 
 ---
 
