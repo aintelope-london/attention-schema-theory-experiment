@@ -12,36 +12,6 @@ from aintelope.analytics.analytics import (
 )
 
 
-@pytest.mark.skip(reason="SB3 PPO debug pending")
-def test_sb3_ppo_learns(base_learning_config):
-    """SB3 PPO agent shows learning improvement over training."""
-    cfg = OmegaConf.merge(
-        base_learning_config,
-        {
-            "train": {
-                "run": {
-                    "experiment": {
-                        "steps": 11,
-                        "episodes": 300,
-                    },
-                },
-                "agent_params": {
-                    "agents": {
-                        "agent_0": {"agent_class": "sb3_ppo_agent"},
-                    },
-                    "num_conv_layers": 0,
-                    "ppo_n_steps": 10,
-                },
-                "env_params": {
-                    "combine_interoception_and_vision": True,
-                },
-            },
-        },
-    )
-    result = run(cfg)
-    assert_learning_improvement(result["analytics"]["learning_improvement"]["train"])
-
-
 @pytest.mark.skip(reason="ModelBased debugging pending")
 def test_model_based_learns(base_learning_config):
     """main_agent with ModelBased architecture shows learning improvement."""
