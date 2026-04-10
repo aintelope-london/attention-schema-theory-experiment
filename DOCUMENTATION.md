@@ -565,58 +565,12 @@ Animation configs live in `animation_config.yaml` as named blocks, following the
 
 ## Cloud setup
 
-Experiments can be run on cloud GPU instances using `cloud.sh`, a bootstrap script at the repo root. It is provider-agnostic and has been verified on Lambda Labs with a plain Ubuntu 22.04 base image (not Lambda Stack — avoid provider-managed ML stacks, as `install.py` manages all dependencies explicitly and pre-installed frameworks risk version conflicts).
+Experiments run on cloud GPU instances via `cloud.sh`, a bootstrap script at the repo root. It is provider-agnostic and has been verified on Lambda Labs with a plain Ubuntu 22.04 base image. Avoid provider-managed ML stacks (e.g. Lambda Stack) — `install.py` manages all dependencies explicitly and pre-installed frameworks risk version conflicts.
 
 A single A100 instance is sufficient for the current workload. Multi-node clusters are out of scope.
 
-### Choosing an instance
-
-Use a **plain Ubuntu 22.04** base image. When prompted to choose between provider ML stacks and bare Ubuntu, always choose bare Ubuntu.
-
 Tested providers: Lambda Labs. RunPod is a viable alternative if Lambda has no capacity.
 
-### SSH key setup (one-time per machine)
+When prompted to choose between a provider ML stack and bare Ubuntu, always choose bare Ubuntu.
 
-Generate a key and register it with the provider before launching an instance:
-
-```bash
-ssh-keygen -t ed25519 -C "your_email@example.com" -f ~/.ssh/lambda
-```
-
-Paste the contents of `~/.ssh/lambda.pub` into the provider's SSH key dashboard. The full string including the `ssh-ed25519` prefix and email suffix is required.
-
-### Per-instance workflow
-
-Find the instance IP in the provider dashboard once the instance is running. SSH in:
-
-```bash
-ssh -i ~/.ssh/lambda ubuntu@INSTANCE_IP
-```
-
-Then run the two setup commands:
-
-```bash
-wget https://raw.githubusercontent.com/aintelope-london/attention-schema-theory-experiment/main/cloud.sh
-bash cloud.sh
-```
-
-This installs system dependencies, clones the repo, creates the venv, and installs all dependencies including dev tools. At the end it prints a ready-to-use `scp` command with the instance's current IP.
-
-Activate the environment and run experiments:
-
-```bash
-source repo/venv_aintelope/bin/activate
-make tests-learning
-```
-
-Note: the GUI is not available on headless SSH instances.
-
-### Retrieving results
-
-Instance storage is ephemeral — results must be pulled before terminating the instance. Use the `scp` command printed at the end of `cloud.sh` output, run from your local machine:
-
-```bash
-scp -r ubuntu@INSTANCE_IP:~/repo/outputs ./outputs
-```
-
-Closing your local SSH terminal does not terminate the instance — it keeps running until explicitly terminated from the provider dashboard.
+The per-instance workflow, SSH key setup, tmux session management, and result retrieval commands are in `README.md`.

@@ -31,3 +31,14 @@ class ProgressReporter:
     def _notify(self):
         if self._on_update:
             self._on_update(self)
+
+
+def terminal_callback(trial: int, block: str) -> Callable[["ProgressReporter"], None]:
+    def _print(reporter: "ProgressReporter"):
+        ep = reporter.state["episode"]
+        print(
+            f"trial {trial} | {block} | episode {ep['current']}/{ep['total']}",
+            flush=True,
+        )
+
+    return _print
