@@ -2,7 +2,7 @@ import numpy as np
 from aintelope.environments.abstract_env import AbstractEnv
 
 # ── Tile indices ───────────────────────────────────────────────────────────────
-FLOOR, WALL, PREDATOR, FOOD, FOOD_UNRIPE, FOOD_ROTTEN, ROCK, WATER = (
+FLOOR, WALL, PREDATOR, FOOD, FOOD_UNRIPE, FOOD_ROTTEN, ROCK, WATER, BUSH = (
     0,
     1,
     2,
@@ -11,11 +11,17 @@ FLOOR, WALL, PREDATOR, FOOD, FOOD_UNRIPE, FOOD_ROTTEN, ROCK, WATER = (
     5,
     6,
     7,
+    8,
 )
-_N_BASE = 8  # agent tiles begin here
+_N_BASE = 9  # agent tiles begin here
 
-_NEXT_STAGE = {FOOD_UNRIPE: FOOD, FOOD: FOOD_ROTTEN}
-_FOOD_STAGES = (FOOD_UNRIPE, FOOD, FOOD_ROTTEN)
+_NEXT_STAGE = {
+    BUSH: FOOD_UNRIPE,
+    FOOD_UNRIPE: FOOD,
+    FOOD: FOOD_ROTTEN,
+    FOOD_ROTTEN: BUSH,
+}
+_FOOD_STAGES = (BUSH, FOOD_UNRIPE, FOOD, FOOD_ROTTEN)
 _PASSABLE = {FLOOR, FOOD, FOOD_UNRIPE, FOOD_ROTTEN, PREDATOR}
 _FOOD_REWARD = {FOOD}
 
@@ -85,8 +91,10 @@ class GridworldEnv(AbstractEnv):
             "food_rotten",
             "rock",
             "water",
+            "bush",
         ] + self.agents
         self._ripening_period = cfg.env_params.get("ripening", 0)
+        self._ripe_randomness = cfg.env_params.get("ripe_randomness", 0)
         self._initial_food_tile = FOOD_UNRIPE if self._ripening_period > 0 else FOOD
         self._manifesto = None
         self.state = {}
@@ -188,32 +196,29 @@ class GridworldEnv(AbstractEnv):
 
     # ── Ripening ──────────────────────────────────────────────────────────────
 
+    def _next_threshold(self, current_age):
+        return (
+            current_age
+            + self._ripening_period
+            + (
+                int(self._step_rng.integers(0, self._ripe_randomness + 1))
+                if self._ripe_randomness
+                else 0
+            )
+        )
+
     def _ripen(self):
         if not self._ripening_period:
             return
-        despawned = []
         for pos in list(self._food_age):
-            self._food_age[pos] += 1
-            if self._food_age[pos] % self._ripening_period:
+            self._food_age[pos][0] += 1
+            age, threshold = self._food_age[pos]
+            if age < threshold:
                 continue
             next_stage = _NEXT_STAGE.get(int(self._board[pos]))
-            if next_stage is None:
-                despawned.append(pos)
-            else:
+            if next_stage is not None:
                 self._board[pos] = next_stage
-        for pos in despawned:
-            self._board[pos] = FLOOR
-            del self._food_age[pos]
-            self._spawn_food()
-
-    def _spawn_food(self):
-        floor_ys, floor_xs = np.where(self._board == FLOOR)
-        if not len(floor_ys):
-            return
-        idx = self._step_rng.integers(len(floor_ys))
-        pos = (int(floor_ys[idx]), int(floor_xs[idx]))
-        self._board[pos] = FOOD_UNRIPE
-        self._food_age[pos] = 0
+                self._food_age[pos] = [age, self._next_threshold(age)]
 
     # ── Board initialisation ──────────────────────────────────────────────────
 
@@ -258,7 +263,7 @@ class GridworldEnv(AbstractEnv):
                 if tile_int == PREDATOR:
                     self._predator_cells.add(pos)
                 if tile_int in _FOOD_STAGES:
-                    self._food_age[pos] = 0
+                    self._food_age[pos] = [0, self._next_threshold(0)]
 
     _LAYOUT_CHARS = {
         ".": FLOOR,
@@ -269,6 +274,7 @@ class GridworldEnv(AbstractEnv):
         "x": FOOD_ROTTEN,
         "r": ROCK,
         "w": WATER,
+        "b": BUSH,
     }
 
     def _place_board_from_layout(self, layout):
@@ -289,7 +295,7 @@ class GridworldEnv(AbstractEnv):
                     if tile == PREDATOR:
                         self._predator_cells.add((r, c))
                     if tile in _FOOD_STAGES:
-                        self._food_age[(r, c)] = 0
+                        self._food_age[(r, c)] = [0, self._next_threshold(0)]
                 elif ch == "A":
                     i, aid = next(agent_iter)
                     self._positions[aid] = (r, c)

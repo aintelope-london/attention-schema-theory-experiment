@@ -42,19 +42,20 @@ def run_trial(cfg_dict, main_config_dict, i_trial):
     set_global_seeds(trial_seed)
 
     trial_results = {}
+
     for experiment_name in main_config:
-        experiment_cfg = prepare_experiment_cfg(
+        cfg = prepare_experiment_cfg(
             cfg, main_config[experiment_name], experiment_name, trial_seed
         )
         reporter = ProgressReporter(["episode"], on_update=None)
-        result = run_experiment(experiment_cfg, i_trial=i_trial, reporter=reporter)
+        result = run_experiment(cfg, i_trial=i_trial, reporter=reporter)
         trial_results[experiment_name] = {
             "events": result["events"],
             "states": result["states"],
             "learning_df": result["learning_df"],
             "performance_df": result["performance_df"],
             "manifesto": result["manifesto"],
-            "cfg_dict": to_picklable(experiment_cfg),
+            "cfg_dict": to_picklable(cfg),
         }
     return trial_results
 
