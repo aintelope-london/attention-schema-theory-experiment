@@ -3,11 +3,24 @@ from aintelope.environments.abstract_env import AbstractEnv
 
 # ── Tile indices ───────────────────────────────────────────────────────────────
 FLOOR, WALL, PREDATOR, FOOD, FOOD_UNRIPE, FOOD_ROTTEN, ROCK, WATER, BUSH = (
-    0, 1, 2, 3, 4, 5, 6, 7, 8,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
 )
 _N_BASE = 9  # agent tiles begin here
 
-_NEXT_STAGE = {BUSH: FOOD_UNRIPE, FOOD_UNRIPE: FOOD, FOOD: FOOD_ROTTEN, FOOD_ROTTEN: BUSH}
+_NEXT_STAGE = {
+    BUSH: FOOD_UNRIPE,
+    FOOD_UNRIPE: FOOD,
+    FOOD: FOOD_ROTTEN,
+    FOOD_ROTTEN: BUSH,
+}
 _FOOD_STAGES = (BUSH, FOOD_UNRIPE, FOOD, FOOD_ROTTEN)
 _PASSABLE = {FLOOR, FOOD, FOOD_UNRIPE, FOOD_ROTTEN, PREDATOR}
 _FOOD_REWARD = {FOOD}
@@ -70,8 +83,15 @@ class GridworldEnv(AbstractEnv):
         self._cfg = cfg
         self.agents = _agents_from_cfg(cfg)
         self.layers = [
-            "floor", "wall", "predator", "food",
-            "food_unripe", "food_rotten", "rock", "water", "bush",
+            "floor",
+            "wall",
+            "predator",
+            "food",
+            "food_unripe",
+            "food_rotten",
+            "rock",
+            "water",
+            "bush",
         ] + self.agents
         self._ripening_period = cfg.env_params.get("ripening", 0)
         self._ripe_randomness = cfg.env_params.get("ripe_randomness", 0)
@@ -177,9 +197,14 @@ class GridworldEnv(AbstractEnv):
     # ── Ripening ──────────────────────────────────────────────────────────────
 
     def _next_threshold(self, current_age):
-        return current_age + self._ripening_period + (
-            int(self._step_rng.integers(0, self._ripe_randomness + 1))
-            if self._ripe_randomness else 0
+        return (
+            current_age
+            + self._ripening_period
+            + (
+                int(self._step_rng.integers(0, self._ripe_randomness + 1))
+                if self._ripe_randomness
+                else 0
+            )
         )
 
     def _ripen(self):

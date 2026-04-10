@@ -119,6 +119,5 @@ def test_foraging_dqn_fc_5x5(base_learning_config):
     report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
 
 
-
 if __name__ == "__main__":
     pytest.main([__file__])

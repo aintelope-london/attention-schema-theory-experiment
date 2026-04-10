@@ -149,7 +149,7 @@ def run_experiment(
     if cfg.run.write_outputs:
         for agent in agents:
             agent.save_model(checkpoint_path(cfg.run.outputs_dir, agent.id, i_trial))
-     
+
     return {
         "events": events.to_dataframe(),
         "states": states.to_dataframe(),
