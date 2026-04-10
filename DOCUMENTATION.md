@@ -227,6 +227,28 @@ Two separate test suites with different purposes:
 
 Each suite has its own base fixture in its own `conftest.py`. Both provide a minimal single-block config diff on top of `default_config.yaml`. The only meaningful difference is `write_outputs`. Each test merges its own episode count, model, and env params on top of the base fixture — two config layers total, no third layer.
 
+tests/learning/test_validation.py — Canonical validation suite
+A locked set of empirical claims about agent capability. Tests here are graduated from test_lab.py once a result is reproducible and ready to serve as a standing record.
+Naming convention: test_<claim>__<method>__<scope>
+
+claim — what the test asserts (foraging, generalizes, etc.)
+method — the model or architectural variant (dqn_fc, dqn_cnn, etc.)
+scope — the environment scale (2x2, 5x5, 5x13, etc.)
+
+Structure invariants across all tests:
+
+trials: 5, train steps: 20, test steps: 10 — held constant so differences between tests are attributable to model and scope only
+greedy_until: 0.3 in train, greedy_until: 0.0 in test — canonical exploration schedule
+min_efficiency_pct is set per-test in the test block's analytics override, never left to the config default
+Single assertion per test: report_optimal_policy on the test block
+
+min_efficiency_pct policy:
+
+1.0 on 2x2 — this is the system correctness gate. If a DQN-FC cannot achieve 100% on the smallest non-trivial map, there is a bug, not a performance issue. It does not run in production until this passes.
+Lower thresholds on larger scopes encode the expected performance of that model class at that scale, as established empirically.
+
+tests/learning/test_lab.py is the development counterpart — no invariants enforced, tests are skipped by default, and anything here is a candidate for eventual graduation into test_validation.py.
+
 ### Return value from `run()`
 
 `run()` returns a dict with a `results` key (per-block raw data) and an `analytics` key (per-analytic, per-block computed results):
