@@ -67,7 +67,7 @@ packages = ["aintelope", "tests"]
 
 [tool.pytest.ini_options]
 addopts = "-s"
-norecursedirs = ["tests/learning"]
+norecursedirs = ["tests/validation"]
 
 [tool.black]
 line-length = 88
