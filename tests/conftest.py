@@ -14,7 +14,6 @@ def base_test_config():
                 "run": {
                     "trials": 1,
                     "write_outputs": False,
-                    "max_workers": 1,
                     "experiment": {
                         "episodes": 1,
                         "steps": 10,
