@@ -18,7 +18,6 @@ def base_learning_config():
                 "run": {
                     "trials": 1,
                     "write_outputs": True,
-                    "max_workers": 1,
                     "experiment": {
                         "episodes": 1,
                         "steps": 10,

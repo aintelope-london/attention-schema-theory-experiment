@@ -7,7 +7,9 @@ Usage: python monitor.py outputs/20260411123456
 import sys
 from pathlib import Path
 from aintelope.utils.report_aggregator import read_reports, parse_reports
+
 sys.path.insert(0, str(Path(__file__).parent))
+
 
 def main():
     if len(sys.argv) != 2:
