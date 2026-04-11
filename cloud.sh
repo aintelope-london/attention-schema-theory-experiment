@@ -15,7 +15,7 @@ VENV="venv_aintelope"
 # ── System dependencies ────────────────────────────────────────────────────────
 echo "--- Installing system dependencies ---"
 sudo apt update -qq
-sudo apt install -y build-essential python3-venv python3.10-dev
+sudo apt install -y build-essential python3-venv python3.10-dev tmux
 
 # ── Clone repo ─────────────────────────────────────────────────────────────────
 if [ ! -d "$REPO_DIR" ]; then
