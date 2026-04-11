@@ -7,7 +7,7 @@ ESTIMATED_MB_PER_WORKER = 2048  # PyTorch + SB3 + env baseline
 
 def find_workers(max_workers: int, num_trials: int) -> int:
     """Resolve worker count. 0 = auto-detect from hardware."""
-    cpu_cap = torch.cuda.device_count() or max(os.cpu_count() - 1, 1)
+    cpu_cap = max(os.cpu_count() - 1, 1)
     mem_cap = psutil.virtual_memory().available // (
         ESTIMATED_MB_PER_WORKER * 1024 * 1024
     )

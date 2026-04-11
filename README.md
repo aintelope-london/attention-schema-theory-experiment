@@ -104,6 +104,11 @@ wget https://raw.githubusercontent.com/aintelope-london/attention-schema-theory-
 bash cloud.sh
 ```
 
+To check the instance specs:
+```bash
+{ echo "=== CPU ==="; lscpu | grep -E "Model name|CPU\(s\)|Thread|Socket"; echo "=== RAM ==="; free -h; echo "=== GPU ==="; nvidia-smi; echo "=== DISK ==="; df -h /; } > specs.txt 2>&1
+```
+
 Start a persistent tmux session so the run survives disconnects and can be reattached from any future SSH:
 ```bash
 tmux new -s main
@@ -112,7 +117,7 @@ tmux new -s main
 Activate the environment and run experiments:
 ```bash
 source repo/venv_aintelope/bin/activate
-make tests-learning
+make tests-validation
 ```
 
 To detach from the session (leaves it running): `Ctrl+B, D`  
