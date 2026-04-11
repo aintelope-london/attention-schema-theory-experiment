@@ -35,7 +35,7 @@ tests-local: ## Run fast unit tests (no validation, no file output)
 tests-validation: ## Run validation, writes outputs/
 	tests-validation: ## Run validation suite in parallel, writes outputs/
 	python -m pytest tests/validation/ --tb=native -v -n auto 2>&1 | tee tests-validation.log
-
+ 
 # ---------- type checking ----------
 .PHONY: typecheck-local
 typecheck-local: ## Local typechecking
