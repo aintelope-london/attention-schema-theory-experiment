@@ -32,10 +32,6 @@ from aintelope.analytics.recording import write_csv
 # ── Output helpers ────────────────────────────────────────────────────────────
 
 
-def _cfg(results):
-    return next(iter(results.values()))["cfg"]
-
-
 def _write_figure(cfg, name, fig):
     if cfg.run.write_outputs:
         path = Path(cfg.run.outputs_dir) / f"{name}.png"
@@ -160,7 +156,6 @@ def _render_optimality_scatter(block_data):
     return figure
 
 
-# Maps metric name → renderer called with the full block_data dict → figure, one per block.
 _BLOCK_RENDERERS = {
     "visitation_heatmap": _render_visitation_heatmap,
     "action_distribution": _render_action_distribution,
@@ -175,25 +170,24 @@ _BLOCK_RENDERERS = {
 def analyze(results):
     """Run all configured analytics. Returns {name: {block: data_dict}}.
 
+    Each block's own cfg.run.analytics drives what runs for that block.
     Figures are written to disk as a side-effect when cfg.run.write_outputs is True.
     """
-    cfg = _cfg(results)
     out = {}
+    for block, data in results.items():
+        cfg = data["cfg"]
+        for name, params in cfg.run.analytics.items():
+            metric_data = getattr(_metrics, name)({block: data}, params)
+            out.setdefault(name, {}).update(metric_data)
 
-    for name, params in cfg.run.analytics.items():
-        metric_data = getattr(_metrics, name)(results, params)
-        out[name] = metric_data
+            if name in _SERIES_SPECS:
+                x_label, y_label, title = _SERIES_SPECS[name]
+                fig = _render_series(metric_data, x_label, y_label, title)
+                if fig:
+                    _write_figure(cfg, f"{name}_{block}", fig)
 
-        if name in _SERIES_SPECS:
-            x_label, y_label, title = _SERIES_SPECS[name]
-            fig = _render_series(metric_data, x_label, y_label, title)
-            if fig:
-                _write_figure(cfg, name, fig)
-
-        elif name in _BLOCK_RENDERERS:
-            render_fn = _BLOCK_RENDERERS[name]
-            for block, block_data in metric_data.items():
-                fig = render_fn(block_data)
+            elif name in _BLOCK_RENDERERS:
+                fig = _BLOCK_RENDERERS[name](metric_data.get(block))
                 if fig:
                     _write_figure(cfg, f"{name}_{block}", fig)
 

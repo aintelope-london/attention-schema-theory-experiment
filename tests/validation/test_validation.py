@@ -63,7 +63,8 @@ _AGENTS = {
         "train": {
             "run": {
                 "trials": 1,
-                "experiment": {"steps": 20, "episodes": 1500, "test_mode": False},
+                "max_workers": 1,
+                "experiment": {"steps": 20, "episodes": 15000, "test_mode": False},
             },
             "agent_params": {
                 "agents": {"agent_0": {"agent_class": "sb3_agent"}},
@@ -80,7 +81,8 @@ _AGENTS = {
         "train": {
             "run": {
                 "trials": 1,
-                "experiment": {"steps": 20, "episodes": 2000, "test_mode": False},
+                "max_workers": 1,
+                "experiment": {"steps": 20, "episodes": 15000, "test_mode": False},
             },
             "agent_params": {
                 "agents": {"agent_0": {"agent_class": "sb3_agent"}},
@@ -98,7 +100,8 @@ _AGENTS = {
         "train": {
             "run": {
                 "trials": 1,
-                "experiment": {"steps": 20, "episodes": 1500, "test_mode": False},
+                "max_workers": 1,
+                "experiment": {"steps": 20, "episodes": 15000, "test_mode": False},
             },
             "agent_params": {
                 "agents": {"agent_0": {"agent_class": "sb3_agent"}},

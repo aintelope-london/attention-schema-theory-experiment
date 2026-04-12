@@ -55,7 +55,10 @@ def run_experiment(
     monitor.sample("init")
 
     # SB3 training has its own loop (special permission — documented in DOCUMENTATION.md).
-    if cfg.agent_params.agents[agents[0].id].agent_class == "sb3_agent":
+    if (
+        cfg.agent_params.agents[agents[0].id].agent_class == "sb3_agent"
+        and not cfg.run.experiment.test_mode
+    ):
         from aintelope.agents.sb3_agent import SB3Agent
 
         SB3Agent.training(
@@ -63,6 +66,16 @@ def run_experiment(
         )
         gc.collect()
         monitor.report()
+        states.log([cfg.experiment_name, i_trial, 0, -1, state])
+        cols = list(cfg.run.experiment.event_columns)
+        dummy = [None] * len(cols)
+        dummy[cols.index("Run_id")] = cfg.experiment_name
+        dummy[cols.index("Trial")] = i_trial
+        dummy[cols.index("Episode")] = 0
+        dummy[cols.index("Agent_id")] = agents[0].id
+        dummy[cols.index("Food_position")] = state.get("food_position")
+        events.log_event(dummy)
+
         return {
             "events": events.to_dataframe(),
             "states": states.to_dataframe(),
