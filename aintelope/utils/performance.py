@@ -29,7 +29,7 @@ def _make_gpu_info():
 
         if not torch.cuda.is_available():
             return 0.0, lambda: (0.0, 0.0)
-        total = torch.cuda.get_device_properties(0).total_mem / (1024**2)
+        total = torch.cuda.get_device_properties(0).total_memory / (1024**2)
         has_util = hasattr(torch.cuda, "utilization")
         if has_util:
             return total, lambda: (
