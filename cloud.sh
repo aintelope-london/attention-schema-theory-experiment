@@ -31,6 +31,12 @@ python3 "$INSTALL_SCRIPT"
 echo "--- Installing dev dependencies ---"
 source "$VENV/bin/activate"
 make install-dev
+ARCH=$(uname -m)
+if [ "$ARCH" = "aarch64" ]; then
+    pip install torch  # PyPI carries CUDA-enabled aarch64 builds
+else
+    pip install torch --index-url https://download.pytorch.org/whl/cu121
+fi
 
 # ── Done ───────────────────────────────────────────────────────────────────────
 INSTANCE_IP=$(curl -s ifconfig.me)
