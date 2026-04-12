@@ -148,7 +148,7 @@ class SB3Agent(AbstractAgent):
         return {"action": self.last_action}
 
     def update(self, observation=None, **kwargs) -> dict:
-        return {}
+        return {"reward": float(observation["interoception"][0])}
 
     def save_model(self, path, **kwargs) -> None:
         pass  # training() saves its own checkpoint; test-mode model is stateless.

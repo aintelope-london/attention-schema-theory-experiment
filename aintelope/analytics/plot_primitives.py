@@ -75,14 +75,16 @@ def save_figure(figure, path):
 
 
 def collapse(df, group_cols, y_col, fn="sum"):
-    """Reduce rows by grouping and aggregating."""
-    return df.groupby(group_cols, as_index=False)[y_col].agg(fn)
+    return df.groupby(group_cols, as_index=False).agg({y_col: fn})
 
 
 def aggregate_series(df, x_col, y_col):
-    """Compute mean and std of y_col grouped by x_col. Returns (x, mean, std)."""
     agg = df.groupby(x_col)[y_col].agg(["mean", "std"]).fillna(0)
-    return agg.index.values, agg["mean"].values, agg["std"].values
+    return (
+        agg.index.values.astype(float),
+        agg["mean"].values.astype(float),
+        agg["std"].values.astype(float),
+    )
 
 
 # =============================================================================
