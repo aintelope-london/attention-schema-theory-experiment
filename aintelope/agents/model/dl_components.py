@@ -239,10 +239,13 @@ class Network(nn.Module):
 
     def forward(self, input_batch):
         """Process input through all network components following config order."""
+        device = next(self.parameters()).device
         activations = {
-            k: torch.tensor(v, dtype=torch.float32)
-            if not isinstance(v, torch.Tensor)
-            else v
+            k: (
+                torch.tensor(v, dtype=torch.float32)
+                if not isinstance(v, torch.Tensor)
+                else v
+            ).to(device)
             for k, v in input_batch.items()
         }
         outputs = {}
