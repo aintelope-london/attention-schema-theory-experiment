@@ -28,7 +28,7 @@ def base_learning_config(request):
                     "learning_rate": 0.0005,
                 },
                 "env_params": {
-                    "map_max": 4,
+                    "map_max": 2,
                     "goal": None,
                 },
             }
