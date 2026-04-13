@@ -8,7 +8,7 @@ from omegaconf import OmegaConf
 
 
 @pytest.fixture
-def base_learning_config():
+def base_learning_config(request):
     """Minimal single-block config for learning tests.
     write_outputs=True so diagnostics and reports are written to outputs/.
     """
@@ -18,6 +18,7 @@ def base_learning_config():
                 "run": {
                     "trials": 1,
                     "write_outputs": True,
+                    "outputs_dir": f"outputs/{request.node.name}",
                     "experiment": {
                         "episodes": 1,
                         "steps": 10,
