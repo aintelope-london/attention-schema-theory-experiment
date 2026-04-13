@@ -20,7 +20,7 @@ def base_test_config():
                     },
                 },
                 "env_params": {
-                    "map_max": 5,
+                    "map_size": 5,
                 },
             }
         }
@@ -31,7 +31,7 @@ def base_test_config():
 def base_env_cfg():
     """Full resolved cfg for direct environment construction in tests."""
     cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
-    return OmegaConf.merge(cfg, {"env_params": {"num_iters": 10, "map_max": 5}})
+    return OmegaConf.merge(cfg, {"env_params": {"num_iters": 10, "map_size": 5}})
 
 
 @pytest.fixture

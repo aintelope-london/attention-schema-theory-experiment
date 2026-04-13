@@ -341,6 +341,7 @@ class DQN(Component):
         loss_fn = q_net.loss_fn
         n = self.n_env_actions
         n_actions = self.n_actions
+        self.update_count += 1
 
         def bellman_loss(net, target_net, tensors):
             state_inputs = {f: tensors[f] for f in net.inputs}
@@ -375,8 +376,13 @@ class DQN(Component):
 
             return total_loss
 
-        signals[self._q_net_id] = bellman_loss
-        report = q_net.update(signals)
+        report = {}
+        if self.update_count % self.metadata["update_frequency"] == 0:
+            signals[self._q_net_id] = bellman_loss
+            report = q_net.update(signals)
+            if self.update_count % q_net.metadata["target_net_update_frequency"] == 0:
+                q_net.update_target_net()
+
         report["episode"] = self.activations.get("episode", 0)
         report["reward"] = float(self.activations.get("reward", 0.0))
         report["explore_episodes"] = int(
@@ -384,10 +390,6 @@ class DQN(Component):
         )
         report["epsilon"] = self.activations.get("epsilon", 0.0)
         report["greedy_until"] = self.metadata["greedy_until"]
-        self.update_count += 1
-        if self.update_count % q_net.metadata["target_net_update_frequency"] == 0:
-            q_net.update_target_net()
-
         return report
 
 

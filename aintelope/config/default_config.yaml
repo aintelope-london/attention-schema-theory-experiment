@@ -58,12 +58,12 @@ env_params:
   mode: parallel                   # @ui str parallel
 
   # ── Gridworld env params (env: gridworld-v1) ───────────────────────
-  map_size: 10                     # @ui int 3 50
-  observation_radius: 5            # @ui int 1 20
+  map_size: 3                      # @ui int 2 50
+  observation_radius: 5            # @ui int 1 50
   observation_format: boolean_cube # @ui str boolean_cube
   termination: food                # @ui str food,null
-  ripening: 4                      # @ui int 0 20
-  ripe_randomness: 3               # @ui int 0 20
+  ripening: 0                      # @ui int 0 20
+  ripe_randomness: 0               # @ui int 0 20
   objects:
     food:
       count: 1                     # @ui int 0 20

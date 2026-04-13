@@ -26,8 +26,8 @@ _AGENTS = {
     "dqn_fc": {
         "train": {
             "run": {
-                "trials": 5,
-                "experiment": {"steps": 20, "episodes": 10000, "test_mode": False},
+                "trials": 1,
+                "experiment": {"steps": 20, "episodes": 7000, "test_mode": False},
             },
             "agent_params": {
                 "batch_size": 200,
@@ -44,11 +44,11 @@ _AGENTS = {
     "dqn_cnn": {
         "train": {
             "run": {
-                "trials": 5,
-                "experiment": {"steps": 20, "episodes": 10000, "test_mode": False},
+                "trials": 1,
+                "experiment": {"steps": 20, "episodes": 6000, "test_mode": False},
             },
             "agent_params": {
-                "batch_size": 550,
+                "batch_size": 200,
                 "replay_buffer_size": 30000,
                 "gamma": 0.99,
                 "agents": {"agent_0": {"model": "dqn_cnn"}},
@@ -122,7 +122,7 @@ _AGENTS = {
 def _scenario_2x2():
     return {
         "train": {
-            "env_params": {"map_max": 2, "goal": "reach_food"},
+            "env_params": {"map_size": 2, "goal": "reach_food"},
         },
         "test": {
             "run": {
@@ -136,7 +136,7 @@ def _scenario_2x2():
 def _scenario_5x5():
     return {
         "train": {
-            "env_params": {"map_max": 5, "goal": "reach_food"},
+            "env_params": {"map_size": 5, "goal": "reach_food"},
         },
         "test": {
             "run": {
@@ -151,7 +151,7 @@ def _scenario_generalize_5x5_to_13x13():
     return {
         "train": {
             "env_params": {
-                "map_max": 5,
+                "map_size": 5,
                 "goal": "reach_food",
                 "observation_radius": 13,
             },
@@ -161,7 +161,7 @@ def _scenario_generalize_5x5_to_13x13():
                 "experiment": {"steps": 10, "episodes": 500, "test_mode": True},
                 "analytics": {"optimal_efficiency": {"min_efficiency_pct": 0.2}},
             },
-            "env_params": {"map_max": 13, "goal": "reach_food"},
+            "env_params": {"map_size": 13, "goal": "reach_food"},
         },
     }
 
