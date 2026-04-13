@@ -92,7 +92,7 @@ def test_foraging_dqn_fc_5x5(base_learning_config):
                     },
                 },
                 "env_params": {
-                    "map_max": 5,
+                    "map_size": 5,
                     "goal": "reach_food",
                 },
             },

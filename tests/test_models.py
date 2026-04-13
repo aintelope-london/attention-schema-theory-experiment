@@ -16,7 +16,7 @@ def model_free_cfg():
             {
                 "test": {
                     "env_params": {
-                        "map_max": 5,
+                        "map_size": 5,
                         "combine_interoception_and_vision": False,
                     },
                     "agent_params": {
@@ -38,7 +38,7 @@ def model_based_cfg():
             {
                 "test": {
                     "env_params": {
-                        "map_max": 5,
+                        "map_size": 5,
                         "combine_interoception_and_vision": False,
                     },
                     "agent_params": {

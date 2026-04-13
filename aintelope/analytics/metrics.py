@@ -181,7 +181,7 @@ def run_summary(results, params):
             }
             lines.append(f"Arch:     {_format_architecture(arch)}")
         env_keys = (
-            "map_max",
+            "map_size",
             "combine_interoception_and_vision",
             "env_layout_seed_repeat_sequence_length",
         )

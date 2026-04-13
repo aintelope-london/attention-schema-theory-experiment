@@ -174,7 +174,7 @@ Fields in `default_config.yaml` can carry `@ui` annotations in comments. These a
 learning_rate: 0.001  # @ui float 0.0001 0.1
 agent_class: main_agent  # @ui str main_agent,random_agent,sb3_agent,dummy_agent
 test_mode: false      # @ui bool
-map_max: 1            # (no annotation → locked/read-only in GUI)
+map_size: 1            # (no annotation → locked/read-only in GUI)
 ```
 
 ### Analytics config block

@@ -28,7 +28,7 @@ def base_learning_config(request):
                     "learning_rate": 0.0005,
                 },
                 "env_params": {
-                    "map_max": 2,
+                    "map_size": 2,
                     "goal": None,
                 },
             }
@@ -40,4 +40,4 @@ def base_learning_config(request):
 def base_env_cfg():
     """Full resolved cfg for direct environment construction in tests."""
     cfg = OmegaConf.load(os.path.join("aintelope", "config", "default_config.yaml"))
-    return OmegaConf.merge(cfg, {"env_params": {"num_iters": 10, "map_max": 5}})
+    return OmegaConf.merge(cfg, {"env_params": {"num_iters": 10, "map_size": 5}})

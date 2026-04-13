@@ -10,7 +10,7 @@ models:
   DQN:
     metadata:
       greedy_until: 0.7
-      update_frequency: 4
+      update_frequency: 1
   ModelBased:
     metadata:
       input:
