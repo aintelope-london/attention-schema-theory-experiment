@@ -27,7 +27,7 @@ _AGENTS = {
         "train": {
             "run": {
                 "trials": 5,
-                "experiment": {"steps": 20, "episodes": 10, "test_mode": False},
+                "experiment": {"steps": 20, "episodes": 10000, "test_mode": False},
             },
             "agent_params": {
                 "batch_size": 200,
@@ -45,7 +45,7 @@ _AGENTS = {
         "train": {
             "run": {
                 "trials": 5,
-                "experiment": {"steps": 20, "episodes": 10, "test_mode": False},
+                "experiment": {"steps": 20, "episodes": 10000, "test_mode": False},
             },
             "agent_params": {
                 "batch_size": 550,
@@ -64,7 +64,7 @@ _AGENTS = {
             "run": {
                 "trials": 1,
                 "max_workers": 1,
-                "experiment": {"steps": 20, "episodes": 10, "test_mode": False},
+                "experiment": {"steps": 20, "episodes": 10000, "test_mode": False},
             },
             "agent_params": {
                 "agents": {"agent_0": {"agent_class": "sb3_agent"}},
@@ -82,7 +82,7 @@ _AGENTS = {
             "run": {
                 "trials": 1,
                 "max_workers": 1,
-                "experiment": {"steps": 20, "episodes": 10, "test_mode": False},
+                "experiment": {"steps": 20, "episodes": 10000, "test_mode": False},
             },
             "agent_params": {
                 "agents": {"agent_0": {"agent_class": "sb3_agent"}},
@@ -101,7 +101,7 @@ _AGENTS = {
             "run": {
                 "trials": 1,
                 "max_workers": 1,
-                "experiment": {"steps": 20, "episodes": 10, "test_mode": False},
+                "experiment": {"steps": 20, "episodes": 10000, "test_mode": False},
             },
             "agent_params": {
                 "agents": {"agent_0": {"agent_class": "sb3_agent"}},
