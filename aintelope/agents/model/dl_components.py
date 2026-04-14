@@ -57,7 +57,10 @@ class NeuralNet(nn.Module, Component):
         return self.optimize(signals or {})
 
     def optimize(self, signals):
-        if len(self.memory) < self.cfg.agent_params.batch_size:
+        if (
+            self.cfg.run.experiment.test_mode
+            or len(self.memory) < self.cfg.agent_params.batch_size
+        ):
             return {}
 
         batch = self.memory.sample(self.cfg.agent_params.batch_size)

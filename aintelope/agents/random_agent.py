@@ -18,7 +18,7 @@ class RandomAgent(AbstractAgent):
         return {"action": self.last_action}
 
     def update(self, observation=None, **kwargs):
-        return []
+        return {}
 
     def save_model(self, path, **kwargs):
         pass
