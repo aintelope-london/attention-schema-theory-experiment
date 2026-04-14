@@ -536,7 +536,7 @@ class PlaybackControl(_PackGridMixin):
 
     def _play(self):
         self._btn.configure(text="Stop")
-        self._tick()
+        self._after_id = self.frame.after(0, self._tick)
 
     def _stop(self):
         self.frame.after_cancel(self._after_id)
