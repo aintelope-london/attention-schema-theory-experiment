@@ -21,21 +21,21 @@ FOOD_RIPENING_CLOSEUP = [
 ]
 
 FOOD_RIPENING_WANDER = [
-    {"action": 0, "internal_action": 1},  # forward
-    {"action": 0, "internal_action": 1},
     {"action": 1, "internal_action": 1},  # left
-    {"action": 0, "internal_action": 1},
+    {"action": 1, "internal_action": 2},
+    {"action": 0, "internal_action": 2},  # forward
+    {"action": 0, "internal_action": 0},
     {"action": 0, "internal_action": 1},
     {"action": 2, "internal_action": 1},  # right
-    {"action": 0, "internal_action": 1},
-    {"action": 0, "internal_action": 1},
-    {"action": 2, "internal_action": 1},
-    {"action": 0, "internal_action": 1},
-    {"action": 0, "internal_action": 1},
+    {"action": 0, "internal_action": 2},
+    {"action": 0, "internal_action": 0},
     {"action": 1, "internal_action": 1},
     {"action": 0, "internal_action": 1},
     {"action": 0, "internal_action": 1},
+    {"action": 1, "internal_action": 1},
+    {"action": 0, "internal_action": 0},
+    {"action": 0, "internal_action": 2},
     {"action": 4, "internal_action": 1},  # wait
-    {"action": 4, "internal_action": 1},
+    {"action": 0, "internal_action": 1},
     {"action": 4, "internal_action": 1},
 ]

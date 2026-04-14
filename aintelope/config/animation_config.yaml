@@ -39,7 +39,7 @@ roi_contracting:
             turn_step: 0.7854
             radius_step: 0.5
             circle_distance: 3.0
-            circle_radius: 4.5
+            circle_radius: 3.5
             circle_radius_min: 0.5
             circle_radius_max: 4.5
   run:
