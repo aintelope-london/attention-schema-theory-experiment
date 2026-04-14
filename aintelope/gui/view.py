@@ -618,10 +618,16 @@ class MainWindow:
         elif metric_cols:
             self.metric_var.set(metric_cols[0])
 
+        trials = sorted(self.df["Trial"].unique())
         episodes = sorted(self.df["Episode"].unique())
+
+        self.trial_combo["values"] = [str(int(t)) for t in trials]
         self.episode_combo["values"] = [str(int(e)) for e in episodes]
         self.playback_agent_combo["values"] = list(agents)
 
+        if trials:
+            self.trial_combo.current(0)
+            self.trial_var.set(str(int(trials[0])))
         if episodes:
             self.episode_combo.current(0)
             self.episode_var.set(str(int(episodes[0])))
@@ -682,7 +688,15 @@ class MainWindow:
         controls = Frame(playback_tab, padding=(10, 5))
         controls.pack(fill=X)
 
-        Label(controls, text="Episode:").pack(side=LEFT, padx=5)
+        Label(controls, text="Trial:").pack(side=LEFT, padx=5)
+        self.trial_var = StringVar()
+        self.trial_combo = Combobox(
+            controls, textvariable=self.trial_var, width=8, state="readonly"
+        )
+        self.trial_combo.pack(side=LEFT, padx=5)
+        self.trial_combo.bind("<<ComboboxSelected>>", self._on_trial_changed)
+
+        Label(controls, text="Episode:").pack(side=LEFT, padx=(15, 5))
         self.episode_var = StringVar()
         self.episode_combo = Combobox(
             controls, textvariable=self.episode_var, width=10, state="readonly"
@@ -762,6 +776,10 @@ class MainWindow:
         PLOT_TYPES[plot_type](self.ax, self.df, metric, agents, "Agent_id")
         self.canvas.draw()
 
+    def _on_trial_changed(self, event=None):
+        self._update_playback_range()
+        self._render_state()
+
     def _on_episode_changed(self, event=None):
         self._update_playback_range()
         self._render_state()
@@ -774,25 +792,33 @@ class MainWindow:
         self._render_state()
 
     def _update_playback_range(self):
+        trial = self.trial_var.get()
         episode = self.episode_var.get()
         agent = self.playback_agent_var.get()
-        if not episode or not agent:
+        if not trial or not episode or not agent:
             return
         filtered = self.df[
-            (self.df["Episode"] == int(episode)) & (self.df["Agent_id"] == agent)
+            (self.df["Trial"] == int(trial))
+            & (self.df["Episode"] == int(episode))
+            & (self.df["Agent_id"] == agent)
         ]
+        # Slider covers step -1 (initial board) through the last event step.
+        # We map slider position 0 → step -1, 1 → step 0, etc.
         max_step = int(filtered["Step"].max()) if len(filtered) > 0 else 0
-        self.step_slider.set_range(0, max_step)
-        self.step_slider.set(0)
-        self.export_start_slider.set_range(0, max_step)
-        self.export_start_slider.set(0)
-        self.export_end_slider.set_range(0, max_step)
+        self.step_slider.set_range(-1, max_step)
+        self.step_slider.set(-1)
+        self.export_start_slider.set_range(-1, max_step)
+        self.export_start_slider.set(-1)
+        self.export_end_slider.set_range(-1, max_step)
         self.export_end_slider.set(max_step)
 
     def _get_frame(self, step):
+        trial = int(self.trial_var.get())
         episode = int(self.episode_var.get())
         state = self.states[
-            (self.states["Episode"] == episode) & (self.states["Step"] == step)
+            (self.states["Trial"] == trial)
+            & (self.states["Episode"] == episode)
+            & (self.states["Step"] == step)
         ].iloc[0]["Board"]
         img = self.renderer.render(
             *self.interpreter.interpret((state["board"], state["layers"]))
@@ -804,9 +830,10 @@ class MainWindow:
     def _render_state(self):
         if self.states is None or self.interpreter is None:
             return
+        trial = self.trial_var.get()
         episode = self.episode_var.get()
         agent = self.playback_agent_var.get()
-        if not episode or not agent:
+        if not trial or not episode or not agent:
             return
         img = self._get_frame(self.step_slider.get())
         w, h = self.state_frame.winfo_width(), self.state_frame.winfo_height()
@@ -817,7 +844,8 @@ class MainWindow:
         self._photo = ImageTk.PhotoImage(scaled)
         self.state_display.configure(image=self._photo)
         self.status.set(
-            f"Episode {episode}, Agent {agent}, Step {self.step_slider.get()}"
+            f"Trial {trial}, Episode {episode}, Agent {agent}, "
+            f"Step {self.step_slider.get()}"
         )
 
     def _export_plot(self):
