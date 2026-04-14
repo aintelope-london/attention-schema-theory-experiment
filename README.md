@@ -117,7 +117,7 @@ tmux new -s main
 Activate the environment and run experiments:
 ```bash
 source repo/venv_aintelope/bin/activate
-make tests-validation 2>&1 | tee ~/repo/test_run.log
+make tests-validation 2>&1 | tee ~/repo/outputs/test_run.log
 ```
 
 To detach from the session (leaves it running): `Ctrl+B, D`  
