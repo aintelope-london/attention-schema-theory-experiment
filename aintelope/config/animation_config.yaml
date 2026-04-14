@@ -1,6 +1,7 @@
 roi_contracting:
   env_params:
     map_size: 13
+    termination: None
     map_layout: |
       ###############
       #.............#
