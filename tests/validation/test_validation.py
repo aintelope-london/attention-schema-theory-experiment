@@ -171,12 +171,13 @@ def _scenario_generalize_5x5_to_13x13():
 # ── Tests ──────────────────────────────────────────────────────────────────────
 
 _AGENTS = {
-    "dqn_fc":  _DQN_FC,
+    "dqn_fc": _DQN_FC,
     "dqn_cnn": _DQN_CNN,
     # "sb3_ppo": _SB3_PPO,
     # "sb3_dqn": _SB3_DQN,
     # "sb3_a2c": _SB3_A2C,
 }
+
 
 @pytest.mark.parametrize("agent", _AGENTS.values(), ids=_AGENTS.keys())
 def test_foraging_2x2(base_learning_config, agent):
