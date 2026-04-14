@@ -124,7 +124,7 @@ _SB3_A2C = {
 def _scenario_2x2():
     return {
         "train": {
-            "env_params": {"map_max": 2, "goal": "reach_food"},
+            "env_params": {"map_size": 2, "goal": "reach_food"},
         },
         "test": {
             "run": {
@@ -138,7 +138,7 @@ def _scenario_2x2():
 def _scenario_5x5():
     return {
         "train": {
-            "env_params": {"map_max": 5, "goal": "reach_food"},
+            "env_params": {"map_size": 5, "goal": "reach_food"},
         },
         "test": {
             "run": {
@@ -153,7 +153,7 @@ def _scenario_generalize_5x5_to_13x13():
     return {
         "train": {
             "env_params": {
-                "map_max": 5,
+                "map_size": 5,
                 "goal": "reach_food",
                 "observation_radius": 13,
             },
@@ -163,7 +163,7 @@ def _scenario_generalize_5x5_to_13x13():
                 "experiment": {"steps": 10, "episodes": 500, "test_mode": True},
                 "analytics": {"optimal_efficiency": {"min_efficiency_pct": 0.2}},
             },
-            "env_params": {"map_max": 13, "goal": "reach_food"},
+            "env_params": {"map_size": 13, "goal": "reach_food"},
         },
     }
 
