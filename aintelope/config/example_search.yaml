@@ -1,0 +1,25 @@
+base: example_config.yaml
+
+run:
+  search:
+    n_trials: 30
+    inner_trials: 5
+    n_startup_trials: 5
+    objective:
+      analytic: optimal_efficiency
+      block: test
+      field: efficiency_pct
+      direction: maximize
+    params:
+      - path: agent_params.agents.agent_0.architecture.action.learning_rate
+        type: loguniform
+        low: 1.0e-5
+        high: 1.0e-2
+      - path: agent_params.agents.agent_0.architecture.action.gamma
+        type: float
+        low: 0.9
+        high: 0.999
+      - path: agent_params.agents.agent_0.architecture.action.batch_size
+        type: int
+        low: 16
+        high: 256

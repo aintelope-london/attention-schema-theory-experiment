@@ -1,6 +1,9 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Repository:
+# https://github.com/aintelope-london/attention-schema-theory-experiment
 
 import os
 import sys
@@ -68,6 +71,16 @@ if __name__ == "__main__":
         action="store_true",
         help="Launch GUI for config editing, then results after run",
     )
+    parser.add_argument(
+        "--search",
+        metavar="FILENAME",
+        help="Run hyperparameter search with the given search config",
+    )
     args = parser.parse_args()
 
-    run(args.config, gui=args.gui)
+    if args.search:
+        from aintelope.utils.param_search import run_search
+
+        run_search(args.search)
+    else:
+        run(args.config, gui=args.gui)

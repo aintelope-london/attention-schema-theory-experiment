@@ -20,6 +20,7 @@ aintelope/config/*.yaml
 !aintelope/config/example_config.yaml
 !aintelope/config/model_library.yaml
 !aintelope/config/animation_config.yaml
+!aintelope/config/example_search.yaml
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
