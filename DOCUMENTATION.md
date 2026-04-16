@@ -1,7 +1,3 @@
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
 # DOCUMENTATION
 
 ## Overview
@@ -144,7 +140,9 @@ Config (yaml)
 
 ### Layering and experiment blocks
 
-`default_config.yaml` serves as the base. Experiment configs (e.g., `example_config.yaml`) contain named blocks of overrides (e.g., `train`, `test`, `train_hard`). At runtime, each block is merged on top of the defaults via `OmegaConf.merge()`, and the orchestrator runs blocks sequentially. Agents carry their models forward between blocks: enabling curriculum learning where agents train on progressively harder scenarios and are tested at arbitrary stages.
+`default_config.yaml` serves as the base. Experiment configs (e.g., `example_config.yaml`) contain named blocks of overrides (e.g., `train`, `test`, `train_hard`). At runtime, each block is merged on top of the previous block's resolved config via `OmegaConf.merge()`, and the orchestrator runs blocks sequentially. This means `defaults + block_1 → block_2 → block_3`: each block accumulates from what came before, enabling curriculum learning where early-block parameters carry forward unless explicitly overridden.
+
+Agents carry their models forward between blocks: enabling curriculum learning where agents train on progressively harder scenarios and are tested at arbitrary stages.
 
 Configs are saved per-block in a diff-style fashion: only the overrides are stored, not the full resolved config. This keeps the config architecture lean and composable, and lays the groundwork for future automated config generation (grid search, hyperparameter sweeps) where programmatic block construction needs to be straightforward.
 
@@ -181,6 +179,8 @@ test_mode: false      # @ui bool
 map_size: 1            # (no annotation → locked/read-only in GUI)
 ```
 
+Fields without annotations render as read-only. This keeps the variable definition and its GUI specification in the same file, so there is no separate schema to maintain: adding or changing a config field and its GUI behavior is a single edit in one place.
+
 ### Analytics config block
 
 Under `run:`, the `analytics:` block is a dict of analytic names to parameter dicts. Each key names a library function in `analytics/analytics.py`; the value is passed as `params` to that function. An empty dict `{}` means the analytic runs with no configurable parameters.
@@ -211,190 +211,7 @@ Adding or removing an analytic from a run requires only a config change — no c
 
 ---
 
-## Test Fixtures
-
-### Test suites
-
-Two separate test suites with different purposes:
-
-**`tests/`** — fast unit tests, collected by default pytest sweep and CI:
-- `write_outputs: False` — no filesystem side effects
-- Runs in seconds per test
-- Entry point: `make tests-local`
-
-**`tests/learning/`** — learning diagnostics, excluded from default sweep and CI:
-- `write_outputs: True` — writes `outputs/` for post-run inspection
-- Runs in minutes per test
-- Entry point: `make tests-learning`
-
-### `base_test_config` / `base_learning_config`
-
-Each suite has its own base fixture in its own `conftest.py`. Both provide a minimal single-block config diff on top of `default_config.yaml`. The only meaningful difference is `write_outputs`. Each test merges its own episode count, model, and env params on top of the base fixture — two config layers total, no third layer.
-
-tests/learning/test_validation.py — Canonical validation suite
-A locked set of empirical claims about agent capability. Tests here are graduated from test_lab.py once a result is reproducible and ready to serve as a standing record.
-Naming convention: test_<claim>__<method>__<scope>
-
-claim — what the test asserts (foraging, generalizes, etc.)
-method — the model or architectural variant (dqn_fc, dqn_cnn, etc.)
-scope — the environment scale (2x2, 5x5, 5x13, etc.)
-
-Structure invariants across all tests:
-
-trials: 5, train steps: 20, test steps: 10 — held constant so differences between tests are attributable to model and scope only
-greedy_until: 0.3 in train, greedy_until: 0.0 in test — canonical exploration schedule
-min_efficiency_pct is set per-test in the test block's analytics override, never left to the config default
-Single assertion per test: report_optimal_policy on the test block
-
-min_efficiency_pct policy:
-
-1.0 on 2x2 — this is the system correctness gate. If a DQN-FC cannot achieve 100% on the smallest non-trivial map, there is a bug, not a performance issue. It does not run in production until this passes.
-Lower thresholds on larger scopes encode the expected performance of that model class at that scale, as established empirically.
-
-tests/learning/test_lab.py is the development counterpart — no invariants enforced, tests are skipped by default, and anything here is a candidate for eventual graduation into test_validation.py.
-
-### Return value from `run()`
-
-`run()` returns a dict with a `results` key (per-block raw data) and an `analytics` key (per-analytic, per-block computed results):
-
-```python
-result = run(cfg)
-assert_learning_improvement(result["analytics"]["learning_improvement"]["train"])
-report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
-```
-
-The block names (`"train"`, `"test"`) are the same keys defined in the config. Analytics always return per-block dicts, so tests are explicit about which block they are asserting on — no implicit phase defaulting.
-
----
-
-## Analytics
-
-### Architecture
-
-`analyze(results)` is the single entry point. It receives the full `results` dict (keyed by block name), iterates `cfg.run.analytics`, and calls each configured library function. It returns `{analytic_name: {block_name: result}}`.
-
-```python
-# analyze() internals:
-analytics = {}
-for name, params in cfg.run.analytics.items():
-    analytics[name] = _ANALYTICS[name](results, params)
-return analytics
-```
-
-Each library function receives the complete `results` dict and its params, computes its analytic independently across all blocks, writes its own outputs (figures, text, CSVs) to `outputs_dir` when `write_outputs` is enabled, and returns computed data keyed by block name. Library functions are standalone — they can be called in isolation from outside `analyze()`.
-
-### Library functions
-
-| Function | Returns per block | Writes |
-|----------|------------------|--------|
-| `run_summary` | list of summary lines | `report.txt` (appended) |
-| `learning_improvement` | `{ratio, start_avg, end_avg, window, passed, min_improvement_ratio}` | `report.txt` |
-| `learning_curve` | `{figure}` | `learning_curve.png` |
-| `loss_curve` | `{figure}` | `loss_curve.png` |
-| `epsilon_curve` | `{figure}` | `epsilon_curve.png` |
-| `reward_curve` | `{figure}` | `reward_curve.png` |
-| `steps_to_reward` | `{figure}` | `steps_to_reward.png` |
-| `optimal_efficiency` | `{efficiency_pct, per_episode, n_episodes, min_efficiency_pct}` | — |
-| `efficiency_curve` | `{figure}` | `efficiency_curve.png` |
-| `visitation_heatmap` | `{block: {figure}}` | `visitation_heatmap_{block}.png` per block |
-| `action_distribution` | `{block: {figure}}` | `action_distribution_{block}.png` per block |
-
-### Assertion helpers
-
-`assert_learning_improvement(block_result)` and `report_optimal_policy(block_result)` take a single block's result dict directly — the caller selects the block by name:
-
-```python
-assert_learning_improvement(result["analytics"]["learning_improvement"]["train"])
-report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
-```
-
-### `DiagnosticsMonitor`
-
-Coordinates resource and learning diagnostics for a single experiment block. Lives in `analytics/diagnostics.py`.
-
-- `sample(label)` — resource snapshot
-- `sample_learning(episode, step, report)` — records `loss`, `epsilon`, and `reward` from the agent update report. Skips steps where no gradient update occurred (identified by absence of `loss`).
-- `report()` — prints resource report to terminal
-- `save_performance(folder)` — writes `performance_report.csv`
-- `learning_dataframe()` — returns accumulated `[trial, episode, step, loss, epsilon, reward]` DataFrame
-
-`ResourceMonitor` continues to exist in `utils/performance.py` as the resource-sampling implementation; `DiagnosticsMonitor` owns it as a member.
-
-### Run outputs (gated by `write_outputs`)
-
-When enabled, the run's timestamp folder contains:
-
-| File | Source | Contents |
-|------|--------|----------|
-| `report.txt` | `run_summary`, `learning_improvement` analytics | Run metadata and improvement summary |
-| `learning_curve.png` | `learning_curve` analytic | Per-episode reward per block |
-| `loss_curve.png` | `loss_curve` analytic | Per-episode mean loss per block |
-| `epsilon_curve.png` | `epsilon_curve` analytic | Epsilon decay per block |
-| `reward_curve.png` | `reward_curve` analytic | Per-update reward signal per block |
-| `steps_to_reward.png` | `steps_to_reward` analytic | Steps to first reward per block |
-| `efficiency_curve.png` | `efficiency_curve` analytic | Per-episode policy efficiency per block |
-| `visitation_heatmap_{block}.png` | `visitation_heatmap` analytic | Grid visitation count heatmap, early vs late episodes, one file per block |
-| `action_distribution_{block}.png` | `action_distribution` analytic | Action frequency bar charts, early vs late episodes, one file per block |
-| `{block}/events.csv` | `write_results()` | Full event log per experiment block |
-| `{block}/states.csv` | `write_results()` | Board state per step |
-| `{block}/performance_report.csv` | `DiagnosticsMonitor.save_performance()` | Resource snapshots |
-| `{block}/env_layouts/{seed}.jpg` | `experiment.py` + `renderer.py` | One image per unique env layout seed used during training |
-
-### Environment layout images
-
-At the end of each experiment block, when `write_outputs` is enabled, a JPEG is rendered for each unique `env_layout_seed` that was used during training. The filename is the seed value itself. Images are written to `{outputs_dir}/{block}/env_layouts/`. The seed set is collected as a natural by-product of the episode loop — no recalculation.
-
----
-
-## Design Choices
-
-*Each entry documents a deliberate architectural decision, its justification, and any special permissions it grants to break the standard design patterns.*
-
-### Concurrency model
-
-Trials run through a single `ProcessPoolExecutor` path. The worker count is controlled by `cfg.run.max_workers`: set to 0 for auto-detection, or any positive integer to cap manually. Serial execution is simply `max_workers=1`: no separate code path.
-
-Auto-detection (`find_workers`) picks the minimum of available CPUs (or GPU count if CUDA is present) and memory headroom. GPU selection rotates across available devices via a shared SQLite counter so that concurrent launches balance naturally, including across separate processes.
-
-The intent is that a basic user never has to think about hardware utilization. If edge cases arise (e.g., mixed CPU/GPU workloads, cloud-specific constraints), the system can be extended: but the single-variable, single-path design stays.
-
-### Sequential and simultaneous environment modes
-
-Multi-agent environments can follow two execution models: sequential (agents act one at a time, observing each other's intermediate effects) or simultaneous (all agents commit actions before the environment advances). The active mode is set by `cfg.env_params.mode` and branched cleanly in `experiments.py`.
-
-### SB3 baseline training path (special permission)
-
-Stable Baselines 3 agents (`sb3_*`) use an alternate training path. When an SB3 agent is training, control is handed to SB3's own `.learn()` loop, bypassing the main episode/step loop entirely. During test mode, SB3 agents rejoin the standard path. SB3 agent initialization and training are isolated into `sb3_agent.py`.
-
-**Why:** Classical RL frameworks assume ownership of the training loop: the agent drives environment interaction internally. This is architecturally incompatible with our mediator pattern where the control file owns the loop. Wrapping SB3's loop to match ours would require reimplementing significant framework internals for no functional gain.
-
-**Special permission:** This is an accepted parallel execution path. It exists to provide a credible RL baseline while the project develops its own agent implementations. The expectation is that this path will be deprecated once native agents replace the SB3 dependency.
-
-### Agent and environment registries (factory pattern)
-
-Agents and environments are instantiated via string-keyed registries (`AGENT_REGISTRY`, `ENV_REGISTRY`). A config value like `agent_class: "main_agent"` maps to a class through `get_agent_class()`, and `env: "gridworld-v1"` maps through `get_env_class()`. Adding a new agent or environment means implementing the interface, registering it with one line, and making it available in config: no control file changes needed.
-
-This is the mechanism that makes the system agent- and environment-agnostic. The orchestrator does not know or care what it is running, only that it conforms to the expected interface.
-
-### Event-based recording
-
-All experiment runs produce an event log: one row per agent per step, capturing state, action, reward dimensions, and serialized observations. `EventLog` accumulates rows during the experiment, converts to a DataFrame, and is written to CSV per run via `write_results()`.
-
-**Purpose:** Event-level granularity enables analytics beyond mean-reward curves: constraint violation detection, hidden performance scores, and (future) macro-event detection, where event detectors can identify predefined multi-step behavioral patterns from sequences of atomic events.
-
-**Format:** CSV was chosen for accessibility to scientists working with standard data tools. State columns (observations, board state) are compressed and base64-encoded to keep file sizes manageable while preserving the full state needed for visualization and future analytical replay.
-
-### Results viewer variables (special permission)
-
-Variables controlling analytical output: plot ranges, grouping, display parameters: live in the results viewer GUI, not in the experiment config. This is a deliberate exception to the config-driven pattern.
-
-**Why:** These are exploration tools, not experiment parameters. End-users need to fiddle with them interactively while inspecting results: adjusting axis ranges, selecting episodes, changing groupings: until the visualization tells the story they need. Baking these into config would force a re-run cycle for what is fundamentally a post-hoc activity.
-
-**Scope:** The results viewer provides predefined plot libraries that group and present event data in standard ways. The experimenter controls the view parameters; the plot logic itself is in code and can be extended when new analytical needs arise.
-
-### `@ui` config annotations
-
-GUI widget types, ranges, and choices are declared as `@ui` comments directly in `default_config.yaml`, parsed at runtime by `ui_schema_manager.py`. Fields without annotations render as read-only. This keeps the variable definition and its GUI specification in the same file, so there is no separate schema to maintain: adding or changing a config field and its GUI behavior is a single edit in one place.
+## Agent Model
 
 ### Code archiving
 
@@ -421,7 +238,6 @@ The environment receives the viewport-space ROI mask from the agent's action dic
 | `angle` | always for `circle` mode | actions if in `roi_features`, else fixed at 0.0 |
 | `radius` | `radius` in `roi_features` | actions, clamped to `[circle_radius_min, circle_radius_max]` |
 | `distance` | `roi_mode: circle` | fixed, seeded from `circle_distance` |
-
 
 ### Reward inference
 
@@ -515,6 +331,24 @@ All components implement the `Component` ABC:
 
 Components receive a `context` dict at init containing: `cfg`, `device`, `components`, `memory`, `activations`, `env_manifesto`, `agent_id`, `component_id`, `inputs` (expanded), and `plans` (the library card).
 
+---
+
+## Analytics
+
+### Architecture
+
+`analyze(results)` is the single entry point. It receives the full `results` dict (keyed by block name), iterates `cfg.run.analytics`, and calls each configured library function. It returns `{analytic_name: {block_name: result}}`.
+
+```python
+# analyze() internals:
+analytics = {}
+for name, params in cfg.run.analytics.items():
+    analytics[name] = _ANALYTICS[name](results, params)
+return analytics
+```
+
+Each library function receives the complete `results` dict and its params, computes its analytic independently across all blocks, writes its own outputs (figures, text, CSVs) to `outputs_dir` when `write_outputs` is enabled, and returns computed data keyed by block name. Library functions are standalone — they can be called in isolation from outside `analyze()`.
+
 ### ROI analytics
 
 Two analytics track whether agents with ROI components are using their attention meaningfully.
@@ -524,6 +358,129 @@ Two analytics track whether agents with ROI components are using their attention
 **`roi_food_alignment`**: plots the rate at which food appears inside the agent's ROI across episode windows. Computed directly from the logged `Observation`: the food channel (`manifesto["food_ind"]`) and the ROI channel (last vision channel, always appended by the env) are ANDed per step. No geometry is re-implemented — the mask the agent actually used is what was logged. Works for any entity present in the observation space (predators, other agents) by channel index; food is the first use case.
 
 Both analytics follow the null-object pattern: absent ROI data flows through as empty and produces no output, with no branching needed.
+
+### DiagnosticsMonitor
+
+Owns resource sampling, learning metrics, and progress reporting:
+
+- `sample(label)` — resource snapshot
+- `sample_learning(episode, step, report)` — records `loss`, `epsilon`, and `reward` from the agent update report. Skips steps where no gradient update occurred (identified by absence of `loss`).
+- `report()` — prints resource report to terminal
+- `save_performance(folder)` — writes `performance_report.csv`
+- `learning_dataframe()` — returns accumulated `[trial, episode, step, loss, epsilon, reward]` DataFrame
+
+`ResourceMonitor` continues to exist in `utils/performance.py` as the resource-sampling implementation; `DiagnosticsMonitor` owns it as a member.
+
+### Run outputs (gated by `write_outputs`)
+
+When enabled, the run's timestamp folder contains:
+
+| File | Source | Contents |
+|------|--------|----------|
+| `report.txt` | `run_summary`, `learning_improvement` analytics | Run metadata and improvement summary |
+| `learning_curve.png` | `learning_curve` analytic | Per-episode reward per block |
+| `loss_curve.png` | `loss_curve` analytic | Per-episode mean loss per block |
+| `epsilon_curve.png` | `epsilon_curve` analytic | Epsilon decay per block |
+| `reward_curve.png` | `reward_curve` analytic | Per-update reward signal per block |
+| `steps_to_reward.png` | `steps_to_reward` analytic | Steps to first reward per block |
+| `efficiency_curve.png` | `efficiency_curve` analytic | Per-episode policy efficiency per block |
+| `visitation_heatmap_{block}.png` | `visitation_heatmap` analytic | Grid visitation count heatmap, early vs late episodes, one file per block |
+| `action_distribution_{block}.png` | `action_distribution` analytic | Action frequency bar charts, early vs late episodes, one file per block |
+| `{block}/events.csv` | `write_results()` | Full event log per experiment block |
+| `{block}/states.csv` | `write_results()` | Board state per step |
+| `{block}/performance_report.csv` | `DiagnosticsMonitor.save_performance()` | Resource snapshots |
+| `{block}/env_layouts/{seed}.jpg` | `experiment.py` + `renderer.py` | One image per unique env layout seed used during training |
+
+### Environment layout images
+
+At the end of each experiment block, when `write_outputs` is enabled, a JPEG is rendered for each unique `env_layout_seed` that was used during training. The filename is the seed value itself. Images are written to `{outputs_dir}/{block}/env_layouts/`. The seed set is collected as a natural by-product of the episode loop — no recalculation.
+
+---
+
+## Design Choices
+
+*Each entry documents a deliberate architectural decision, its justification, and any special permissions it grants to break the standard design patterns.*
+
+### Concurrency model
+
+Trials run through a single `ProcessPoolExecutor` path. The worker count is controlled by `cfg.run.max_workers`: set to 0 for auto-detection, or any positive integer to cap manually. Serial execution is simply `max_workers=1`: no separate code path.
+
+Auto-detection (`find_workers`) picks the minimum of available CPUs (or GPU count if CUDA is present) and memory headroom. GPU selection rotates across available devices via a shared SQLite counter so that concurrent launches balance naturally, including across separate processes.
+
+The intent is that a basic user never has to think about hardware utilization. If edge cases arise (e.g., mixed CPU/GPU workloads, cloud-specific constraints), the system can be extended: but the single-variable, single-path design stays.
+
+### Sequential and simultaneous environment modes
+
+Multi-agent environments can follow two execution models: sequential (agents act one at a time, observing each other's intermediate effects) or simultaneous (all agents commit actions before the environment advances). The active mode is set by `cfg.env_params.mode` and branched cleanly in `experiments.py`.
+
+### SB3 baseline agents (special permission)
+
+SB3 exists specifically to provide a credible RL reference point for verifying that `MainAgent` is learning correctly — not as a target for further development. All SB3 algorithms (DQN, PPO, A2C) are accessed through a single `SB3Agent` class; the algorithm is selected via the `algorithm` config field.
+
+**Training path (special permission):** When an SB3 agent is training, control is handed to SB3's own `.learn()` loop via `SB3Agent.training()`, bypassing the main episode/step loop entirely. During test mode, SB3 agents rejoin the standard canonical path. This is architecturally incompatible with our mediator pattern where the control file owns the loop, but wrapping SB3's loop to match ours would require reimplementing significant framework internals for no functional gain.
+
+**Reward:** Where `MainAgent` infers reward from observation via `RewardInference`, SB3 reads reward directly from `interoception[0]` inside `GridworldGymWrapper`. This is a consequence of SB3 owning its own training loop and having no access to the agent's brain.
+
+**Analytics on the SB3 training block:** SB3's training path does not participate in the event-logging loop. The train block receives a dummy-row DataFrame so analytics flow through without branching — consistent with the null-object pattern. Results from this block are meaningless and intentionally ignored.
+
+**Special permission:** This is an accepted parallel execution path. It exists to provide a credible RL baseline while the project develops its own agent implementations. The expectation is that this path will be deprecated once native agents fully replace the SB3 dependency.
+
+### Agent and environment registries (factory pattern)
+
+Agents and environments are instantiated via string-keyed registries (`AGENT_REGISTRY`, `ENV_REGISTRY`). A config value like `agent_class: "main_agent"` maps to a class through `get_agent_class()`, and `env: "gridworld-v1"` maps through `get_env_class()`. Adding a new agent or environment means implementing the interface, registering it with one line, and making it available in config: no control file changes needed.
+
+This is the mechanism that makes the system agent- and environment-agnostic. The orchestrator does not know or care what it is running, only that it conforms to the expected interface.
+
+### Event-based recording
+
+All experiment runs produce an event log: one row per agent per step, capturing state, action, reward dimensions, and serialized observations. `EventLog` accumulates rows during the experiment, converts to a DataFrame, and is written to CSV per run via `write_results()`.
+
+**Purpose:** Event-level granularity enables analytics beyond mean-reward curves: constraint violation detection, hidden performance scores, and (future) macro-event detection, where event detectors can identify predefined multi-step behavioral patterns from sequences of atomic events.
+
+**Format:** CSV was chosen for accessibility to scientists working with standard data tools. State columns (observations, board state) are compressed and base64-encoded to keep file sizes manageable while preserving the full state needed for visualization and future analytical replay.
+
+### Results viewer variables (special permission)
+
+Variables controlling analytical output: plot ranges, grouping, display parameters: live in the results viewer GUI, not in the experiment config. This is a deliberate exception to the config-driven pattern.
+
+**Why:** These are exploration tools, not experiment parameters. End-users need to fiddle with them interactively while inspecting results: adjusting axis ranges, selecting episodes, changing groupings: until the visualization tells the story they need. Baking these into config would force a re-run cycle for what is fundamentally a post-hoc activity.
+
+**Scope:** The results viewer provides predefined plot libraries that group and present event data in standard ways. The experimenter controls the view parameters; the plot logic itself is in code and can be extended when new analytical needs arise.
+
+### Test mode gating
+
+The `test_mode` check that prevents weight updates during evaluation sits inside `NeuralNet.optimize()` — not in the orchestration layer or `DQN.update()`. NeuralNet owns its own training mechanics; test mode is a training mechanic concern, not a control flow concern. The gate is a single condition alongside the existing batch-size check:
+
+```python
+if self.cfg.run.experiment.test_mode or len(self.memory) < self.cfg.agent_params.batch_size:
+    return {}
+```
+
+No other file needs to know about test mode gating. `Model.update()`, `DQN.update()`, `memory.push`, and the abstract contract all remain unchanged.
+
+### Memory limits (Linux-only)
+
+`set_memory_limits()` sets `RLIMIT_AS` to available RAM via `psutil` and Python's `resource` module. Windows memory limiting was removed — a prior Job Object approach silently failed. Windows remains a supported platform otherwise.
+
+### Config block cascading
+
+Each block merges onto the previous block's resolved config: `defaults + block_1 → block_2 → block_3`, not `defaults + block_N`. This enables curriculum learning where early-block parameters carry forward unless explicitly overridden. The cascade is implemented by reassigning `cfg` in the block loop inside `run_trial`.
+
+### `wait` action excluded from canonical validation
+
+The `wait` action is configurable but deliberately excluded from foraging validation scenarios. In a foraging task `wait` is never optimal and only widens the random exploration space, inflating the sample budget required to converge. The default action list in `default_config.yaml` does not include `wait`; validation scenarios inherit this.
+
+### Food consumption
+
+When an agent steps onto a ripe food tile, the food disappears permanently: `_food_age` is popped and the agent tile overwrites the cell. No new food is spawned on consumption. The ripening cycle (`unripe → ripe → rotten → bush → unripe → ...`) manages food lifecycle at existing tracked positions only — each food cell cycles in-place, it does not respawn at a random floor cell.
+
+### `update_frequency` (DQN strategy parameter)
+
+The `update_frequency` field lives in the DQN library card (not in NeuralNet). It gates the optimizer step — the target network update runs independently of this gate and ticks on its own schedule. This feature is present in the codebase but currently untested; `update_frequency` is set to `1` (every step) in `model_library.yaml`, making it a no-op.
+
+### Termination modes
+
+Episode termination is controlled by `cfg.env_params.termination`. When set to `"food"`, the episode ends as soon as the agent consumes food (`Done=True`). When set to `null`, the episode runs to its full step budget regardless of food contact. This is a config-driven behavior switch with no branching in the control files — the environment sets `done` in its state dict, and the experiment loop reads it.
 
 ### GridworldEnv
 
@@ -541,15 +498,16 @@ Minimal randomised MOMA gridworld.
 | 5 | food_rotten | ripening mode only |
 | 6 | rock | |
 | 7 | water | |
-| 8+ | agent_N | one layer per agent in sorted order |
+| 8 | bush | |
+| 9+ | agent_N | one layer per agent in sorted order |
 
-**Ripening cycle** (active when `env_params.ripening > 0`): each food cell advances `unripe → ripe → rotten` every `ripening` steps. On expiry of the rotten stage the cell clears and a new `food_unripe` spawns on a random floor cell. Only `food` contact fires `interoception[0]` and counts as `ate_food` — the two signals are always identical.
+**Ripening cycle** (active when `env_params.ripening > 0`): each food cell advances through stages (`bush → unripe → ripe → rotten → bush → ...`) every `ripening` steps, cycling in-place at the same board position. Only `food` (ripe) contact fires `interoception[0]` and counts as `ate_food` — the two signals are always identical.
 
 **Interoception channels:** `[0]` food reward this step, `[1]` contact (`+1.0` predator, `-1.0` wall/agent block).
 
 **Observation encoding** is selected by `env_params.observation_format`; add `_encode_<key>()` to extend without touching anything else.
 
-**ASCII map layout:** when `env_params.map_layout` is set, the board is initialised from a multiline string instead of random placement. Character vocabulary: `.` floor, `#` wall, `F` food, `u` food_unripe, `x` food_rotten, `P` predator, `A` agent (assigned in sorted order). When `map_layout` is absent, random placement is used with `env_params.map_size` and `env_params.objects`.
+**ASCII map layout:** when `env_params.map_layout` is set, the board is initialised from a multiline string instead of random placement. Character vocabulary: `.` floor, `#` wall, `F` food, `u` food_unripe, `x` food_rotten, `P` predator, `r` rock, `w` water, `b` bush, `A` agent (assigned in sorted order). When `map_layout` is absent, random placement is used with `env_params.map_size` and `env_params.objects`.
 
 ### File-based tileset
 
@@ -567,16 +525,120 @@ Animation configs live in `animation_config.yaml` as named blocks, following the
 
 ---
 
+## Test Fixtures
+
+### Test suites
+
+Two separate test suites with different purposes:
+
+**`tests/`** — fast unit tests, collected by default pytest sweep and CI:
+- `write_outputs: False` — no filesystem side effects
+- Runs in seconds per test
+- Entry point: `make tests-local`
+
+**`tests/learning/`** — learning diagnostics, excluded from default sweep and CI:
+- `write_outputs: True` — writes `outputs/` for post-run inspection
+- Runs in minutes per test
+- Entry point: `make tests-learning`
+
+### `base_test_config` / `base_learning_config`
+
+Each suite has its own base fixture in its own `conftest.py`. Both provide a minimal single-block config diff on top of `default_config.yaml`. The only meaningful difference is `write_outputs`. Each test merges its own episode count, model, and env params on top of the base fixture — two config layers total, no third layer.
+
+### `tests/learning/test_validation.py` — Canonical validation suite
+
+A locked set of empirical claims about agent capability. Tests here are graduated from `test_lab.py` once a result is reproducible and ready to serve as a standing record.
+
+**Naming convention:** `test_<claim>__<method>__<scope>`
+- `claim` — what the test asserts (`foraging`, `generalizes`, etc.)
+- `method` — the model or architectural variant (`dqn_fc`, `dqn_cnn`, etc.)
+- `scope` — the environment scale (`2x2`, `5x5`, `5x13`, etc.)
+
+**Structure invariants across all tests:**
+- `trials: 5`, `train steps: 20`, `test steps: 10` — held constant so differences between tests are attributable to model and scope only
+- `greedy_until: 0.3` in train, `greedy_until: 0.0` in test — canonical exploration schedule
+- `min_efficiency_pct` is set per-test in the test block's analytics override, never left to the config default
+- Single assertion per test: `report_optimal_policy` on the `test` block
+
+**`min_efficiency_pct` policy:**
+- `1.0` on 2x2 — this is the system correctness gate. If a DQN-FC cannot achieve 100% on the smallest non-trivial map, there is a bug, not a performance issue. It does not run in production until this passes.
+- Lower thresholds on larger scopes encode the expected performance of that model class at that scale, as established empirically.
+
+`tests/learning/test_lab.py` is the development counterpart — no invariants enforced, tests are skipped by default, and anything here is a candidate for eventual graduation into `test_validation.py`.
+
+### Return value from `run()`
+
+`run()` returns a dict with a `results` key (per-block raw data) and an `analytics` key (per-analytic, per-block computed results):
+
+```python
+result = run(cfg)
+assert_learning_improvement(result["analytics"]["learning_improvement"]["train"])
+report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
+```
+
+The block names (`"train"`, `"test"`) are the same keys defined in the config. Analytics always return per-block dicts, so tests are explicit about which block they are asserting on — no implicit phase defaulting.
+
+### DQN parameter optimization — foraging baseline
+
+This section records the parameter search that established the canonical DQN-FC and DQN-CNN training config used in `test_validation.py`.
+
+#### Baseline parameters (pre-optimization)
+
+| param | dqn_fc | dqn_cnn |
+|---|---|---|
+| `episodes` | 10 000 | 10 000 |
+| `batch_size` | 200 | 550 |
+| `replay_buffer_size` | 7 000 | 30 000 |
+| `gamma` | 0.99 | 0.99 |
+| `greedy_until` (train) | 0.3 | 0.3 |
+
+Results (5 trials, `test_mode=True`, 500 test episodes):
+
+| test | dqn_fc | dqn_cnn |
+|---|---|---|
+| `test_foraging_2x2` | 97.4% | 97.1% |
+| `test_foraging_5x5` | 83.0% | 81.5% |
+| `test_generalizes_5x5_to_13x13` | 4.1% | 5.8% |
+
+#### Optimized parameters (current)
+
+Sourced from `test_lab.py` (`test_foraging_dqn_fc_5x5`). The same parameter set was applied to both model variants and all scopes, and yielded substantial gains across the board — including the generalization test which was not the target of the search.
+
+| param | dqn_fc | dqn_cnn |
+|---|---|---|
+| `episodes` | 7 500 | 7 500 |
+| `batch_size` | 350 | 350 |
+| `replay_buffer_size` | 30 000 | 30 000 |
+| `gamma` | 0.99 | 0.99 |
+| `greedy_until` (train) | 0.3 | 0.3 |
+
+Results:
+
+| test | dqn_fc | dqn_cnn |
+|---|---|---|
+| `test_foraging_2x2` | 92.9% | — |
+| `test_foraging_5x5` | 92.9% | 95.2% |
+| `test_generalizes_5x5_to_13x13` | 94.2% | 93.7% |
+
+**Note:** `test_foraging_2x2[dqn_fc]` regressed from 97.4% to 92.9% under the new params. The 2x2 scenario is the system correctness gate (`min_efficiency_pct: 1.0`) and is not yet passing. Active investigation ongoing — primary hypothesis is that the `wait` action has been added to the default action space since the original 100% run, inflating the random exploration budget needed for this trivially small map.
+
+---
+
 ## Cloud setup
 
-Experiments run on cloud GPU instances via `cloud.sh`, a bootstrap script at the repo root. It is provider-agnostic and has been verified on Lambda Labs with a plain Ubuntu 22.04 base image. Avoid provider-managed ML stacks (e.g. Lambda Stack) — `install.py` manages all dependencies explicitly and pre-installed frameworks risk version conflicts.
+Experiments run on cloud GPU instances via `cloud.sh`, a bootstrap script at the repo root. It is provider-agnostic and has been verified on Lambda Labs. Avoid provider-managed ML stacks (e.g. Lambda Stack) — `install.py` manages all dependencies explicitly and pre-installed frameworks risk version conflicts. The recommended instance image is one that pre-installs CUDA/cuDNN/NCCL at the system level while leaving the Python environment unmanaged, so `install.py` retains full control over Python dependencies.
 
 A single A100 instance is sufficient for the current workload. Multi-node clusters are out of scope.
 
 Tested providers: Lambda Labs. RunPod is a viable alternative if Lambda has no capacity.
 
-When prompted to choose between a provider ML stack and bare Ubuntu, always choose bare Ubuntu.
-
 The per-instance workflow, SSH key setup, tmux session management, and result retrieval commands are in `README.md`.
 
+---
 
+## Attribution & License
+
+Original upstream repository: https://github.com/aintelope-london/attention-schema-theory-experiment
+
+License: see `LICENSE.txt`.
+Code contribution details: see `AUTHORS.md`.
