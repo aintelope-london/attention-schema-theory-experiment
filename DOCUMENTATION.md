@@ -91,6 +91,16 @@ __main__.run()
 
 Control files: `__main__.py`, `orchestrator.py`, `experiments.py`.
 
+### Execution hierarchy
+
+The experiment loop nests three levels: trials, episodes, and steps.
+
+**Trials** provide statistical significance. The agent's model is reinitialised from scratch each trial — same config, different random seed. Multiple trials verify that learning is robust and not an artefact of a lucky initialisation.
+
+**Episodes** are environment resets within a trial. Each episode randomises the environment layout (positions, seed) while the agent's model persists and continues learning. Episodes are the unit of training: one episode = one trajectory from reset to termination or step limit.
+
+**Steps** are individual agent–environment interactions within an episode: observe, act, receive next observation.
+
 ### Logic modules
 
 | Module | Responsibility |
