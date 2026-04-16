@@ -62,7 +62,7 @@ Available make commands (Linux/Mac):
 
 ```bash
 make tests-local    # Run tests
-make tests-learning # Run learning validation
+make tests-validation # Run learning validation
 make format         # Apply black formatter
 make isort          # Sort imports
 make flake8         # Lint

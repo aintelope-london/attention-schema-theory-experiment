@@ -28,7 +28,7 @@ install-all: install install-dev ## install all packages
 #	pip install -e .
 
 # ---------- testing ----------
-.PHONY: tests-local tests-learning
+.PHONY: tests-local tests-validation
 tests-local: ## Run fast unit tests (no validation, no file output)
 	python -m pytest tests/ --ignore=tests/validation --tb=native --cov=$(CODEBASE)
 

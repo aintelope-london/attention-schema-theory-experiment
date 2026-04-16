@@ -35,6 +35,7 @@ dependencies = [
   "numpy==1.26.4",
   "omegaconf==2.3.0",
   "openai==1.55.3",
+  "optuna",
   "pandas==1.5.3",
   "Pillow>=10.0.0",
   "progressbar2==4.2.0",

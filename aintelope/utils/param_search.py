@@ -28,10 +28,16 @@ from omegaconf import OmegaConf
 
 
 _SUGGEST = {
-    "float":      lambda trial, name, spec: trial.suggest_float(name, spec["low"], spec["high"]),
-    "loguniform": lambda trial, name, spec: trial.suggest_float(name, spec["low"], spec["high"], log=True),
-    "int":        lambda trial, name, spec: trial.suggest_int(name, spec["low"], spec["high"]),
-    "categorical": lambda trial, name, spec: trial.suggest_categorical(name, spec["choices"]),
+    "float": lambda trial, name, spec: trial.suggest_float(
+        name, spec["low"], spec["high"]
+    ),
+    "loguniform": lambda trial, name, spec: trial.suggest_float(
+        name, spec["low"], spec["high"], log=True
+    ),
+    "int": lambda trial, name, spec: trial.suggest_int(name, spec["low"], spec["high"]),
+    "categorical": lambda trial, name, spec: trial.suggest_categorical(
+        name, spec["choices"]
+    ),
 }
 
 
@@ -79,17 +85,26 @@ def run_search(search_filename):
             OmegaConf.update(cfg[block], "run.trials", s.inner_trials, force_add=True)
 
         result = run(cfg)
-        score = result["analytics"][s.objective.analytic][s.objective.block][s.objective.field]
+        score = result["analytics"][s.objective.analytic][s.objective.block][
+            s.objective.field
+        ]
 
         with trials_csv.open("a", newline="") as f:
             csv.writer(f).writerow(
-                [trial.number, score, result["outputs_dir"], *[suggested[p] for p in param_paths]]
+                [
+                    trial.number,
+                    score,
+                    result["outputs_dir"],
+                    *[suggested[p] for p in param_paths],
+                ]
             )
         logger.info("trial %d | score=%.4f | %s", trial.number, score, suggested)
         return score
 
     study.optimize(objective, n_trials=s.n_trials)
-    logger.info("search complete | best=%.4f | params=%s", study.best_value, study.best_params)
+    logger.info(
+        "search complete | best=%.4f | params=%s", study.best_value, study.best_params
+    )
 
 
 def _resolve_initials(params, base_cfg):
