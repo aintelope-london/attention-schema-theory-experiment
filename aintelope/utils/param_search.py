@@ -108,10 +108,12 @@ def run_search(search_filename):
 
 
 def _resolve_initials(params, base_cfg):
-    first_block = next(iter(base_cfg.values()))
+    from aintelope.config.config_utils import init_config
+
+    resolved_cfg = init_config(base_cfg)
     resolved, missing = {}, []
     for p in params:
-        value = OmegaConf.select(first_block, p.path)
+        value = OmegaConf.select(resolved_cfg, p.path)
         if value is None:
             missing.append(p.path)
         else:
