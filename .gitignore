@@ -20,7 +20,8 @@ aintelope/config/*.yaml
 !aintelope/config/example_config.yaml
 !aintelope/config/model_library.yaml
 !aintelope/config/animation_config.yaml
-!aintelope/config/example_search.yaml
+!aintelope/config/dqn_5x5_to_13x13.yaml
+!aintelope/config/dqn_gen_search.yaml
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

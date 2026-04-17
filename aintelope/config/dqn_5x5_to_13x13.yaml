@@ -1,0 +1,39 @@
+train:
+  run:
+    trials: 5
+    experiment:
+      steps: 20
+      episodes: 7500
+      test_mode: false
+  env_params:
+    map_size: 5
+    goal: reach_food
+    observation_radius: 13
+  agent_params:
+    batch_size: 350
+    replay_buffer_size: 30000
+    gamma: 0.99
+    agents:
+      agent_0:
+        model: dqn_cnn
+  models:
+    DQN:
+      metadata:
+        greedy_until: 0.3
+
+test:
+  run:
+    experiment:
+      steps: 10
+      episodes: 500
+      test_mode: true
+    analytics:
+      optimal_efficiency:
+        min_efficiency_pct: 0.2
+  env_params:
+    map_size: 13
+    goal: reach_food
+  models:
+    DQN:
+      metadata:
+        greedy_until: 0.0

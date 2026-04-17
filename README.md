@@ -128,7 +128,7 @@ make tests-validation 2>&1 | tee ~/repo/outputs/test_run.log
 ```
 or this for parameter search:
 ```bash
-python -m aintelope --search my_search.yaml
+python -m aintelope --search dqn_gen_search.yaml
 ```
 
 To detach from the session (leaves it running): `Ctrl+B, D`  

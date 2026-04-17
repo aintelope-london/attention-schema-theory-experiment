@@ -1,4 +1,4 @@
-base: example_config.yaml
+base: dqn_5x5_to_13x13.yaml
 
 run:
   search:
@@ -11,15 +11,15 @@ run:
       field: efficiency_pct
       direction: maximize
     params:
-      - path: agent_params.agents.agent_0.architecture.action.learning_rate
+      - path: agent_params.learning_rate
         type: loguniform
         low: 1.0e-5
         high: 1.0e-2
-      - path: agent_params.agents.agent_0.architecture.action.gamma
+      - path: agent_params.gamma
         type: float
         low: 0.9
         high: 0.999
-      - path: agent_params.agents.agent_0.architecture.action.batch_size
+      - path: agent_params.batch_size
         type: int
         low: 16
-        high: 256
+        high: 512
