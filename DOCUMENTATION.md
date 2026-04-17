@@ -698,27 +698,6 @@ Results (5 trials, `test_mode=True`, 500 test episodes):
 | `test_foraging_5x5` | 83.0% | 81.5% |
 | `test_generalizes_5x5_to_13x13` | 4.1% | 5.8% |
 
-#### Optimized parameters (current)
-
-Sourced from `test_lab.py` (`test_foraging_dqn_fc_5x5`). The same parameter set was applied to both model variants and all scopes, and yielded substantial gains across the board — including the generalization test which was not the target of the search.
-
-| param | dqn_fc | dqn_cnn |
-|---|---|---|
-| `episodes` | 7 500 | 7 500 |
-| `batch_size` | 350 | 350 |
-| `replay_buffer_size` | 30 000 | 30 000 |
-| `gamma` | 0.99 | 0.99 |
-| `greedy_until` (train) | 0.3 | 0.3 |
-
-Results:
-
-| test | dqn_fc | dqn_cnn |
-|---|---|---|
-| `test_foraging_2x2` | 92.9% | — |
-| `test_foraging_5x5` | 92.9% | 95.2% |
-| `test_generalizes_5x5_to_13x13` | 94.2% | 93.7% |
-
-**Note:** `test_foraging_2x2[dqn_fc]` regressed from 97.4% to 92.9% under the new params. The 2x2 scenario is the system correctness gate (`min_efficiency_pct: 1.0`) and is not yet passing. Active investigation ongoing — primary hypothesis is that the `wait` action has been added to the default action space since the original 100% run, inflating the random exploration budget needed for this trivially small map.
 
 ---
 
