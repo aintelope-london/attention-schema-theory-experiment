@@ -646,6 +646,72 @@ The per-instance workflow, SSH key setup, tmux session management, and result re
 
 ---
 
+### Determinism invariants
+
+Bit-exact reproducibility per seed is required for locked-value tests
+(`tests/test_learning_smoke.py`). Three mechanisms combine to guarantee it:
+
+**`set_global_seeds(seed)`** (`aintelope/utils/seeding.py`) seeds
+`random`/`numpy`/`torch` and enables every torch determinism flag:
+
+- `torch.backends.cudnn.deterministic = True`
+- `torch.backends.cudnn.benchmark = False`
+- `torch.use_deterministic_algorithms(True)`
+- `os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"`
+
+These are safe no-ops on CPU. On GPU, the CUBLAS var is only effective if set
+before CUDA initialises — for GPU reproducibility work, export it from the
+invoking shell rather than relying on `set_global_seeds` to pick it up in time.
+`torch.use_deterministic_algorithms(True)` does **not** remove stochasticity from
+the agent's experience (that comes from seeded RNG streams); it only removes
+algorithmic nondeterminism. Statistical robustness is still obtained by varying
+`cfg.run.seed` across trials, and each trial remains bit-reproducible.
+
+**`PYTHONHASHSEED=0`** is exported at the top of the Makefile, so both
+`tests-local` and `tests-validation` inherit it. GUI launches and IDE debugger
+invocations do not — this is an accepted gap because the codebase is held free
+of hash-dependent numerics by the next mechanism.
+
+**`tests/test_determinism_invariants.py`** is an AST tripwire that walks every
+`.py` file under `aintelope/` and `tests/` and fails if it finds any of:
+
+- a call to `hash(...)`
+- iteration over a set or frozenset literal
+- iteration over `set(...)` or `frozenset(...)`
+- iteration over a module- or function-local name bound to any of the above
+
+The message on failure is `"breaks PYTHONHASHSEED determinism, it is time."` —
+the tripwire exists so the day determinism becomes load-bearing beyond the test
+suite is the day it is noticed, not silently later. Known limitation: iteration
+over attribute-held sets (e.g. `self._cells = set(); for c in self._cells`) is
+not caught statically; the smoke test catches any resulting numeric drift as a
+second line of defence.
+
+### Learning smoke test
+
+`tests/test_learning_smoke.py` runs one 1500-episode training trial on the 2x2
+foraging task (`dqn_fc`, seed 0) and asserts three tier-locked numeric values
+against the fixed-seed result: early-window mean reward (eps 200–300),
+mid-window mean reward (eps 1200–1500), and test-block `efficiency_pct`. Any
+code change that affects learning produces numeric drift; the three tiers
+isolate *when* in training the change first shows up, which narrows the search
+when something breaks.
+
+The smoke test is a separate concern from `tests/validation/test_validation.py`:
+validation tests encode empirical performance claims (threshold-based, relaxed
+as parameter searches shift the frontier), while the smoke test locks
+reproducibility (exact-match, moves only on intentional relock). The two tests
+share neither config nor fixtures. Shrunk 2x2 budget, `dqn_fc`, and
+`greedy_until=0.5` are chosen so the run completes in seconds on a CPU and so
+tier 2's window observes a fully-greedy policy.
+
+Relock procedure: when a tier fails with an upward delta, review the change,
+run the smoke test once more in isolation, and paste the observed value into
+the corresponding `_TIER{N}_*` constant at the top of the file.
+
+
+---
+
 ## Attribution & License
 
 Original upstream repository: https://github.com/aintelope-london/attention-schema-theory-experiment
