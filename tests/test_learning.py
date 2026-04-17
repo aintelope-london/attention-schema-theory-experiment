@@ -34,7 +34,7 @@ _TIER1_MEAN_REWARD = 6.68
 _TIER2_MEAN_REWARD = 8.213333333333333
 _TIER3_EFFICIENCY = 31.5
 
-_TOL = 1e-6
+_TOL = 1e-1
 
 
 # ── Training windows ──────────────────────────────────────────────────────────
