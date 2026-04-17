@@ -406,9 +406,12 @@ def epsilon(max_episodes, greedy_until, episode):
     epsilon = max(1.0 - episode / explore_episodes, 0.0)
     return epsilon
 
-
 class ModelBased(Component):
-    """Model-based RL -- MCTS over dynamics and value components.
+    """Model-based RL -- MCTS over dynamics, value, and reward components.
+
+    Reuses the architecture's reward component during planning so reward
+    inference is SSOT: real transitions and imagined transitions score through
+    the same code path.
 
     TODO: ROI joint action search -- MCTS must search the joint
     (env_action x internal_action) space. Deferred until ROI baseline is stable.
@@ -423,7 +426,7 @@ class ModelBased(Component):
 
         self.dynamics_id = self.inputs[0]
         self.value_id = self.inputs[1]
-        self.mcts = MCTS(context["plans"])
+        self.mcts = MCTS(context["plans"], context["cfg"].agent_params.gamma)
 
     def activate(self, activations):
         def value_fn(state):
@@ -443,7 +446,15 @@ class ModelBased(Component):
                 )
             }
 
-        best_action = self.mcts.search(activations, value_fn, dynamics_fn)
+        def reward_fn(state):
+            # Re-prefix with next_ to mirror real update semantics: RewardInference
+            # reads "next_interoception" etc. during real transitions; planning
+            # presents the same shape so one code path covers both.
+            temp = {f"next_{k}": v for k, v in state.items()}
+            self.components["reward"].activate(temp)
+            return float(temp["reward"][0])
+
+        best_action = self.mcts.search(activations, value_fn, dynamics_fn, reward_fn)
         activations[self.component_id] = best_action
 
     def reset(self):
@@ -451,13 +462,14 @@ class ModelBased(Component):
 
 
 class MCTS:
-    def __init__(self, plans):
+    def __init__(self, plans, gamma):
         self.c_puct = plans["metadata"]["c_puct"]
         self.num_simulations = plans["metadata"]["num_simulations"]
         self.max_depth = plans["metadata"]["max_depth"]
         self.n_actions = plans["n_actions"]
+        self.gamma = gamma
 
-    def search(self, root_state, value_fn, dynamics_fn):
+    def search(self, root_state, value_fn, dynamics_fn, reward_fn):
         root = MCTSNode(root_state)
         for _ in range(self.num_simulations):
             node = root
@@ -471,35 +483,37 @@ class MCTS:
                 path.append(node)
 
             if len(path) < self.max_depth:
-                self._expand(node, dynamics_fn)
+                self._expand(node, dynamics_fn, reward_fn)
                 if node.children:
                     action_idx = np.random.choice(list(node.children.keys()))
                     node = node.children[action_idx]
                     path.append(node)
 
-            value = self._evaluate(node, value_fn)
-            for node in path:
-                node.visits += 1
-                node.value_sum += value
+            # Backup: G = r + gamma * G walked leaf -> root. Each node stores
+            # the reward received upon entering it; root.reward = 0 by default.
+            g = value_fn(node.state)
+            for n in reversed(path):
+                n.visits += 1
+                n.value_sum += g
+                g = n.reward + self.gamma * g
 
         return max(root.children.keys(), key=lambda a: root.children[a].visits)
 
-    def _expand(self, node, dynamics_fn):
+    def _expand(self, node, dynamics_fn, reward_fn):
         for action_idx in range(self.n_actions):
             next_state = dynamics_fn(node.state, action_idx)
+            reward = reward_fn(next_state)
             node.children[action_idx] = MCTSNode(
-                next_state, parent=node, action=action_idx
+                next_state, parent=node, action=action_idx, reward=reward
             )
-
-    def _evaluate(self, node, value_fn):
-        return value_fn(node.state)
 
 
 class MCTSNode:
-    def __init__(self, state, parent=None, action=None):
+    def __init__(self, state, parent=None, action=None, reward=0.0):
         self.state = state
         self.parent = parent
         self.action = action
+        self.reward = reward  # reward received upon entering this node
         self.children = {}
         self.visits = 0
         self.value_sum = 0.0
@@ -515,3 +529,4 @@ class MCTSNode:
             return float("inf")
         exploration = c_puct * np.sqrt(np.log(self.parent.visits) / self.visits)
         return self.value() + exploration
+    

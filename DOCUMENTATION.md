@@ -393,29 +393,83 @@ architecture:
 
 The `observation` keyword is expanded at init time via the environment manifesto's `observation_shapes` keys. This is the single source of truth for available modalities.
 
+#### Architecture declaration order (convention)
+
+Components in an architecture entry must be declared root-first: strategies
+before their children (e.g., `action` before `q_net`, `dynamic`, `value`).
+Activation is pull-based and order-independent, but the update loop iterates
+in declaration order and relies on strategies running before their children
+so loss closures are written before children read them.
+
+Architectures violating this convention will produce incorrect learning with
+no error. A topology verifier is tracked in the TODO section.
+
 #### Activation (pull-based, top-down)
 
-`Model.get_action(obs)` seeds the shared `activations` dict with observation data, then calls `components["action"].activate(activations)`. The action component pulls from its declared inputs: if an input is another component, it calls that component's `activate` first. This recurses to leaf components, which read observation fields from activations. Each component writes its output to `activations[self.component_id]`.
+`Model.get_action(obs)` seeds the shared `activations` dict with observation
+data, then calls `components["action"].activate(activations)`. The action
+component pulls from its declared inputs: if an input is another component,
+it calls that component's `activate` first. This recurses to leaf components,
+which read observation fields from activations. Each component writes its
+output to `activations[self.component_id]`.
 
-There is no iteration over components in Model during activation. The DAG traversal is implicit in the recursive pull. Components that are never reached from the action root are never activated during `get_action`.
+There is no iteration over components in Model during activation. The DAG
+traversal is implicit in the recursive pull. Components that are never
+reached from the action root are never activated during `get_action`.
 
-Strategy components like DQN or MCTS may call their input components multiple times with hypothetical states. These calls use temporary dicts to avoid polluting the shared activations namespace.
+Strategy components like DQN or MCTS may call their input components multiple
+times with hypothetical states. These calls use temporary dicts to avoid
+polluting the shared activations namespace.
+
+#### Post-activation (config-driven, during update)
+
+Components whose library card declares `post_activate: True` in their
+metadata are activated during `Model.update`, after the `next_*` fields have
+been injected and before the memory push. This is the generic hook for
+components that must produce fields entering memory — chiefly
+`RewardInference`, which infers the reward signal from the post-transition
+state.
+
+Post-activation iterates in architecture declaration order. Activation
+itself remains pull-based, so dependencies are resolved recursively by each
+component as in normal activation.
 
 #### Reward and `done`
 
-`Model.update(next_obs, done)` adds the next observation to activations (prefixed with `next_`), injects `done` as a plain float, then calls `components["reward"].activate(activations)`. The reward component computes an internal reward signal from observation state. `done` is passed through the `**kwargs` chain from `experiment.py` → `MainAgent.update()` → `Model.update()` — the same pattern as other step-context fields (episode, step, trial).
+`Model.update(next_obs, done)` adds the next observation to activations
+(prefixed with `next_`), injects `done` as a plain float, runs the
+post-activate pass (which activates `RewardInference` among any other
+flagged components), then pushes the full transition to memory. `done` is
+passed through the `**kwargs` chain from `experiment.py` → `MainAgent.update()`
+→ `Model.update()` — the same pattern as other step-context fields (episode,
+step, trial). The reward signal and `done` enter learning through shared
+memory. `done` is used by strategy components to correctly mask terminal
+states in the Bellman equation.
 
-The reward signal and `done` enter learning through shared memory. `done` is used by strategy components to correctly mask terminal states in the Bellman equation.
+#### Learning (flat update loop)
 
-#### Learning (push-based, top-down via signals)
+After the memory push, `Model.update` iterates every component in
+declaration order and calls `.update(signals)` on each. `signals` is a
+shared dict that strategy components write loss closures into; NN children
+read from it.
 
-After reward activation, `Model` pushes the full transition to shared memory, then calls `components["action"].update(signals)` where `signals` is an initially empty dict. The learning DAG mirrors the activation DAG exactly: strategy components propagate training signals down to their subnetworks through `signals`.
+- **Strategy components** (DQN, ModelBased) write a loss closure into
+  `signals[child_id]` describing what to optimize. They do not call child
+  update themselves — the flat loop reaches the child next.
+- **NeuralNet components** read `signals[self.component_id]`. If a closure
+  is present, they execute it against a memory batch. If not, they fall
+  back to self-supervised training against their declared `target` field(s).
+- **Non-learning components** (RewardInference, ROI, ModelBased, MCTS) return
+  `{}` via the `Component` ABC default.
 
-**Strategy components** (e.g., `DQN`) own the training logic for their subnetworks. `DQN.update(signals)` computes a Bellman loss closure and writes it into `signals[q_net_id]`, then calls `q_net.update(signals)`. The closure captures the RL algorithm's logic — action indexing, discount factor, target network bootstrap — but is agnostic to the network's shape and device.
+Reports from each component are merged into a single dict (last-write-wins
+in declaration order). Key collisions between components are not expected
+in current architectures — tracked in TODO if per-component report tracking
+becomes necessary.
 
-**NeuralNet components** own their own training mechanics: batch sampling from shared memory, tensor conversion, forward passes, optimizer step. When a custom loss closure is present in `signals`, `NeuralNet` executes it against its own batch. When no closure is present, `NeuralNet` falls back to self-supervised training using the targets declared in its library card.
-
-This design keeps responsibilities cleanly separated: strategy components define *what* to optimize, NeuralNet defines *how* to optimize. A strategy component can be swapped for a different RL algorithm without touching the NeuralNet implementation, and vice versa.
+This design keeps responsibilities cleanly separated: strategy components
+define *what* to optimize (via closures), NeuralNet defines *how* to optimize
+(via its own batch sampling and optimizer step).
 
 #### Shared state
 
@@ -516,6 +570,26 @@ Trials run through a single `ProcessPoolExecutor` path. The worker count is cont
 Auto-detection (`find_workers`) picks the minimum of available CPUs (or GPU count if CUDA is present) and memory headroom. GPU selection rotates across available devices via a shared SQLite counter so that concurrent launches balance naturally, including across separate processes.
 
 The intent is that a basic user never has to think about hardware utilization. If edge cases arise (e.g., mixed CPU/GPU workloads, cloud-specific constraints), the system can be extended: but the single-variable, single-path design stays.
+
+### MCTS planning (ModelBased)
+
+`ModelBased` runs MCTS over three subcomponents from the architecture:
+
+- `dynamics`: NextState-NN predicting next observation given state and action.
+- `value`: StateValue-NN predicting immediate reward from a state (the tree
+  does the temporal credit assignment, not the NN).
+- `reward`: reuses the architecture's `RewardInference` component — the same
+  instance used for real transitions. Planning presents simulated next-states
+  with `next_*` prefix to mirror real-update key semantics, so one reward
+  code path covers both.
+
+**Backup:** leaf-to-root accumulation `G = r + γ·G`, where the leaf
+contributes `V(leaf)` and each non-leaf node contributes the reward received
+upon entering it. γ is read from `cfg.agent_params.gamma` (SSOT with DQN).
+
+**Why V(s) estimates immediate reward:** the tree rollout handles discounting;
+forcing the NN to learn a discounted return would duplicate the tree's job and
+require deeper targets. This matches the FSSS-style factoring.
 
 ### Sequential and simultaneous environment modes
 
@@ -786,6 +860,66 @@ Relock procedure: when a tier fails with an upward delta, review the change,
 run the smoke test once more in isolation, and paste the observed value into
 the corresponding `_TIER{N}_*` constant at the top of the file.
 
+
+---
+
+## TODO
+
+Design choices deferred pending future passes. Each entry describes what
+needs addressing and why it was deferred.
+
+### DQN under the flat update loop
+
+With the flat update loop, strategy components write closures and NN children
+are reached by the loop directly. `DQN.update` still calls `q_net.update(signals)`
+itself, which double-triggers `q_net.optimize` once the flat loop reaches
+`q_net`. Fix: remove the `q_net.update(signals)` line from `DQN.update`;
+it still writes the bellman closure and manages target-net sync.
+
+Additionally, DQN architectures in `model_library.yaml` are declared
+child-first (`q_net` before `action`). Under the root-first convention, these
+must be reordered so the strategy writes its closure before the NN runs.
+
+### Component uncertainty/confidence signal
+
+Components currently return `{loss, epsilon, ...}` reports. Originally there
+was a `confidence` field defaulting to 1.0. For `ModelBased` in particular,
+the noisiness of the dynamics NN's prediction and the variance of the value
+estimate are natural uncertainty signals, and are needed downstream for
+analysis and adaptive planning. Revive `confidence` on component reports and
+wire sensible estimates in the MCTS-related NNs.
+
+### Noise handling in RewardInference
+
+Once dynamics predictions feed RewardInference during planning, the inferred
+rewards inherit the NN's prediction noise. Add rounding or thresholding logic
+in the reward schemes that consume continuous predictions (e.g.,
+FoodInteroception reading a soft interoception signal), coupled with the
+confidence/uncertainty signal above.
+
+### Topology verifier
+
+Architectures must be declared root-first; violations produce silent incorrect
+learning. For complex connectomes, a verifier that performs a topological
+sort on the inputs graph and warns on out-of-order declarations would be
+useful. Out of scope until architectures become harder to eyeball.
+
+### MCTS dynamics output mapping
+
+`dynamics_fn` in `ModelBased.activate` maps the dynamics NN's output dict
+(`vision_denet`, `interoception_denet`) to the target dict
+(`next_vision`, `next_interoception`) via insertion-order zip. This relies on
+the YAML author declaring output plans and metadata.target in the same order.
+Fragile but functional; worth a more principled naming contract eventually.
+
+### Per-component report tracking
+
+The flat update loop merges reports last-write-wins. No collisions exist in
+current architectures (strategies write scalars, NNs write `loss`). If
+multiple NNs become active per step (ModelBased already has two — dynamic
+and value — but only the last `loss` currently surfaces), per-component
+namespacing will be needed. Requires a coordinated edit to
+`LearningMonitor.sample` in `diagnostics.py`.
 
 ---
 

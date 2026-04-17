@@ -13,7 +13,12 @@ class Component(ABC):
     - activate() writes to the shared activations dict.
     - update() performs learning and returns a report (dict or None).
     - reset() is called at episode boundaries. Default is no-op.
+    - metadata is a class default so components without a library card
+      (self-parameterised from the architecture entry) still expose an
+      empty dict for framework-level introspection (e.g. post_activate).
     """
+
+    metadata: Dict[str, Any] = {}
 
     @abstractmethod
     def activate(self, activations: Dict[str, Any]) -> None:

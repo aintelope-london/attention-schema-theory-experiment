@@ -13,9 +13,6 @@ models:
       update_frequency: 1
   ModelBased:
     metadata:
-      input:
-        dynamic: sae
-        value: state_value
       num_simulations: 5
       max_depth: 2
       c_puct: 1.0
@@ -85,7 +82,6 @@ models:
       loss_function: MSELoss
       target: [next_observation]
       use_target_net: False
-      post_activate: True
     architecture:
       vision_net:
         - {type: input, source: vision}

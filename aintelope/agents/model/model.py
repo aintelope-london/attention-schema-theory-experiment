@@ -145,12 +145,30 @@ class Model:
         for field, value in next_observation.items():
             self.activations[f"next_{field}"] = value
         self.activations["done"] = float(done)
-        self.components["reward"].activate(self.activations)
+
+        # Post-activate pass: components flagged `post_activate: True` in their
+        # library card metadata activate after next_* arrives, in declaration
+        # order. This lets components like RewardInference produce fields that
+        # enter memory on this step's push.
+        for component in self.components.values():
+            if component.metadata.get("post_activate", False):
+                component.activate(self.activations)
+
         self.memory.push(**self.activations)
+
+        # Update pass: every component's update() is called in architecture
+        # declaration order (root-first convention). Strategy components write
+        # loss closures into `signals`; NN children read closures and train,
+        # or fall back to self-supervised on their declared target. Components
+        # with no learning no-op via the Component ABC default.
         signals = {}
-        report = self.components["action"].update(signals)
+        report = {}
+        for component in self.components.values():
+            report.update(component.update(signals) or {})
+
         # Partial clear: remove transient fields only. Action outputs (e.g.
-        # "internal_action") persist so stateful components can read them next step.
+        # "internal_action") persist so stateful components can read them
+        # next step.
         for key in [
             k for k in self.activations if k.startswith("next_") or k == "done"
         ]:
