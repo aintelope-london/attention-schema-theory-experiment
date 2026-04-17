@@ -4,14 +4,22 @@
 
 
 def set_global_seeds(seed: int) -> None:
-    """Set all random seeds for reproducibility.
+    """Set random seeds and enable deterministic ops for reproducibility.
 
-    Args:
-        seed: Base seed value
+    Seeds random/numpy/torch and enables every torch determinism flag. Flags
+    are safe no-ops on CPU. On GPU, CUBLAS_WORKSPACE_CONFIG is effective only
+    if set before CUDA initialises — export it from the invoking shell for
+    full GPU reproducibility.
     """
+    import os
     import random
     import numpy as np
     import torch
+
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.use_deterministic_algorithms(True)
 
     random.seed(seed)
     np.random.seed(seed)
