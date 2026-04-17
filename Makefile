@@ -4,6 +4,8 @@ TESTS = tests
 CODEBASE = ${PROJECT} ${TESTS}
 VENV = venv_$(PROJECT)
 
+export PYTHONHASHSEED := 0
+
 # ---------- installation and environment ----------
 .PHONY: venv clean-venv install install-dev install-all build-local
 

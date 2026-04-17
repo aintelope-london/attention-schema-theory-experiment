@@ -164,7 +164,8 @@ def set_memory_limits():
     import resource
     import psutil
 
-    limit = psutil.virtual_memory().available
+    _, current_hard = resource.getrlimit(resource.RLIMIT_AS)
+    limit = min(psutil.virtual_memory().available, current_hard)
     resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
 
 
