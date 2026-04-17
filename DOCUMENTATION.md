@@ -35,7 +35,7 @@ All execution flows through a single function: `aintelope.__main__.run()`.
 | `make install-dev` | Install development tooling (pytest, black, mypy, etc.) |
 | `make install-all` | Run both `install` and `install-dev` |
 | `make tests-local` | Run fast unit tests — no learning tests, no file output |
-| `make tests-learning` | Run learning diagnostics — slow, writes outputs/ |
+| `make tests-validation` | Run validation diagnostics — slow, writes outputs/ |
 | `make typecheck-local` | Run mypy type checking |
 | `make format` | Apply black code formatter |
 | `make format-check` | Check formatting without changing files |
@@ -156,6 +156,8 @@ Agents carry their models forward between blocks: enabling curriculum learning w
 
 Configs are saved per-block in a diff-style fashion: only the overrides are stored, not the full resolved config. This keeps the config architecture lean and composable, and lays the groundwork for future automated config generation (grid search, hyperparameter sweeps) where programmatic block construction needs to be straightforward.
 
+Block overrides additionally cascade: each block's merged config becomes the base for the next block, not just the defaults. A value set in the first block propagates through subsequent blocks unless explicitly overridden. This is why search configs only need to inject tuned values into the first block to affect the whole run.
+
 ### Models library
 
 `models_library.yaml` is a protected config file (never overwritten by the GUI or experiment saves) that contains two top-level sections:
@@ -264,6 +266,102 @@ Environments conform to `AbstractEnv`: `reset(**kwargs)`, `step_parallel(actions
 ### Component connectome
 
 The agent's `Model` class manages a **connectome**: a dict of named components that form a directed acyclic graph (DAG) for both activation and learning.
+
+
+## Parameter Search
+
+Optuna-driven hyperparameter search. One search run = N Optuna trials; each trial is one full `run()` call with Optuna-suggested overrides merged into an existing experiment config. TPE (Tree-structured Parzen Estimator) proposes new param sets from the history of `(params, score)` pairs, with pure random warmup for the first `n_startup_trials` trials.
+
+### Entry point
+
+```
+python -m aintelope --search my_search.yaml
+```
+
+Flags through to `aintelope.utils.param_search.run_search(filename)`. `param_search.py` is the only file in the repo that imports optuna — remove that import and the `--search` elif in `__main__.py` to drop the feature entirely.
+
+### Search config structure
+
+A search config references an existing experiment config as its `base:`. The search declares which fields in that config are free, their bounds, and the objective. The base config's values at each declared path are read as the initial trial.
+
+```yaml
+base: my_experiment_config.yaml
+
+run:
+  search:
+    n_trials: 30              # total Optuna trials
+    inner_trials: 5           # run.trials used per Optuna trial
+    n_startup_trials: 5       # random warmup before TPE engages
+    objective:
+      analytic: optimal_efficiency   # key from cfg.run.analytics
+      block: test                    # which block's result to score
+      field: efficiency_pct          # scalar field to extract
+      direction: maximize
+    params:
+      - path: agent_params.agents.agent_0.architecture.action.learning_rate
+        type: loguniform
+        low: 1.0e-5
+        high: 1.0e-2
+      - path: agent_params.agents.agent_0.architecture.action.gamma
+        type: float
+        low: 0.9
+        high: 0.999
+      - path: agent_params.agents.agent_0.architecture.action.batch_size
+        type: int
+        low: 16
+        high: 256
+```
+
+Any top-level key other than `base` and `run` is merged as an override onto the base config for every trial — use this to pin run-wide settings (e.g. `run.write_outputs: true`) without editing the base.
+
+### Supported param types
+
+| Type | Optuna call | Extra fields |
+|------|-------------|--------------|
+| `float` | `suggest_float(low, high)` | — |
+| `loguniform` | `suggest_float(low, high, log=True)` | — |
+| `int` | `suggest_int(low, high)` | — |
+| `categorical` | `suggest_categorical(choices)` | `choices: [...]` instead of low/high |
+
+Adding a new type is a single entry in `_SUGGEST` in `param_search.py`.
+
+### Initial values
+
+The base config is the single source of initial values. For each declared param path, the value at that path in the base config's first block becomes the initial. These are enqueued as Optuna's first trial, so it runs the baseline configuration unchanged before any exploration. If a declared path does not exist in the base config, `run_search` raises `KeyError` immediately.
+
+### Objective
+
+`result["analytics"][objective.analytic][objective.block][objective.field]` must resolve to a scalar. The responsibility for exposing a clean scalar lies with the analytic function — if a useful score is not yet scalarized, the analytic should be extended rather than adding reduction logic to the search.
+
+### Output layout
+
+Everything the search produces lives directly under `outputs/`:
+
+| File | Contents |
+|------|----------|
+| `outputs/search.db` | SQLite study, resumable via `load_if_exists` |
+| `outputs/search.log` | One line per completed trial with score and params |
+| `outputs/trials.csv` | Flat index: `trial_id, score, outputs_dir, <param values...>` |
+| `outputs/<timestamp>/` | One standard run directory per trial, fully navigable in the results viewer |
+
+The search adds no new directory structure — each trial is a normal run with a normal output directory. `search.db`, `search.log`, and `trials.csv` sit alongside. The results viewer ignores non-directory entries in `outputs/`, so no change is needed there.
+
+### Resuming
+
+Rerunning `python -m aintelope --search my_search.yaml` against an existing `outputs/search.db` resumes the study in place. `study.enqueue_trial(..., skip_if_exists=True)` ensures the baseline initial is not re-run after a restart. Trials completed before the interruption are preserved in the study's history and continue to inform TPE's proposals.
+
+### How TPE proposes params
+
+First `n_startup_trials` trials: random sampling across declared bounds. After that, each trial fits two kernel density estimators over the history — `p(params | good_trials)` and `p(params | bad_trials)` — and proposes params that maximize the ratio. All declared params vary on every trial; TPE handles interactions between them natively. No derivatives, no coordinate descent, no param-by-param prioritization.
+
+For noisy RL objectives, 3–5 inner trials per configuration is the practical floor for usable signal; 20–50 Optuna trials is the practical range for TPE to produce meaningfully better-than-random suggestions. Tune both via the search config as experience accumulates.
+
+### Not supported
+
+- **Per-block param differences.** The same suggested value is written to every block of the base config. If a future need arises for distinct train/test values, the param path would need a block prefix.
+- **Conditional params** (params that only apply when another param has a specific value). Optuna supports this natively; not wired up to the search config yet.
+- **Multi-objective / composite scoring.** Current objective is one scalar from one block. Curriculum cases that care about the transfer target can point `block:` at the test block directly.
+- **Pruning** (early termination of bad configurations mid-training). Optuna supports this; not integrated.
 
 #### Design choices
 
@@ -546,10 +644,10 @@ Two separate test suites with different purposes:
 - Runs in seconds per test
 - Entry point: `make tests-local`
 
-**`tests/learning/`** — learning diagnostics, excluded from default sweep and CI:
+**`tests/validation/`** — validation diagnostics, excluded from default sweep and CI:
 - `write_outputs: True` — writes `outputs/` for post-run inspection
 - Runs in minutes per test
-- Entry point: `make tests-learning`
+- Entry point: `make tests-validation`
 
 ### `base_test_config` / `base_learning_config`
 
@@ -610,27 +708,6 @@ Results (5 trials, `test_mode=True`, 500 test episodes):
 | `test_foraging_5x5` | 83.0% | 81.5% |
 | `test_generalizes_5x5_to_13x13` | 4.1% | 5.8% |
 
-#### Optimized parameters (current)
-
-Sourced from `test_lab.py` (`test_foraging_dqn_fc_5x5`). The same parameter set was applied to both model variants and all scopes, and yielded substantial gains across the board — including the generalization test which was not the target of the search.
-
-| param | dqn_fc | dqn_cnn |
-|---|---|---|
-| `episodes` | 7 500 | 7 500 |
-| `batch_size` | 350 | 350 |
-| `replay_buffer_size` | 30 000 | 30 000 |
-| `gamma` | 0.99 | 0.99 |
-| `greedy_until` (train) | 0.3 | 0.3 |
-
-Results:
-
-| test | dqn_fc | dqn_cnn |
-|---|---|---|
-| `test_foraging_2x2` | 92.9% | — |
-| `test_foraging_5x5` | 92.9% | 95.2% |
-| `test_generalizes_5x5_to_13x13` | 94.2% | 93.7% |
-
-**Note:** `test_foraging_2x2[dqn_fc]` regressed from 97.4% to 92.9% under the new params. The 2x2 scenario is the system correctness gate (`min_efficiency_pct: 1.0`) and is not yet passing. Active investigation ongoing — primary hypothesis is that the `wait` action has been added to the default action space since the original 100% run, inflating the random exploration budget needed for this trivially small map.
 
 ---
 

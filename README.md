@@ -62,7 +62,7 @@ Available make commands (Linux/Mac):
 
 ```bash
 make tests-local    # Run tests
-make tests-learning # Run learning validation
+make tests-validation # Run learning validation
 make format         # Apply black formatter
 make isort          # Sort imports
 make flake8         # Lint
@@ -121,7 +121,14 @@ tmux new -s main
 Activate the environment and run experiments:
 ```bash
 source repo/venv_aintelope/bin/activate
+```
+Then either this for validation tests:
+```bash
 make tests-validation 2>&1 | tee ~/repo/outputs/test_run.log
+```
+or this for parameter search:
+```bash
+python -m aintelope --search my_search.yaml
 ```
 
 To detach from the session (leaves it running): `Ctrl+B, D`  
