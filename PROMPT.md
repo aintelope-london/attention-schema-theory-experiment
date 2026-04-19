@@ -42,6 +42,10 @@ FIRST AND FOREMOST PRINCIPLE: MINIMIZE AMOUNT OF CODE
 SECOND PRINCIPLE: PLAN FOR REMOVAL/REUSE/REPLACEMENT
 - This means replacing a feature is often removing one import, and one call-line
 - Modularity, mediator pattern
+- Avoid needing to synchronize variables in two places
+THIRD PRINCIPLE: CORRECT RESPONSIBILITY
+- Config-driven
+- The user is responsible for designing a coherent experiment
 
 ## DESIGN PATTERNS
 - MEDIATOR PATTERN: We have control files, and we have logic modules, and their roles are strict. The control files include orchestrator.py and experiments.py.
@@ -57,11 +61,13 @@ SECOND PRINCIPLE: PLAN FOR REMOVAL/REUSE/REPLACEMENT
    - We have only one canonical set of entry-points, each preferrably utilizing the same pathways to the extent they can.
    - No format-juggling! Everything should be in the same format, and we shouldn't change say a pandas df into a dictionary midway without a really good reason. Probably we'll end up refactoring that reason away anyway.
    - Also means there should be no if-else statements for isinstances or similar branching patterns. We use factory patterns or otherwise the data format should be always singular. An if isinstance hides a bug if we've f-ed up somewhere!
+   - Keep information in one authoritative place: avoid having to synchronize information across multiple places if a change needs to be made!
    - No parallel execution paths, unless they have a special permission.
    - Correct responsibility: each feature belongs under the responsibility of a certain class/function. Logic is leaking if even a data-formatting happens somewhere else than the function itself: it is the responsibility of the feature to handle the dataflow into a common format that is understood by all recipients of that information, not a middle-class, not the end-class.
 - CONFIG-DRIVEN: 
    - Variables related to the experiments reside in the configs. They are available to the end-user via the GUI. If we end up creating a variable inside the code, it needs special permission to be there.
    - Result reviewer is one of these special permissions: variables related to creating analytical media is left for the end-user, and they can modify these variables via the results-viewer GUI element.
+   - Config declares what exists; nothing is filtered after generation.
 - Null object / identity element -pattern: no ifs to check if content is present, an empty case is a valid input that flows through the same code path and produces a no-op result. You never ask "is there something?", you just do it.
 - DOCUMENTATION.md:
    - Special permissions to break these patterns can be given if they serve a particular design CHOICE we have made. And those choices should reside in the DOCUMENTATION. If it is not there, it does NOT have the special permission, and is thus something we need to discuss.
@@ -97,3 +103,6 @@ SECOND PRINCIPLE: PLAN FOR REMOVAL/REUSE/REPLACEMENT
 - Exposing new variables should always ring alarm bells: the information might already be present, and there's a canonical/design principled place where the info should be read. Examples: creating new parameters like "n-actions" in the config, when we already can calculate the number of actions dynamically from the context of the component recipes. ALWAYS ASK FIRST BEFORE INTRODUCING NEW LOGIC, if you can't find the canonical location for the information, ask, I can find the right place to expose the data from.
 - REUSE REUSE REUSE. Always see if we have anything even remotely similar existing, and then suggest to me if we could somehow utilize that logic instead. 
 - Using variable -keywords in code has to be done carefully: using strings like "train" and "test" might make assumptions about the format of more general-purpose variables, and this will fail. There might've been variables like "eval" or "leisure-learning", and locking this to work only with "train"/"test" is a folly. Instead, take the variable keyword as a parameter.
+Here are two short additions for PROMPT.md, in its voice:
+- The decision about what data flows through the system lives in the declaration of the generating components, not in a consumer's extraction logic. If a probe component is in the architecture, its outputs appear in the activations and downstream analytics can read them; if it isn't, nothing is generated and nothing is read. There is no separate "probe mode" flag, no reserved-keyword list, no post-hoc filtering of outputs. When you find yourself writing a filter to exclude part of a generated value, the decision boundary is in the wrong place — push it up until the choice is expressed by something being declared or absent in config. Storage is allowed to be pessimistic (a column may hold data no configured analytic reads), but generation is always declarative.
+- Because the config is the single declarative surface that determines what runs, what is generated, and what is analyzed, the end-user carries the responsibility for internal consistency: declared analytics must have architecturally-satisfiable inputs, probe tests must include the components they intend to probe, checkpoint-loading blocks must have matching observation shapes, and so on. The system does not second-guess the config or supply missing pieces. This is acceptable because config validation is a separable, future layer: verifier logic will check these constraints at load time, surfacing inconsistencies as clear errors before a run starts rather than as silent misbehavior during one. Until then, this responsibility sits with the human writing the config — which is the correct location for it regardless of whether automated verification exists yet.

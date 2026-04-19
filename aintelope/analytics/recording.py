@@ -16,7 +16,7 @@ import pandas as pd
 import pickle
 
 # Columns stored as compressed+base64 blobs — require deserialize_state on read.
-SERIALIZABLE_COLUMNS = ("Observation", "Board")
+SERIALIZABLE_COLUMNS = ("Observation", "Board", "Agent_outputs")
 
 # Columns stored as Python repr strings (e.g. "(1, 2)") — require ast.literal_eval on read.
 TUPLE_COLUMNS = ("Position", "Food_position")

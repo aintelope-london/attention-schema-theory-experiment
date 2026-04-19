@@ -648,6 +648,8 @@ No other file needs to know about test mode gating. `Model.update()`, `DQN.updat
 
 Each block merges onto the previous block's resolved config: `defaults + block_1 → block_2 → block_3`, not `defaults + block_N`. This enables curriculum learning where early-block parameters carry forward unless explicitly overridden. The cascade is implemented by reassigning `cfg` in the block loop inside `run_trial`.
 
+**Implications for probe blocks.** A probe block (`agent_class: dummy_agent` with an architecture referencing the train block's checkpointed components) inherits the preceding train block's `model:`, `architecture:`, and `reward:` settings through the cascade. This is desirable for the current use case — the same connectome naturally applies, ensuring checkpoint-weight compatibility. If per-agent-type divergence becomes necessary (e.g. `DummyAgent` using a different reward schema than the trained `MainAgent`), the probe block must override those sections explicitly. Accepted cost until the need concretely arises.
+
 ### `wait` action excluded from canonical validation
 
 The `wait` action is configurable but deliberately excluded from foraging validation scenarios. In a foraging task `wait` is never optimal and only widens the random exploration space, inflating the sample budget required to converge. The default action list in `default_config.yaml` does not include `wait`; validation scenarios inherit this.
@@ -695,13 +697,19 @@ Minimal randomised MOMA gridworld.
 
 Tiles are loaded from individual PNG files in `gui/tiles/`. The keyword for each tile is its filename stem (e.g. `food.png` → keyword `"food"`). Adding a new tile requires only dropping a PNG into the directory — no code changes. Draw order is declared in `_DRAW_ORDER` in `renderer.py` and must be updated when new tile types are added. All tiles in the directory must be the same pixel dimensions.
 
-### DummyAgent and animation scripts
+### DummyAgent and probe/animation scripts
 
-`DummyAgent` is a scripted agent that replays a named action sequence from `agents/scripts.py`. It conforms fully to `AbstractAgent` and is registered as `"dummy_agent"` in the agent registry. No model, no learning — `update` and `save_model` are no-ops.
+`DummyAgent` is a `MainAgent` variant with its action-selection hijacked by an external script. Conceptually, the script IS the agent's internal decision-making — it plays the role MainAgent delegates to its Model's `action` component. The rest of the Model still runs normally: the real observation flows through the declared components each step, and each non-action component's output is surfaced in the returned action dict under its `component_id`.
 
-The script name is declared in config under `agent_params.agents.[id].script` and resolves to a list of `{"action": int, ...}` dicts in `scripts.py`. When the sequence is exhausted the agent emits `wait` indefinitely.
+The script name is declared in config under `agent_params.agents.[id].script` and resolves to a list of `{"action": int, ...}` dicts in `scripts.py`. Each entry may include `internal_action` for components that read it. When the sequence is exhausted the agent emits `wait` indefinitely.
 
-If the agent's architecture entry contains an ROI component, `DummyAgent` instantiates it directly (without a full Model) and drives it with `internal_action` from the script each step, returning the resulting mask as `"roi"` in the action dict. This allows ROI animations to be authored as plain integer sequences in `scripts.py` while reusing the ROI component code exactly.
+**Always-a-Model (null-object default).** `DummyAgent` always instantiates a `Model`. When no `architecture` is declared in config, `Model`'s null-object pattern produces an empty connectome: reset/activate/update all no-op through zero components. No None-checks anywhere in the agent. Declaring an architecture progressively adds behavior via the standard connectome factory — same code path as `MainAgent`, same library cards, same checkpoint resolution.
+
+**Use cases:**
+- **Animations** (`animation_config.yaml`): architecture declares `{roi: ...}`. The script shapes the action sequence; the ROI mask flows to the env via `actions[aid]["roi"]` for `_blit_roi`.
+- **Probes**: architecture declares pre-trained predictors (`value`, `dynamic`, `q_net`, future diagnostics). Each script step produces one data point — the component's output over a controlled observation, with the next observation as paired ground truth for next-state predictors. `checkpoint=` loads frozen weights from a prior training block.
+
+**Learning is disabled.** `update()` returns `{}` — no memory push, no post-activation pass, no backpropagation. Probe blocks run in test mode; Model components' weights are frozen at load time.
 
 Animation configs live in `animation_config.yaml` as named blocks, following the same block structure as experiment configs. Each block sets `env`, `map_layout` (or `objects`), agent script, and episode/step counts. Animations are run and exported through the standard results viewer export path.
 
@@ -920,6 +928,158 @@ multiple NNs become active per step (ModelBased already has two — dynamic
 and value — but only the last `loss` currently surfaces), per-component
 namespacing will be needed. Requires a coordinated edit to
 `LearningMonitor.sample` in `diagnostics.py`.
+
+### Collapse DummyAgent into MainAgent
+
+The current split between `MainAgent` and `DummyAgent` exists only because
+the script is an external orchestrator, not a component. A `Script` component
+would close the gap and let `MainAgent` handle scripted agents natively.
+
+Requirements:
+
+1. **New `Script` component type.** Reads its sequence name from the library
+   card. `activate()` looks up the entry by the current step index (from
+   `activations["step"]`) and writes `action` (and optional `internal_action`)
+   to activations. Stateless within a step — re-entrant safe.
+2. **`Model.get_action` activates all roots.** Currently only `"action"`
+   activates; under the new pattern, any component not consumed as input to
+   a sibling is a root and is activated each step. Probe components
+   (`value`, `dynamic`) become natural roots and run automatically. No
+   `"action"` hard-coding in the iteration.
+3. **`step` counter in activations.** Added by `Model.get_action` and reset
+   by `Model.reset`. Required so `Script.activate` is idempotent when
+   multiple roots pull it (e.g. `dynamic` declaring `action` as input) —
+   without this, the script's pointer advances multiple times per step.
+
+Result: `DummyAgent` class disappears; the agent registry maps
+`"dummy_agent"` → `MainAgent`, and the architecture's
+`action: {type: Script, name: ...}` is what distinguishes a scripted run
+from an RL run. One agent class, one code path, one activation model, no
+reserved-key skips.
+
+Note: the "orphan root = natural no-op" observation makes this especially
+clean. Any component not in the root's reachable set is instantiated but
+never activated — no branches, no special cases. Probe components opt in
+to activation by being roots; stale components left over from a cascaded
+config are harmless. The cost paid is iteration over all roots during
+activation, mirroring what the flat update loop already does.
+
+Deferred because: couples to the architecture-declaration-order convention
+and topology verifier TODOs — worth revisiting after the activation-side
+iteration question has been properly thought through rather than bolted on.
+
+### Relative-orientation probe scenario
+
+A canonical scripted traversal that sweeps the agent's facing vs. food
+direction, for benchmarking the NextState-NN's learning difficulty on
+rotating-camera dynamics against a stationary-camera baseline. Target
+deliverable: two learning curves with a headline ratio ("X× more steps to
+reach matching accuracy"). Authored as a named script in `scripts.py` and a
+probe block in the default experiment config.
+
+Deferred because: depends on the probe infrastructure (DummyAgent-with-NN-
+components, `component_probe` analytic) being proven end-to-end first.
+
+### GUI analytics replay
+
+The results-viewer currently exposes live events-plot generation (via the
+`PLOT_TYPES` registry) but not the post-experiment analytics suite (via the
+`analyze()` getattr lookup). A future pass should factor analytics
+registration so a dropdown in the Results tab can re-run any registered
+analytic on any timestamped run. Would unify the two registries under a
+single factory.
+
+Deferred because: touches GUI wiring and analytics signature contracts.
+Non-urgent — the current analytics write their outputs to disk as figures
+and CSVs automatically at run time.
+
+### Config-key verification test
+Unit test that walks `default_config.yaml` to produce the set of all leaf
+key-paths, then verifies each against the codebase: every key in yaml must be
+read somewhere, and every `cfg.<path>` access in code must resolve to a key
+that exists in yaml. Fails CI on dead config (yaml key with no consumer) and
+on silent typos (code reads nonexistent path, gets None via OmegaConf access).
+
+Deferred because: the check is highest-value once the config surface
+stabilises. Implementing it now would mean chasing yaml/code drift during
+active refactoring. The implementation itself is ~a day: greppable dotted
+access plus suffix-matching for paths that resolve per-agent or per-block.
+
+### Architecture DAG verifier
+Unit test that validates every named architecture in `models_library.yaml`
+resolves cleanly before any experiment runs it. For each architecture entry:
+walk components, verify every string in `inputs` resolves to either another
+component_id, an observation keyword (`observation`/`next_observation`/a
+modality name from a representative manifesto), or a known internal
+activation key (`internal_action`, `reward`, etc.). Check for cycles. Verify
+declared roots match unreferenced entries.
+
+The resolution logic already exists in `Model.__init__`; this test extracts
+and runs it standalone against the full library. A new architecture entry
+that references a nonexistent input fails CI instead of failing at first run.
+
+Deferred because: the connectome framework is still gaining component types.
+Adding the verifier after the component set stabilises means the test
+doesn't need updating every time a new valid input keyword is introduced.
+
+### Registry contract tests
+Parameterised tests across every key in the agent and environment registries.
+For each registered env: run `reset()` and `step_parallel(random_action)`,
+assert the canonical state schema from `abstract_env.py` is satisfied
+(required keys present, shapes and types correct, manifesto has the minimum
+fields). For each registered agent: run one `reset`/`get_action`/`update`
+cycle against a minimal env, assert return shapes match the contract.
+
+Makes the registry pattern's promise ("add one line, it works") a CI-enforced
+guarantee rather than an aspiration. Catches contract violations at
+registration time instead of mid-experiment.
+
+Deferred because: the ABCs and canonical schemas are still evolving as new
+agent and component types surface requirements. Writing contract tests
+against a moving target wastes test-maintenance effort. Revisit once
+`AbstractAgent` and `AbstractEnv` have been stable for a few feature cycles.
+
+### Minimal extension examples
+Add `MinimalEnv`, `MinimalAgent`, and `MinimalComponent` as intentionally
+smallest-possible implementations of their respective interfaces. Register
+them in their registries. These serve as copy-paste templates for toolkit
+users adding their own implementations, and double as the fixtures for the
+registry contract tests above — if the minimal example stops satisfying its
+contract, something changed about the extension interface and that is
+information worth surfacing.
+
+`RandomAgent` is already close to minimal-by-accident; the work is to make
+minimality intentional and to add the matching env and component.
+
+Deferred because: coupled to the registry contract tests — the examples are
+most useful as test fixtures, and the test infrastructure comes first.
+
+### DECISIONS.md
+Separate file at repo root containing architecture decision records. Each
+entry: date, title, context, decision, alternatives rejected and why, and
+(where applicable) a "triggers for reconsideration" line naming the future
+condition under which the decision should be reopened (e.g. "reconsider if
+we start running multi-node").
+
+DOCUMENTATION.md describes the current state of the architecture; DECISIONS.md
+describes the history of how it got there. Keeping them separate prevents
+DOCUMENTATION.md from drifting into a mixed reference/archaeology document
+and makes decision history directly loadable as LLM context during future
+architectural work.
+
+Deferred because: writing ADRs retroactively for decisions already made is a
+distinct exercise from capturing them as they happen. Starting the file now
+with a handful of the most load-bearing past decisions (reward inference
+inside the agent, event-based recording, single-model-per-experiment-set)
+is ~a few hours; catching up on the rest can happen incrementally as each
+decision surfaces in a conversation.
+
+### BREAKING.md
+Single markdown file logging breaking changes to config keys, registry keys,
+and public APIs. One line per change: commit hash, what changed, replacement
+path. Low priority — adopt once the toolkit has external users whose configs
+would break silently otherwise. Until then, breaking changes are absorbed
+internally and the file has no readers.
 
 ---
 

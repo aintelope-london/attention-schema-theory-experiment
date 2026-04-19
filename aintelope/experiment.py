@@ -36,11 +36,11 @@ def run_experiment(
 
     agents = []
     dones = {}
-    custom_model = cfg.agent_params.get("custom_model", "")
+    custom_checkpoint = cfg.agent_params.get("custom_checkpoint", "")
 
     for agent_id, agent_cfg in cfg.agent_params.agents.items():
         checkpoint = select_checkpoint(
-            cfg.run.outputs_dir, agent_id, i_trial, custom_model
+            cfg.run.outputs_dir, agent_id, i_trial, custom_checkpoint
         )
         agent = get_agent_class(agent_cfg.agent_class)(
             agent_id=agent_id,
@@ -141,6 +141,7 @@ def run_experiment(
                         state["agent_positions"].get(agent.id),
                         episode_food_position,
                         actions[agent.id].get("internal_action"),
+                        actions[agent.id],
                     ]
                 )
 

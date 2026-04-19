@@ -24,6 +24,109 @@ def expand_keywords(entries, obs_fields):
     return expanded
 
 
+def fill_plans(obs_shapes, action_space, plans, obs_fields, internal_actions=0):
+    """Expand string size references in architecture to actual values from dynamic fields.
+    Normalize formats before adding them into the plans.
+    """
+    lookup = dict(obs_shapes)
+    lookup.update({k: v[0] for k, v in lookup.items()})
+    lookup["observation"] = "+".join(obs_fields)
+    lookup["next_observation"] = "+".join("next_" + f for f in obs_fields)
+
+    plans["n_env_actions"] = len(action_space)
+    plans["n_actions"] = len(action_space) + internal_actions
+    lookup["action"] = plans["n_actions"]
+
+    if "vision" in obs_shapes:
+        plans["vision_size"] = obs_shapes["vision"][1:]
+
+    if "target" in plans.get("metadata", {}):
+        plans["metadata"]["target"] = expand_keywords(
+            plans["metadata"]["target"], obs_fields
+        )
+
+    if "architecture" in plans.keys():
+        if "vision_net" in plans["architecture"] and "vision" in obs_shapes:
+            channels, height, width = obs_shapes["vision"]
+            for layer in plans["architecture"]["vision_net"]:
+                if layer["type"] == "conv":
+                    kernel = layer["kernel"]
+                    height = height - kernel + 1
+                    width = width - kernel + 1
+                    channels = layer["size"]
+            plans["vision_encoded_shape"] = [height, width, channels]
+            lookup["vision_encoded"] = height * width * channels
+
+        for plan_name, plan in plans["architecture"].items():
+            for layer in plan:
+                if "source" in layer.keys():
+                    source = layer["source"]
+                    if "+" in source:
+                        layer["size"] = sum(lookup[src] for src in source.split("+"))
+                    else:
+                        layer["size"] = lookup[source]
+                if layer["type"] == "unflatten":
+                    shape = plans["vision_encoded_shape"]
+                    layer["size"] = [shape[0], shape[1], shape[2]]
+                if "size" in layer.keys():
+                    last_size = layer["size"]
+            lookup[plan_name] = last_size
+
+
+def instantiate_components(
+    architecture, cfg, env_manifesto, agent_id, activations, components, memory, device
+):
+    """Populate the `components` dict with instantiated entries from `architecture`.
+
+    Shared between Model (full training connectome) and DummyAgent (probe-driven
+    components with pre-trained weights). Factory-based: each entry's `type`
+    maps to a class via the -NN suffix or direct name lookup, and its plans
+    come from cfg.models if a library card exists, else from the entry itself.
+
+    The caller owns `activations`, `components`, and `memory`; they are shared
+    by reference with each component so siblings can reach each other.
+    """
+    obs_shapes = env_manifesto["observation_shapes"]
+    action_space = env_manifesto["action_space"]
+    obs_fields = list(obs_shapes.keys())
+
+    # internal_actions: sum of non-env action slots declared by architecture entries.
+    # Each entry may declare n_internal_actions in config (e.g. roi: n_internal_actions: 3).
+    # This is read generically here — no component names are mentioned.
+    internal_actions = sum(
+        entry.get("n_internal_actions", 0) for entry in architecture.values()
+    )
+
+    context = {
+        "cfg": cfg,
+        "device": device,
+        "components": components,
+        "memory": memory,
+        "env_manifesto": env_manifesto,
+        "agent_id": agent_id,
+        "activations": activations,
+    }
+
+    for component_id, entry in architecture.items():
+        module_type = "NeuralNet" if "-NN" in entry.type else entry.type
+        module_cls = globals()[module_type]
+
+        # Components with a library card in cfg.models get fill_plans.
+        # Components without one receive the architecture entry as plans so
+        # they can self-parameterise directly from their own config fields.
+        if entry.type in cfg.models:
+            plans = copy.deepcopy(cfg.models[entry.type])
+            fill_plans(obs_shapes, action_space, plans, obs_fields, internal_actions)
+        else:
+            plans = entry
+
+        context["plans"] = plans
+        context["component_id"] = component_id
+        context["inputs"] = expand_keywords(list(entry.inputs), obs_fields)
+
+        components[component_id] = module_cls(context)
+
+
 class Model:
     """
     Brains of a single agent. Component-based connectome.
@@ -36,20 +139,12 @@ class Model:
         self.agent_id = agent_id
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         obs_shapes = env_manifesto["observation_shapes"]
-        action_space = env_manifesto["action_space"]
         self.components = {}
         self.activations = {}
         self.resets = 0
 
-        architecture = cfg.agent_params.agents[agent_id].architecture
+        architecture = cfg.agent_params.agents[agent_id].get("architecture") or {}
         obs_fields = list(obs_shapes.keys())
-
-        # internal_actions: sum of non-env action slots declared by architecture entries.
-        # Each entry may declare n_internal_actions in config (e.g. roi: n_internal_actions: 3).
-        # This is read generically here — no component names are mentioned.
-        internal_actions = sum(
-            entry.get("n_internal_actions", 0) for entry in architecture.values()
-        )
 
         # Inputs that are not component ids and not observation keywords are
         # extra activation keys written by strategy components (e.g. "internal_action").
@@ -83,36 +178,16 @@ class Model:
             set(root_component_ids) | output_keys | set(internal_activation_keys)
         )
 
-        context = {
-            "cfg": self.cfg,
-            "device": self.device,
-            "components": self.components,
-            "memory": self.memory,
-            "env_manifesto": env_manifesto,
-            "agent_id": agent_id,
-            "activations": self.activations,
-        }
-
-        for component_id, entry in architecture.items():
-            module_type = "NeuralNet" if "-NN" in entry.type else entry.type
-            module_cls = globals()[module_type]
-
-            # Components with a library card in cfg.models get fill_plans.
-            # Components without one receive the architecture entry as plans so
-            # they can self-parameterise directly from their own config fields.
-            if entry.type in cfg.models:
-                plans = copy.deepcopy(cfg.models[entry.type])
-                self.fill_plans(
-                    obs_shapes, action_space, plans, obs_fields, internal_actions
-                )
-            else:
-                plans = entry
-
-            context["plans"] = plans
-            context["component_id"] = component_id
-            context["inputs"] = expand_keywords(list(entry.inputs), obs_fields)
-
-            self.components[component_id] = module_cls(context)
+        instantiate_components(
+            architecture=architecture,
+            cfg=cfg,
+            env_manifesto=env_manifesto,
+            agent_id=agent_id,
+            activations=self.activations,
+            components=self.components,
+            memory=self.memory,
+            device=self.device,
+        )
 
         if checkpoint:
             self._load_checkpoint(checkpoint)
@@ -145,30 +220,12 @@ class Model:
         for field, value in next_observation.items():
             self.activations[f"next_{field}"] = value
         self.activations["done"] = float(done)
-
-        # Post-activate pass: components flagged `post_activate: True` in their
-        # library card metadata activate after next_* arrives, in declaration
-        # order. This lets components like RewardInference produce fields that
-        # enter memory on this step's push.
-        for component in self.components.values():
-            if component.metadata.get("post_activate", False):
-                component.activate(self.activations)
-
+        self.components["reward"].activate(self.activations)
         self.memory.push(**self.activations)
-
-        # Update pass: every component's update() is called in architecture
-        # declaration order (root-first convention). Strategy components write
-        # loss closures into `signals`; NN children read closures and train,
-        # or fall back to self-supervised on their declared target. Components
-        # with no learning no-op via the Component ABC default.
         signals = {}
-        report = {}
-        for component in self.components.values():
-            report.update(component.update(signals) or {})
-
+        report = self.components["action"].update(signals)
         # Partial clear: remove transient fields only. Action outputs (e.g.
-        # "internal_action") persist so stateful components can read them
-        # next step.
+        # "internal_action") persist so stateful components can read them next step.
         for key in [
             k for k in self.activations if k.startswith("next_") or k == "done"
         ]:
@@ -185,55 +242,3 @@ class Model:
             if hasattr(c, "checkpoint_data")
         }
         torch.save(data, path)
-
-    @staticmethod
-    def fill_plans(obs_shapes, action_space, plans, obs_fields, internal_actions=0):
-        """
-        Expand string size references in architecture to actual values from dynamic fields.
-        Normalize formats before adding them into the plans.
-        """
-        lookup = dict(obs_shapes)
-        lookup.update({k: v[0] for k, v in lookup.items()})
-        lookup["observation"] = "+".join(obs_fields)
-        lookup["next_observation"] = "+".join("next_" + f for f in obs_fields)
-
-        plans["n_env_actions"] = len(action_space)
-        plans["n_actions"] = len(action_space) + internal_actions
-        lookup["action"] = plans["n_actions"]
-
-        if "vision" in obs_shapes:
-            plans["vision_size"] = obs_shapes["vision"][1:]
-
-        if "target" in plans.get("metadata", {}):
-            plans["metadata"]["target"] = expand_keywords(
-                plans["metadata"]["target"], obs_fields
-            )
-
-        if "architecture" in plans.keys():
-            if "vision_net" in plans["architecture"] and "vision" in obs_shapes:
-                channels, height, width = obs_shapes["vision"]
-                for layer in plans["architecture"]["vision_net"]:
-                    if layer["type"] == "conv":
-                        kernel = layer["kernel"]
-                        height = height - kernel + 1
-                        width = width - kernel + 1
-                        channels = layer["size"]
-                plans["vision_encoded_shape"] = [height, width, channels]
-                lookup["vision_encoded"] = height * width * channels
-
-            for plan_name, plan in plans["architecture"].items():
-                for layer in plan:
-                    if "source" in layer.keys():
-                        source = layer["source"]
-                        if "+" in source:
-                            layer["size"] = sum(
-                                lookup[src] for src in source.split("+")
-                            )
-                        else:
-                            layer["size"] = lookup[source]
-                    if layer["type"] == "unflatten":
-                        shape = plans["vision_encoded_shape"]
-                        layer["size"] = [shape[0], shape[1], shape[2]]
-                    if "size" in layer.keys():
-                        last_size = layer["size"]
-                lookup[plan_name] = last_size

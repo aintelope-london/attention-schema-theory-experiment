@@ -156,11 +156,87 @@ def _render_optimality_scatter(block_data):
     return figure
 
 
+# ── Probe renderers ──────────────────────────────────────────────────────────
+
+
+def _probe_unwrap(output):
+    """Reduce NeuralNet dict-outputs or other nested shapes to a single ndarray."""
+    if isinstance(output, dict):
+        if len(output) == 1:
+            return np.asarray(next(iter(output.values())))
+        return np.concatenate([np.asarray(v).flatten() for v in output.values()])
+    return np.asarray(output)
+
+
+def _render_scalar_probe(ax, cid, agents, block):
+    for i, (agent_id, data) in enumerate(agents.items()):
+        values = [float(_probe_unwrap(o).item()) for o in data["outputs"]]
+        ax.plot(
+            range(len(values)),
+            values,
+            label=str(agent_id),
+            color=get_color(i),
+            marker="o",
+        )
+    ax.set_xlabel("Probe step")
+    ax.set_ylabel(cid)
+    ax.set_title(f"{block} — {cid}")
+    if len(agents) > 1:
+        ax.legend()
+
+
+def _render_vector_probe(ax, cid, agents, block):
+    first = next(iter(agents.values()))
+    values = np.stack([_probe_unwrap(o).flatten() for o in first["outputs"]])
+    n_steps, dim = values.shape
+    xs = np.arange(n_steps)
+    width = 0.8 / dim
+    for k in range(dim):
+        ax.bar(
+            xs + k * width, values[:, k], width, label=f"[{k}]", color=get_color(k)
+        )
+    ax.set_xlabel("Probe step")
+    ax.set_ylabel(cid)
+    ax.set_title(f"{block} — {cid}")
+    ax.legend()
+
+
+def _render_spatial_probe(ax, cid, agents, block):
+    first = next(iter(agents.values()))
+    arr = _probe_unwrap(first["outputs"][0])
+    if arr.ndim == 3:
+        arr = arr.sum(axis=0)
+    render_heatmap(ax, arr, f"{block} — {cid}")
+
+
+_PROBE_RENDERERS = {
+    0: _render_scalar_probe,
+    1: _render_vector_probe,
+    2: _render_spatial_probe,
+    3: _render_spatial_probe,
+}
+
+
+def _render_component_probe(block_data):
+    if block_data is None or not block_data.get("components"):
+        return None
+    components = block_data["components"]
+    block = block_data["block"]
+    figure, axes = create_figure_grid(len(components))
+    for ax, (cid, agents) in zip(axes, components.items()):
+        first_output = next(iter(agents.values()))["outputs"][0]
+        ndim = _probe_unwrap(first_output).ndim
+        _PROBE_RENDERERS.get(ndim, _render_scalar_probe)(ax, cid, agents, block)
+    figure.tight_layout()
+    return figure
+
+
 _BLOCK_RENDERERS = {
     "visitation_heatmap": _render_visitation_heatmap,
     "action_distribution": _render_action_distribution,
     "roi_turn_distribution": _render_roi_turn_distribution,
     "optimal_efficiency": _render_optimality_scatter,
+    "component_probe": _render_component_probe,
 }
 
 

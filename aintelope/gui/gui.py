@@ -364,7 +364,7 @@ def create_widget(
 
         def browse():
             path = filedialog.askopenfilename(
-                title="Select model file",
+                title="Select checkpoint file",
                 initialdir=range_or_choices,
                 filetypes=[("PyTorch checkpoint", "*.pt"), ("All files", "*.*")],
             )

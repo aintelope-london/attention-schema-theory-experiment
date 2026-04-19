@@ -17,6 +17,7 @@ from aintelope.analytics.analytics import (
 
 
 #@pytest.mark.skip(reason="ModelBased debugging pending")
+#@pytest.mark.skip(reason="ModelBased debugging pending")
 def test_model_based_learns(base_learning_config):
     """main_agent with ModelBased architecture shows learning improvement."""
     cfg = OmegaConf.merge(
@@ -24,42 +25,44 @@ def test_model_based_learns(base_learning_config):
         {
             "train": {
                 "run": {
+                    "trials": 1,
                     "experiment": {
-                        "steps": 11,
-                        "episodes": 500,
+                        "steps": 20,
+                        "episodes": 2500,
+                        "test_mode": False,
                     },
                 },
                 "agent_params": {
-                    "roi_mode": None,
+                    "batch_size": 350,
+                    "replay_buffer_size": 30000,
+                    "gamma": 0.99,
                     "agents": {
                         "agent_0": {
-                            "architecture": {
-                                "action": {
-                                    "type": "ModelBased",
-                                    "inputs": ["dynamic", "value"],
-                                },
-                                "reward": {
-                                    "type": "RewardInference",
-                                    "inputs": ["observation"],
-                                },
-                                "dynamic": {
-                                    "type": "NextState-NN",
-                                    "inputs": ["observation"],
-                                },
-                                "value": {
-                                    "type": "StateValue-NN",
-                                    "inputs": ["observation"],
-                                },
-                            },
+                            "model": "model_based",
                         },
                     },
                 },
-                "env_params": {},
+                "env_params": {
+                    "map_size": 5,
+                    "goal": "reach_food",
+                },
+            },
+            "test": {
+                "run": {
+                    "experiment": {
+                        "steps": 10,
+                        "episodes": 500,
+                        "test_mode": True,
+                    },
+                    "analytics": {
+                        "optimal_efficiency": {"min_efficiency_pct": 0.8},
+                    },
+                },
             },
         },
     )
     result = run(cfg)
-    assert_learning_improvement(result["analytics"]["learning_improvement"]["train"])
+    report_optimal_policy(result["analytics"]["optimal_efficiency"]["test"])
 
 
 @pytest.mark.skip("89% with base DQN-FC 5x5")

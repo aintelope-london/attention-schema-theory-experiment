@@ -14,7 +14,7 @@ run:
     event_columns: [
       Run_id, Trial, Episode, Seed, Step, IsTest,
       Agent_id, Action, Reward, Done, Observation,
-      Position, Food_position, Internal_action]
+      Position, Food_position, Internal_action, Agent_outputs]
   write_outputs: True              # @ui bool
   analytics:
     run_summary: {}
@@ -40,7 +40,7 @@ run:
 
 agent_params:
   save_frequency: 50
-  custom_model: ""                 # @ui file outputs
+  custom_checkpoint: ""                 # @ui file outputs
   batch_size: 32                   # @ui int 1 100
   replay_buffer_size: 30000        # @ui int 0 30000
   gamma: 0.99                      # @ui float 0.0 1.0
@@ -74,4 +74,3 @@ env_params:
     - left
     - right
     - backward
-

@@ -413,3 +413,46 @@ def roi_food_alignment(results, params):
         )
         out[block] = {"series": aggregate_series(df, "Episode", "food_in_roi")}
     return out
+
+
+def component_probe(results, params):
+    """Package per-step component outputs from Agent_outputs for probe analysis.
+
+    Discovers component ids present in Agent_outputs and collects per-agent
+    output sequences paired with episode/step/observation metadata. Renders
+    (in analytics.py) via shape-dispatched probe renderers.
+
+    Params (optional):
+        component_ids: list[str] to restrict to a subset; default = all present.
+    """
+    requested_filter = params.get("component_ids")
+    out = {}
+    for block, data in results.items():
+        events = deserialize_events(data["events"])
+
+        all_cids = set()
+        for row in events["Agent_outputs"]:
+            all_cids.update(row.keys())
+        requested = requested_filter or sorted(all_cids)
+
+        components_data = {}
+        for cid in requested:
+            rows = events[events["Agent_outputs"].apply(lambda x: cid in x)]
+            if rows.empty:
+                continue
+            agents = {}
+            for agent_id in sorted(rows["Agent_id"].unique()):
+                agent_df = rows[rows["Agent_id"] == agent_id].sort_values(
+                    ["Episode", "Step"]
+                )
+                agents[agent_id] = {
+                    "outputs": [r[cid] for r in agent_df["Agent_outputs"]],
+                    "episodes": agent_df["Episode"].tolist(),
+                    "steps": agent_df["Step"].tolist(),
+                    "observations": agent_df["Observation"].tolist(),
+                }
+            components_data[cid] = agents
+
+        if components_data:
+            out[block] = {"components": components_data, "block": block}
+    return out
