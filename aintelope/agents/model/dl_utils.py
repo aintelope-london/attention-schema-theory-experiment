@@ -16,16 +16,16 @@ def checkpoint_path(outputs_dir, agent_id, i_trial):
     return Path(outputs_dir) / "checkpoints" / f"{agent_id}_trial_{i_trial}.pt"
 
 
-def select_checkpoint(outputs_dir, agent_id, i_trial, custom_model=""):
+def select_checkpoint(outputs_dir, agent_id, i_trial, custom_checkpoint=""):
     """Resolve which checkpoint to load for a given agent and trial.
 
     Resolution order:
-        1. custom_model path if set → use it directly
+        1. custom_checkpoint path if set → use it directly
         2. Glob checkpoints/{agent_id}_*.pt → sort alphabetically → index by i_trial % n
         3. None → fresh initialization
     """
-    if custom_model:
-        path = Path(custom_model)
+    if custom_checkpoint:
+        path = Path(custom_checkpoint)
         return path if path.exists() else None
 
     trial_ckpt = checkpoint_path(outputs_dir, agent_id, i_trial)

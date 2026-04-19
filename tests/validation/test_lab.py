@@ -16,8 +16,8 @@ from aintelope.analytics.analytics import (
 )
 
 
-#@pytest.mark.skip(reason="ModelBased debugging pending")
-#@pytest.mark.skip(reason="ModelBased debugging pending")
+# @pytest.mark.skip(reason="ModelBased debugging pending")
+# @pytest.mark.skip(reason="ModelBased debugging pending")
 def test_model_based_learns(base_learning_config):
     """main_agent with ModelBased architecture shows learning improvement."""
     cfg = OmegaConf.merge(

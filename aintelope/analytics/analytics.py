@@ -192,9 +192,7 @@ def _render_vector_probe(ax, cid, agents, block):
     xs = np.arange(n_steps)
     width = 0.8 / dim
     for k in range(dim):
-        ax.bar(
-            xs + k * width, values[:, k], width, label=f"[{k}]", color=get_color(k)
-        )
+        ax.bar(xs + k * width, values[:, k], width, label=f"[{k}]", color=get_color(k))
     ax.set_xlabel("Probe step")
     ax.set_ylabel(cid)
     ax.set_title(f"{block} — {cid}")

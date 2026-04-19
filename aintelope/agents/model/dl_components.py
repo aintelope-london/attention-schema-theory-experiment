@@ -406,6 +406,7 @@ def epsilon(max_episodes, greedy_until, episode):
     epsilon = max(1.0 - episode / explore_episodes, 0.0)
     return epsilon
 
+
 class ModelBased(Component):
     """Model-based RL -- MCTS over dynamics, value, and reward components.
 
@@ -529,4 +530,3 @@ class MCTSNode:
             return float("inf")
         exploration = c_puct * np.sqrt(np.log(self.parent.visits) / self.visits)
         return self.value() + exploration
-    

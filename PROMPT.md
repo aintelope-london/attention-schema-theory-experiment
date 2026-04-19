@@ -69,6 +69,8 @@ THIRD PRINCIPLE: CORRECT RESPONSIBILITY
    - Result reviewer is one of these special permissions: variables related to creating analytical media is left for the end-user, and they can modify these variables via the results-viewer GUI element.
    - Config declares what exists; nothing is filtered after generation.
 - Null object / identity element -pattern: no ifs to check if content is present, an empty case is a valid input that flows through the same code path and produces a no-op result. You never ask "is there something?", you just do it.
+-Config is law; code obeys.
+Every config field is the author's responsibility, authored correctly in one canonical place. Code reads and uses — never derives one config field from another, never reconciles related fields, never validates authored consistency. Cross-field rules (e.g. steps == len(script)) belong in the schema-validator, nowhere else. If authored config is wrong, code fails loud at the consumption site; it does not paper over.
 - DOCUMENTATION.md:
    - Special permissions to break these patterns can be given if they serve a particular design CHOICE we have made. And those choices should reside in the DOCUMENTATION. If it is not there, it does NOT have the special permission, and is thus something we need to discuss.
 - OTHER:
